@@ -1,0 +1,1111 @@
+# Project: Smart Personal Finance & Money Management System
+
+Act as a Senior Full-Stack Software Architect, Financial Application Developer, Database Architect, and UI/UX Designer.
+
+I want you to build a complete, production-quality, responsive Personal Finance Management Website that helps me manage my money effectively, track every transaction, control spending, manage credit cards and bank accounts, monitor investments, and plan my financial future.
+
+This should not be a basic expense tracker. It should be an intelligent personal finance management system with accurate financial calculations and logical transaction handling.
+
+Build the complete working application, including frontend, backend, database, authentication, financial calculations, notifications, and email reminders.
+
+# 1. Technology Stack
+
+Use the following technologies:
+
+**Frontend (separate folder)**
+- React.js
+- Vite
+- JavaScript or TypeScript
+- Tailwind CSS
+- Shadcn UI
+- React Router
+- Recharts for charts and analytics
+- Lucide React icons
+- Axios for API communication
+- React Hook Form with validation
+- Sonner for toast notifications
+
+**Backend (separate folder)**
+- Node.js
+- Express.js
+- MongoDB Atlas
+- Mongoose
+- JWT authentication
+- bcrypt for password hashing
+- Node Cron for scheduled reminders
+- Nodemailer for email notifications
+- Express Validator or Zod for validation
+
+**Deployment requirements**
+- Frontend must be deployable on Vercel.
+- Backend must be deployable on Render.
+- Database must use MongoDB Atlas.
+- Use environment variables for all secrets and configuration.
+- The project must be compatible with free hosting tiers wherever available.
+- Do not depend on paid APIs or services for core functionality.
+
+# 2. Main Dashboard
+
+Create a modern financial dashboard that displays:
+
+1. Total available money.
+2. Total bank account balance.
+3. Total cash balance.
+4. Total credit card outstanding.
+5. Total monthly income.
+6. Total monthly expenses.
+7. Total investments.
+8. Total emergency fund.
+9. Total savings.
+10. Remaining monthly budget.
+11. Upcoming credit card bills.
+12. Upcoming FD maturity dates.
+13. Recent transactions.
+14. Monthly spending summary.
+
+The dashboard should have a clean overview of my financial position.
+
+Use separate cards for different financial categories.
+
+Important: Do not add credit card outstanding to available money. Do not count investments and emergency funds as ordinary spending money.
+
+# 3. Income and Money Allocation System
+
+Whenever I receive money, I should be able to add it as income.
+
+Income sources should include:
+- Salary
+- Freelancing
+- Business income
+- Interest
+- Bonus
+- Gift received
+- Other income
+
+When adding income, provide:
+
+- Amount
+- Date
+- Income source
+- Receiving account or payment method
+- Description
+- Notes
+
+After receiving money, I should be able to allocate it into different financial categories.
+
+Create these main allocation categories:
+
+1. Essential
+2. Fun
+3. Investment
+4. Emergency Fund
+5. Savings
+
+Allow me to set a budget for each category before spending.
+
+For example:
+
+Monthly income: ₹40,000
+
+| Category | Allocated budget |
+| Essential | ₹18,000 |
+| Fun | ₹4,000 |
+| Investment | ₹8,000 |
+| Emergency Fund | ₹5,000 |
+| Savings | ₹5,000 |
+
+The application should automatically calculate:
+
+- Allocated amount
+- Amount spent
+- Remaining amount
+- Percentage utilized
+- Budget exceeded amount
+
+Allow me to modify the allocation whenever required.
+
+Important:
+- Allocation is not an expense.
+- Moving money between categories must not create additional income or expenses.
+- Spending from an allocation must reduce its available budget.
+- Prevent accidental double deductions.
+- Unused allocation should carry forward only if I explicitly enable that option.
+
+# 4. Daily Expense Management
+
+Create an easy-to-use Add Transaction section.
+
+Every time I spend money, I should be able to enter:
+
+- Amount
+- Transaction date
+- Transaction description
+- Main category
+- Subcategory
+- Payment method
+- Account or card used
+- Notes
+
+First, I should select one of these three spending types:
+
+**A. Essential**
+
+Essential expense subcategories:
+
+- Food
+- Clothing
+- Travel
+- Rent
+- Family
+- Gifts
+- Mobile Recharge
+- Internet
+- Electricity
+- Medical
+- Education
+- Groceries
+- Household
+- Personal Care
+- Other
+
+**B. Fun**
+
+Fun expense subcategories:
+
+- Entertainment
+- Movies
+- Restaurants
+- Shopping
+- Gaming
+- Trips
+- Hobbies
+- Eating Outside
+- Other
+
+**C. Investment**
+
+Investment subcategories:
+
+- Fixed Deposit
+- Recurring Deposit
+- Mutual Funds
+- Stocks
+- Gold
+- Bonds
+- Other Investments
+
+If I select Others in any category, display an additional text input where I can write the custom category name.
+
+All categories and subcategories should be manageable through settings.
+
+Every transaction should update the corresponding allocation and account balance correctly.
+
+# 5. Payment Method Management
+
+Before adding a transaction, I must be able to select how I paid.
+
+Create two primary payment methods:
+
+**A. Cash**
+
+If I select Cash:
+- Deduct the transaction amount from my cash balance.
+- Update the appropriate spending allocation.
+- Record the transaction.
+
+**B. Online Payment**
+
+If I select Online, display my previously registered digital payment methods.
+
+I should be able to add and manage multiple digital payment methods.
+
+Examples:
+
+- HDFC Bank
+- SBI
+- ICICI Bank
+- Axis Bank
+- UPI
+- Debit Card
+- Credit Card
+- Other Wallets
+
+For every payment method, allow me to enter:
+
+- Bank name
+- Account holder name
+- Account type (Savings / Current / Other)
+- Account nickname
+- Account number (masked or last four digits only)
+- Payment method type
+- Opening balance
+- Current balance
+- Notes
+
+For cards, additionally provide:
+- Card name
+- Card type (Credit / Debit)
+- Issuing bank
+- Last four digits
+- Credit limit (for credit cards)
+- Billing cycle
+- Statement generation date
+- Payment due date
+
+Allow adding, editing, activating, and deactivating payment methods.
+
+Never store full card numbers, CVV, PIN, UPI PIN, or banking passwords.
+
+# 6. Bank Account Management
+
+Create a separate Bank Management module.
+
+Each bank account must have its own independent balance.
+
+I should be able to:
+
+- Add a bank account.
+- Edit account details.
+- Add money.
+- Withdraw money.
+- View transaction history.
+- Check current balance.
+- View monthly deposits and withdrawals.
+
+Create a separate transaction type called **Money Deposit / Add Money**.
+
+For example:
+
+If I receive ₹40,000 salary in my HDFC account, I can record:
+
+Transaction Type: Income
+Source: Salary
+Amount: ₹40,000
+Receiving Account: HDFC Savings Account.
+
+The HDFC account balance should increase by ₹40,000.
+
+Also support:
+- Cash deposits into bank.
+- Cash withdrawals from bank.
+- Bank-to-bank transfers.
+- UPI transfers.
+- Account adjustments.
+
+IMPORTANT FINANCIAL LOGIC:
+
+Bank transfers must be treated differently from income and expenses.
+
+Example:
+
+Transfer ₹5,000 from HDFC to SBI.
+
+- HDFC balance decreases by ₹5,000.
+- SBI balance increases by ₹5,000.
+- Total money remains unchanged.
+- No income or expense should be generated.
+
+Similarly, cash withdrawal from a bank is not an expense. It is a transfer from bank balance to cash balance.
+
+Maintain a complete account-wise ledger.
+
+# 7. Credit Card Management
+
+This is one of the most important modules.
+
+Create a dedicated Credit Card Management section.
+
+I should be able to register multiple credit cards.
+
+For every credit card, store:
+
+- Card name
+- Bank name
+- Card nickname
+- Last four digits
+- Credit limit
+- Available credit
+- Outstanding balance
+- Statement generation date
+- Payment due date
+- Billing cycle
+- Current billing amount
+- Previous unpaid balance
+
+Automatically calculate:
+
+Available Credit = Credit Limit - Current Outstanding Balance.
+
+Whenever I purchase something using a credit card:
+
+1. Record the purchase as an expense.
+2. Deduct the amount from the appropriate Essential or Fun allocation.
+3. Increase the credit card outstanding balance.
+4. Do not deduct money from my bank account immediately.
+5. Update available credit.
+
+Example:
+
+I purchase groceries worth ₹2,000 using my HDFC credit card.
+
+- Essential expenses increase by ₹2,000.
+- HDFC credit card outstanding increases by ₹2,000.
+- Available credit decreases by ₹2,000.
+- Bank balance remains unchanged.
+
+## Credit Card Bill Payment
+
+Create a separate Credit Card Bill Payment section.
+
+I should be able to see:
+
+- Card name
+- Total outstanding
+- Statement amount
+- Minimum amount due
+- Due date
+- Payment status
+- Previous bill payments
+- Remaining outstanding
+
+When I pay a credit card bill, I must select:
+
+- Credit card being paid.
+- Payment amount.
+- Payment date.
+- Source bank account or payment method.
+- Transaction reference.
+- Notes.
+
+Example:
+
+HDFC credit card outstanding = ₹10,000.
+
+I pay ₹10,000 from my SBI bank account.
+
+The system must:
+
+- Reduce SBI balance by ₹10,000.
+- Reduce HDFC credit card outstanding by ₹10,000.
+- Mark the bill as Paid.
+- Show zero outstanding if the entire amount has been paid.
+- Record the payment in the credit card payment history.
+
+CRITICAL RULE: Credit card bill payments must NEVER be counted as new monthly expenses.
+
+The original purchases have already been counted as expenses when they occurred.
+
+Paying the credit card bill is only a settlement of an existing liability.
+
+If I pay only ₹7,000 out of ₹10,000, the remaining outstanding should be ₹3,000.
+
+Never automatically show zero for a partially paid bill.
+
+If I pay the entire outstanding, show ₹0 outstanding and Paid status.
+
+Avoid duplicate expense entries.
+
+## Credit Card Bill Reminders
+
+Automatically schedule a reminder on the 25th of every month.
+
+Display:
+- Upcoming credit card bills.
+- Due dates.
+- Outstanding amounts.
+- Paid / Unpaid status.
+
+Also send email reminders for upcoming bills.
+
+Allow me to customize the reminder date and notification preferences.
+
+If a bill has already been paid, do not send unnecessary payment reminders.
+
+# 8. Emergency Fund Management
+
+Create a completely separate Emergency Fund module.
+
+This fund must not be mixed with ordinary spending allocations.
+
+Features:
+
+- Set an emergency fund target.
+- Add money to the emergency fund.
+- Withdraw money when necessary.
+- View total emergency savings.
+- View remaining amount to reach the target.
+- Track deposits and withdrawals.
+- Display progress percentage.
+
+Example:
+
+Emergency Fund Target: ₹1,00,000
+Current Emergency Fund: ₹30,000
+Remaining: ₹70,000.
+
+Emergency fund deposits and withdrawals must not be counted as ordinary expenses.
+
+If money is transferred from a bank account to the emergency fund, deduct it from the source account and increase the emergency fund balance without counting it twice.
+
+# 9. Investment Management
+
+Create a dedicated Investment Portfolio module.
+
+I should be able to record and monitor different investments.
+
+Investment types:
+
+- Fixed Deposit
+- Recurring Deposit
+- Mutual Funds
+- Stocks
+- Gold
+- Bonds
+- Other Investments
+
+For every investment, provide:
+
+- Investment name
+- Investment type
+- Initial invested amount
+- Investment date
+- Current value
+- Expected return
+- Actual return
+- Investment duration
+- Maturity date (where applicable)
+- Risk level
+- Notes
+
+Automatically calculate:
+
+Total Invested Amount.
+
+Current Portfolio Value.
+
+Total Gain or Loss.
+
+Return Percentage.
+
+Formula:
+
+Profit/Loss = Current Value - Invested Amount
+
+Return Percentage = (Profit/Loss / Invested Amount) × 100
+
+## Investment Risk Analysis
+
+For every investment, provide a risk classification:
+
+- Very Low Risk
+- Low Risk
+- Moderate Risk
+- High Risk
+- Very High Risk
+
+Display:
+- Investment risk level.
+- Expected gain.
+- Actual gain or loss.
+- Investment allocation percentage.
+- Portfolio diversification.
+- Total portfolio exposure.
+
+Do not invent guaranteed returns.
+
+For manually entered investments, clearly label expected returns as estimates.
+
+For market-linked investments, allow me to update current market value manually. Do not display fabricated real-time market prices.
+
+## Fixed Deposit Management
+
+FD management must have a separate detailed section.
+
+For every FD, record:
+
+- Bank name
+- FD name
+- Principal amount
+- Interest rate
+- Compounding frequency
+- Start date
+- Maturity date
+- Duration
+- Maturity amount
+- Interest earned
+- Auto-renewal status
+
+Calculate maturity value based on the interest rate and compounding frequency.
+
+Display upcoming maturity dates.
+
+Send reminders before maturity, such as:
+- 30 days before.
+- 7 days before.
+- On maturity date.
+
+Allow customizable reminders.
+
+Maintain historical FD records after maturity.
+
+# 10. Savings Management
+
+Create a separate Savings module.
+
+I should be able to create multiple savings goals.
+
+Examples:
+- New Laptop
+- Emergency Travel
+- Vacation
+- New Phone
+- Future Education
+- Personal Goals
+
+For every goal:
+
+- Goal name
+- Target amount
+- Current saved amount
+- Target date
+- Monthly contribution
+- Progress percentage
+
+Show a progress bar for each goal.
+
+# 11. Financial Analytics and Reports
+
+Create a comprehensive financial analytics module.
+
+I want to analyze my money usage across different periods.
+
+Provide filters for:
+
+1. Daily
+2. Weekly
+3. Monthly
+4. Quarterly
+5. Half-yearly
+6. Yearly
+7. Custom date range
+
+Use Recharts to create professional, interactive charts.
+
+Required charts:
+
+**A. Expense Distribution - Pie Chart**
+
+Show Essential, Fun, and other expense categories.
+
+**B. Monthly Income vs Expense - Bar Chart**
+
+Compare income and expenses.
+
+**C. Spending Trend - Line Chart**
+
+Show how spending changes over time.
+
+**D. Investment Portfolio - Pie Chart**
+
+Show investment distribution by type.
+
+**E. Budget Utilization - Donut Chart**
+
+Show allocated, spent, and remaining budgets.
+
+**F. Account Balance Distribution**
+
+Compare money held in different bank accounts, cash, and other financial holdings.
+
+**G. Savings and Emergency Fund Progress**
+
+Show progress toward financial goals.
+
+Every chart must have:
+- Proper labels.
+- Tooltips.
+- Legends.
+- Correct percentage calculations.
+- Responsive design.
+- Currency formatting in INR.
+
+Provide detailed reports for every period.
+
+Allow exporting financial reports to CSV and PDF.
+
+# 12. Notifications and Reminders
+
+Create an intelligent notification system.
+
+There should be two types of notifications.
+
+**A. In-App Notifications**
+
+Whenever I log in to the website, display a notification icon with unread notification count.
+
+Show reminders for:
+
+- Upcoming credit card payments.
+- Unpaid credit card bills.
+- Upcoming FD maturity dates.
+- Budget exceeded alerts.
+- Low bank account balance.
+- Emergency fund progress.
+- Savings goal updates.
+- Upcoming financial commitments.
+
+Provide:
+- Notification history.
+- Read / Unread status.
+- Mark all as read.
+- Notification preferences.
+
+**B. Email Notifications**
+
+Create a separate email notification system in the backend.
+
+Use Nodemailer with SMTP configuration.
+
+Email reminders should include:
+
+- Credit card bill reminders.
+- Upcoming FD maturity reminders.
+- Important financial alerts.
+- Monthly financial summary.
+
+Email notification logic must be placed in a dedicated backend folder, separate from the main transaction logic.
+
+Suggested backend structure:
+
+backend/
+  src/
+    config/
+    controllers/
+    models/
+    routes/
+    services/
+    middleware/
+    utils/
+    notifications/
+      notification.service.js
+      notification.scheduler.js
+      email.service.js
+      email.templates/
+    jobs/
+    validators/
+    app.js
+    server.js
+
+Use Node Cron for scheduled reminders.
+
+Avoid duplicate email notifications. Store notification history and track which reminders have already been sent.
+
+Use environment variables for SMTP credentials.
+
+# 13. Transaction History
+
+Create a complete transaction history section.
+
+Display all financial activities:
+
+- Income
+- Expenses
+- Bank deposits
+- Cash withdrawals
+- Bank transfers
+- Credit card purchases
+- Credit card bill payments
+- Investment deposits
+- Investment withdrawals
+- Emergency fund deposits
+- Emergency fund withdrawals
+- Savings contributions
+
+Every transaction should include:
+
+- Transaction ID
+- Date
+- Transaction type
+- Category
+- Amount
+- Payment method
+- Source account
+- Destination account (where applicable)
+- Description
+- Status
+
+Provide:
+- Search.
+- Date filters.
+- Category filters.
+- Payment method filters.
+- Edit transaction.
+- Delete transaction with confirmation.
+- Transaction details.
+
+IMPORTANT: Editing or deleting a transaction must correctly reverse its previous balance and allocation effects before applying the updated transaction.
+
+Maintain an audit trail for important financial modifications.
+
+# 14. Financial Calculation Rules
+
+These rules are mandatory.
+
+Implement a reliable financial ledger and ensure every financial operation is handled exactly once.
+
+1. Income increases the receiving account balance.
+2. Expenses decrease the corresponding cash or bank balance.
+3. Credit card purchases increase card outstanding but do not immediately reduce bank balance.
+4. Credit card bill payments decrease the paying bank account and card outstanding.
+5. Credit card bill payments must not create another expense.
+6. Bank transfers decrease one account and increase another.
+7. Cash withdrawals are transfers, not expenses.
+8. Cash deposits into a bank are transfers, not income.
+9. Emergency fund deposits and savings contributions are internal allocations or transfers, not additional expenses.
+10. Investment purchases should reduce available cash/bank funds and increase investment holdings.
+11. Investment gains and losses must update portfolio value, not ordinary income or expenses unless explicitly recorded as realized income.
+12. FD maturity should correctly account for principal and interest.
+13. Partial credit card payments must retain the unpaid balance.
+14. Refunds must reverse the original expense and restore the appropriate payment balance.
+15. Never count a single financial event twice.
+16. All balance calculations must be consistent across the dashboard, accounts, transaction history, and reports.
+
+Use database transactions where necessary to ensure that related balance updates happen atomically.
+
+Use proper decimal/money handling to avoid floating-point calculation errors. Store monetary values in integer paise wherever practical.
+
+# 15. Authentication and Security
+
+Create a secure authentication system.
+
+Features:
+- User registration.
+- Login.
+- Logout.
+- Forgot password.
+- Reset password.
+- JWT-based authentication.
+- Protected routes.
+- Password hashing.
+- Input validation.
+- Authorization checks.
+
+Each user must have access only to their own financial records.
+
+Do not expose financial information through public APIs.
+
+Never hardcode credentials or secrets.
+
+# 16. UI/UX Design Requirements
+
+Design a premium, modern financial dashboard.
+
+Design inspiration: Modern fintech applications such as professional banking dashboards.
+
+Visual style:
+- Clean and minimal.
+- Professional financial dashboard.
+- Modern typography.
+- Subtle shadows.
+- Rounded cards.
+- Consistent spacing.
+- Beautiful charts.
+- Smooth animations.
+- Responsive layouts.
+
+Suggested color palette:
+- Primary: Deep Navy / Blue.
+- Success: Green.
+- Warning: Orange.
+- Danger: Red.
+- Background: Light Grey / White.
+- Dark mode support.
+
+Layout:
+
+**Desktop**
+- Left sidebar navigation.
+- Top navigation bar.
+- Main dashboard.
+- Responsive financial cards and charts.
+
+**Mobile**
+- Mobile-friendly navigation.
+- Responsive transaction forms.
+- Properly optimized charts.
+- Easy one-hand transaction entry.
+
+Sidebar menu:
+
+1. Dashboard
+2. Add Transaction
+3. Income
+4. Expenses
+5. Budget Allocation
+6. Bank Accounts
+7. Cash Management
+8. Credit Cards
+9. Credit Card Bills
+10. Investments
+11. Fixed Deposits
+12. Emergency Fund
+13. Savings Goals
+14. Analytics & Reports
+15. Transaction History
+16. Notifications
+17. Settings
+
+# 17. Settings
+
+Create a comprehensive settings module.
+
+Include:
+- Profile management.
+- Currency selection (default INR).
+- Financial year settings.
+- Monthly budget settings.
+- Default budget categories.
+- Custom categories.
+- Payment method management.
+- Notification preferences.
+- Email preferences.
+- Reminder configuration.
+- Dark/light mode.
+- Export data.
+- Backup and restore options.
+
+# 18. Database Architecture
+
+Design a proper MongoDB schema using Mongoose.
+
+Create separate models or collections for:
+
+- Users
+- BankAccounts
+- CashWallets
+- CreditCards
+- Transactions
+- Budgets
+- BudgetAllocations
+- Investments
+- FixedDeposits
+- EmergencyFunds
+- SavingsGoals
+- Notifications
+- EmailLogs
+- RecurringTransactions
+
+Use appropriate references, indexes, timestamps, and validation.
+
+Ensure that every financial record is associated with the authenticated user.
+
+Use a ledger-based architecture for reliable balance tracking.
+
+# 19. Project Structure
+
+Keep frontend and backend completely separate.
+
+Project structure:
+
+money-management/
+  frontend/
+    src/
+      assets/
+      components/
+      pages/
+      layouts/
+      hooks/
+      contexts/
+      services/
+      utils/
+      charts/
+      routes/
+      App.jsx
+      main.jsx
+    public/
+    package.json
+    .env.example
+    vercel.json
+
+  backend/
+    src/
+      config/
+      controllers/
+      models/
+      routes/
+      services/
+      middleware/
+      validators/
+      notifications/
+      jobs/
+      utils/
+      app.js
+      server.js
+    package.json
+    .env.example
+    README.md
+
+  README.md
+
+# 20. Deployment
+
+Make the application ready for free-tier deployment.
+
+**Frontend: Vercel**
+- Configure Vite build.
+- Configure SPA routing rewrites.
+- Configure backend API URL using environment variables.
+- Ensure refresh works on every route.
+
+**Backend: Render**
+- Configure production start script.
+- Configure environment variables.
+- Configure CORS for the Vercel domain.
+- Add a health-check endpoint.
+- Configure MongoDB Atlas connection.
+- Ensure scheduled jobs and email notifications are properly configured.
+
+**MongoDB Atlas**
+- Create proper schemas and indexes.
+- Use a secure connection string.
+- Configure database access securely.
+
+Provide:
+- .env.example files.
+- Installation commands.
+- Local development instructions.
+- Production deployment instructions.
+- README documentation.
+
+Important: Free hosting providers may have sleeping instances or execution limitations. Design scheduled reminders so they can be reliably processed without sending duplicate notifications. Document any limitations and provide a suitable solution that does not require an expensive service.
+
+# 21. Development Instructions
+
+Follow these instructions strictly:
+
+1. First, design the complete application architecture.
+2. Then create the frontend and backend folders.
+3. Implement the MongoDB database models.
+4. Implement authentication.
+5. Implement the financial transaction and ledger services.
+6. Implement all financial calculation rules.
+7. Implement APIs.
+8. Build all frontend pages and components.
+9. Integrate frontend with backend.
+10. Implement charts and analytics.
+11. Implement notifications and email reminders.
+12. Test all financial calculations.
+13. Test all transaction scenarios.
+14. Prepare the deployment configuration.
+
+Do not create a frontend that only looks functional.
+
+Every button, form, chart, filter, and feature must work.
+
+Do not use static dummy data as a replacement for actual functionality.
+
+Use realistic seed data only for initial demonstration, and clearly distinguish demo data from actual user records.
+
+Implement proper loading states, empty states, validation errors, success messages, and error handling.
+
+# 22. Mandatory Financial Testing Scenarios
+
+Before declaring the project complete, test these scenarios:
+
+**Scenario 1: Salary**
+
+Receive ₹40,000 in HDFC.
+
+Expected:
+- HDFC balance increases by ₹40,000.
+- Income increases by ₹40,000.
+
+**Scenario 2: Cash Expense**
+
+Spend ₹500 on food using cash.
+
+Expected:
+- Cash balance decreases by ₹500.
+- Essential allocation decreases by ₹500.
+- Monthly expenses increase by ₹500.
+
+**Scenario 3: Credit Card Purchase**
+
+Purchase ₹2,000 using HDFC credit card.
+
+Expected:
+- Credit card outstanding increases by ₹2,000.
+- Essential expense increases by ₹2,000.
+- Bank balance remains unchanged.
+
+**Scenario 4: Credit Card Bill Payment**
+
+Pay ₹2,000 from SBI to settle the HDFC credit card bill.
+
+Expected:
+- SBI balance decreases by ₹2,000.
+- HDFC credit card outstanding becomes zero.
+- Bill status becomes Paid.
+- Monthly expenses do not increase again.
+
+**Scenario 5: Bank Transfer**
+
+Transfer ₹5,000 from HDFC to SBI.
+
+Expected:
+- HDFC decreases by ₹5,000.
+- SBI increases by ₹5,000.
+- Total available money remains unchanged.
+- No expense or income is created.
+
+**Scenario 6: Investment**
+
+Invest ₹5,000 in a mutual fund.
+
+Expected:
+- Bank balance decreases by ₹5,000.
+- Investment portfolio increases by ₹5,000.
+- Ordinary expenses do not increase.
+
+**Scenario 7: Emergency Fund**
+
+Move ₹3,000 from HDFC to the emergency fund.
+
+Expected:
+- HDFC decreases by ₹3,000.
+- Emergency fund increases by ₹3,000.
+- No ordinary expense is created.
+
+**Scenario 8: Partial Credit Card Payment**
+
+Outstanding is ₹10,000. Pay ₹7,000.
+
+Expected:
+- Paying account decreases by ₹7,000.
+- Outstanding becomes ₹3,000.
+- Bill remains partially unpaid.
+
+**Scenario 9: FD Maturity**
+
+Create an FD with a principal of ₹50,000, a defined interest rate, and a one-year duration.
+
+Expected:
+- Calculate maturity value correctly.
+- Show principal and interest separately.
+- Notify before maturity.
+
+# Final Requirement
+
+I want a complete, functional, secure, and deployable personal finance management website.
+
+Think like a financial software architect, not just a frontend developer.
+
+Prioritize financial calculation accuracy, transaction consistency, proper database architecture, and a simple user experience.
+
+If any requirement is ambiguous, choose the financially correct approach and document the assumption.
+
+Do not skip features, simplify financial logic, or replace working functionality with mockups.
+
+Start by presenting the architecture, folder structure, database design, and implementation plan. Then build the application module by module, ensuring that the entire system works together.
+
+The final application should allow me to manage my entire personal financial life from one place.
