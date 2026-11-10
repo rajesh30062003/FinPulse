@@ -70,8 +70,9 @@ export class EmailService {
     return emailLog;
   }
 
-  static async sendVerificationEmail(user: { id: string; email: string; name: string; token: string; otp: string }) {
-    const verifyUrl = `/verify-email?token=${encodeURIComponent(user.token)}&email=${encodeURIComponent(user.email)}`;
+  static async sendVerificationEmail(user: { id?: string; email: string; name: string; token?: string; otp: string }) {
+    const tokenParam = user.token ? `token=${encodeURIComponent(user.token)}&` : '';
+    const verifyUrl = `/verify-email?${tokenParam}email=${encodeURIComponent(user.email)}`;
     const htmlBody = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
         <div style="background: #0f172a; padding: 28px 32px; color: #ffffff;">

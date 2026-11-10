@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import {
   getDb,
   saveDatabase,
@@ -12,15 +13,57 @@ import {
   persistBankAccount,
   persistCashWallet,
   persistBudgetAllocation,
-  persistEmergencyFund
+  persistEmergencyFund,
+  persistRefreshToken,
+  findRefreshTokenByHash,
+  revokeRefreshToken,
+  revokeAllUserRefreshTokens,
+  persistEmailVerification,
+  findEmailVerification,
+  deleteEmailVerification
 } from '../db.js';
 import { LedgerService } from '../services/ledgerService.js';
 import { EmailService } from '../services/emailService.js';
 import { SchedulerService } from '../services/scheduler.js';
-import { ITransaction, IUser, IBankAccount, ICashWallet, IBudgetAllocation, IEmergencyFund } from '../types.js';
+import {
+  ITransaction,
+  IUser,
+  IBankAccount,
+  ICashWallet,
+  IBudgetAllocation,
+  IEmergencyFund,
+  IRefreshToken,
+  IEmailVerification
+} from '../types.js';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'finpulse_jwt_secret_dev_2026';
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || `${JWT_SECRET}_refresh_token_vault_2026`;
+
+function hashToken(val: string): string {
+  return crypto.createHash('sha256').update(val).digest('hex');
+}
+
+function setRefreshTokenCookie(res: Response, token: string) {
+  const isProduction = process.env.NODE_ENV === 'production';
+  res.cookie('finpulse_refresh_token', token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: isProduction ? 'none' : 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/'
+  });
+}
+
+function clearRefreshTokenCookie(res: Response) {
+  const isProduction = process.env.NODE_ENV === 'production';
+  res.clearCookie('finpulse_refresh_token', {
+    httpOnly: true,
+    secure: true,
+    sameSite: isProduction ? 'none' : 'lax',
+    path: '/'
+  });
+}
 
 // Health check endpoint inside API router (/api/health)
 router.get('/health', (req: Request, res: Response) => {
@@ -32,7 +75,8 @@ router.get('/health', (req: Request, res: Response) => {
   });
 });
 
-// Auth Middleware
+// ================= AUTHENTICATION MIDDLEWARE ================= //
+
 export interface AuthRequest extends Request {
   user?: { id: string; email: string };
 }
@@ -40,13 +84,7 @@ export interface AuthRequest extends Request {
 export function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    // If no token provided, fallback to demo user in dev for seamless UX
-    const db = getDb();
-    if (db.users.length > 0) {
-      req.user = { id: db.users[0].id, email: db.users[0].email };
-      return next();
-    }
-    return res.status(401).json({ error: 'Authentication required' });
+    return res.status(401).json({ error: 'Authentication required. Please log in.' });
   }
 
   const token = authHeader.split(' ')[1];
@@ -54,24 +92,22 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     const decoded = jwt.verify(token, JWT_SECRET) as { id: string; email: string };
     req.user = decoded;
     next();
-  } catch (err) {
-    // Fallback to first user if invalid token to avoid blocking user interaction in preview
-    const db = getDb();
-    if (db.users.length > 0) {
-      req.user = { id: db.users[0].id, email: db.users[0].email };
-      return next();
+  } catch (err: any) {
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Access token expired', code: 'TOKEN_EXPIRED' });
     }
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    return res.status(401).json({ error: 'Invalid or expired token. Please log in again.' });
   }
 }
 
-// ================= AUTH ROUTES ================= //
+// ================= AUTHENTICATION CONTROLLER ================= //
 
+// 1. REGISTRATION - Validate fields, prevent duplicate, store hashed OTP (5m expiry), send email
 router.post('/auth/register', async (req: Request, res: Response) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, confirmPassword } = req.body;
 
-    // 1. Validate inputs thoroughly
+    // Validate inputs
     if (!name || typeof name !== 'string' || name.trim().length < 2) {
       return res.status(400).json({ error: 'Full name is required (minimum 2 characters)' });
     }
@@ -85,118 +121,270 @@ router.post('/auth/register', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters in length' });
     }
 
+    if (confirmPassword !== undefined && password !== confirmPassword) {
+      return res.status(400).json({ error: 'Passwords do not match' });
+    }
+
     const cleanEmail = email.trim().toLowerCase();
     const cleanName = name.trim();
 
-    // 2. Check if user already exists in MongoDB Atlas or local store
-    const existing = await findUserByEmail(cleanEmail);
-    if (existing) {
-      return res.status(400).json({ error: 'An account with this email address already exists. Please sign in.' });
+    // Check if user is already registered and verified
+    const existingUser = await findUserByEmail(cleanEmail);
+    if (existingUser && existingUser.isVerified) {
+      return res.status(400).json({ error: 'An account with this email address already exists. Please log in.' });
     }
 
-    // 3. Securely hash password
-    const passwordHash = await bcrypt.hash(password, 10);
-    const userId = `user-${Date.now()}`;
+    // Check resend cooldown on existing pending verification
+    const existingVerif = await findEmailVerification(cleanEmail);
+    if (existingVerif && Date.now() - existingVerif.lastSentAt < 60000) {
+      const waitSec = Math.ceil((60000 - (Date.now() - existingVerif.lastSentAt)) / 1000);
+      return res.status(429).json({ error: `Please wait ${waitSec} seconds before requesting another code.` });
+    }
+
+    // Generate secure 6-digit OTP & hash both OTP and password
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const token = Buffer.from(`${userId}-${Date.now()}-${Math.random()}`).toString('base64');
+    const otpHash = hashToken(otp);
+    const passwordHash = await bcrypt.hash(password, 10);
 
-    const newUser: IUser = {
-      id: userId,
-      name: cleanName,
+    // Save pending verification with 5-minute expiration
+    const verificationRecord: IEmailVerification = {
+      id: `verif-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       email: cleanEmail,
+      name: cleanName,
       passwordHash,
-      isVerified: false,
-      verificationToken: token,
-      verificationOtp: otp,
-      currency: 'INR',
-      monthlyBudgetInPaise: 4000000,
-      reminderDayOfMonth: 25,
-      emailNotificationsEnabled: true,
+      otpHash,
+      expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
+      attempts: 0,
+      verified: false,
+      lastSentAt: Date.now(),
       createdAt: new Date().toISOString()
     };
+    await persistEmailVerification(verificationRecord);
 
-    // 4. Save user to MongoDB Atlas & resilient store
-    await persistUser(newUser);
-
-    // 5. Seed initial accounts for the newly registered user
-    const bankAccount: IBankAccount = {
-      id: `bank-${Date.now()}`,
-      userId,
-      bankName: 'Primary Bank',
-      accountHolderName: cleanName,
-      accountType: 'Savings',
-      accountNickname: 'Savings Account',
-      accountNumberMasked: '•••• 1234',
-      balanceInPaise: 0,
-      openingBalanceInPaise: 0,
-      isActive: true,
-      createdAt: new Date().toISOString()
-    };
-    await persistBankAccount(bankAccount);
-
-    const cashWallet: ICashWallet = {
-      id: `cash-${Date.now()}`,
-      userId,
-      balanceInPaise: 0,
-      updatedAt: new Date().toISOString()
-    };
-    await persistCashWallet(cashWallet);
-
-    const now = new Date();
-    const currentMonthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const budgetAllocation: IBudgetAllocation = {
-      id: `budget-${userId}`,
-      userId,
-      monthYear: currentMonthYear,
-      essentialBudgetInPaise: 2000000,
-      funBudgetInPaise: 500000,
-      investmentBudgetInPaise: 500000,
-      emergencyBudgetInPaise: 500000,
-      savingsBudgetInPaise: 500000,
-      carryForwardEnabled: false
-    };
-    await persistBudgetAllocation(budgetAllocation);
-
-    const emergencyFund: IEmergencyFund = {
-      id: `ef-${Date.now()}`,
-      userId,
-      targetAmountInPaise: 10000000,
-      currentBalanceInPaise: 0,
-      updatedAt: new Date().toISOString()
-    };
-    await persistEmergencyFund(emergencyFund);
-
-    // 6. Send verification email via automated service
+    // Dispatch verification email via Nodemailer
     await EmailService.sendVerificationEmail({
-      id: userId,
       email: cleanEmail,
       name: cleanName,
-      token,
-      otp
+      otp,
+      token: ''
     });
 
-    const jwtToken = jwt.sign({ id: userId, email: cleanEmail }, JWT_SECRET, { expiresIn: '7d' });
-
-    // 7. Return JSON response with status 201
-    return res.status(201).json({
+    // Pure secure JSON response WITHOUT leaking the OTP
+    return res.status(200).json({
       success: true,
-      message: 'Registration successful. Verification email sent.',
-      user: {
-        id: userId,
-        name: cleanName,
-        email: cleanEmail,
-        isVerified: false,
-        currency: 'INR'
-      },
-      token: jwtToken,
-      otpSent: otp
+      message: 'Verification code sent to your email. Code expires in 5 minutes.',
+      email: cleanEmail,
+      expiresInSeconds: 300
     });
   } catch (err: any) {
-    console.error('Registration route error:', err);
+    console.error('Registration error:', err);
     return res.status(500).json({ error: err.message || 'Registration failed' });
   }
 });
 
+// 2. EMAIL VERIFICATION - Verify hashed OTP, enforce max 5 attempts, activate account
+router.post('/auth/verify-email', async (req: Request, res: Response) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ error: 'Email and 6-digit verification code are required' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const verif = await findEmailVerification(cleanEmail);
+
+    if (!verif) {
+      return res.status(400).json({ error: 'No pending verification found. Please register first.' });
+    }
+
+    // Check expiration (5 minutes)
+    if (Date.now() > verif.expiresAt) {
+      return res.status(400).json({ error: 'Verification code has expired. Please request a new code.' });
+    }
+
+    // Check attempts limit (max 5)
+    if (verif.attempts >= 5) {
+      return res.status(400).json({ error: 'Too many failed verification attempts. Please request a new code.' });
+    }
+
+    // Validate OTP hash
+    const enteredOtpHash = hashToken(otp.trim());
+    if (enteredOtpHash !== verif.otpHash) {
+      verif.attempts += 1;
+      await persistEmailVerification(verif);
+      const remaining = 5 - verif.attempts;
+      return res.status(400).json({
+        error: `Invalid verification code. ${remaining > 0 ? remaining + ' attempt(s) remaining.' : 'Code locked. Please request a new one.'}`
+      });
+    }
+
+    // OTP is valid! Activate or create user account
+    let user = await findUserByEmail(cleanEmail);
+    const userId = user ? user.id : `user-${Date.now()}`;
+
+    if (!user) {
+      user = {
+        id: userId,
+        name: verif.name,
+        email: cleanEmail,
+        passwordHash: verif.passwordHash,
+        isVerified: true,
+        accountStatus: 'active',
+        failedLoginAttempts: 0,
+        currency: 'INR',
+        monthlyBudgetInPaise: 4000000,
+        reminderDayOfMonth: 25,
+        emailNotificationsEnabled: true,
+        createdAt: new Date().toISOString()
+      };
+      await persistUser(user);
+
+      // Seed starter accounts for the new verified user
+      const bankAccount: IBankAccount = {
+        id: `bank-${Date.now()}`,
+        userId,
+        bankName: 'Primary Bank',
+        accountHolderName: verif.name,
+        accountType: 'Savings',
+        accountNickname: 'Primary Savings',
+        accountNumberMasked: '•••• 1234',
+        balanceInPaise: 0,
+        openingBalanceInPaise: 0,
+        isActive: true,
+        createdAt: new Date().toISOString()
+      };
+      await persistBankAccount(bankAccount);
+
+      const cashWallet: ICashWallet = {
+        id: `cash-${Date.now()}`,
+        userId,
+        balanceInPaise: 0,
+        updatedAt: new Date().toISOString()
+      };
+      await persistCashWallet(cashWallet);
+
+      const now = new Date();
+      const currentMonthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const budgetAllocation: IBudgetAllocation = {
+        id: `budget-${userId}`,
+        userId,
+        monthYear: currentMonthYear,
+        essentialBudgetInPaise: 2000000,
+        funBudgetInPaise: 500000,
+        investmentBudgetInPaise: 500000,
+        emergencyBudgetInPaise: 500000,
+        savingsBudgetInPaise: 500000,
+        carryForwardEnabled: false
+      };
+      await persistBudgetAllocation(budgetAllocation);
+
+      const emergencyFund: IEmergencyFund = {
+        id: `ef-${Date.now()}`,
+        userId,
+        targetAmountInPaise: 10000000,
+        currentBalanceInPaise: 0,
+        updatedAt: new Date().toISOString()
+      };
+      await persistEmergencyFund(emergencyFund);
+    } else {
+      user.isVerified = true;
+      user.passwordHash = verif.passwordHash;
+      user.accountStatus = 'active';
+      user.failedLoginAttempts = 0;
+      await persistUser(user);
+    }
+
+    // Clean up used verification record
+    await deleteEmailVerification(cleanEmail);
+
+    // Issue tokens
+    const accessToken = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '15m' });
+    const refreshToken = jwt.sign(
+      { id: user.id, email: user.email, jti: crypto.randomUUID() },
+      JWT_REFRESH_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Store hashed refresh token in database
+    await persistRefreshToken({
+      id: `token-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      userId: user.id,
+      tokenHash: hashToken(refreshToken),
+      expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+      revoked: false,
+      createdAt: new Date().toISOString()
+    });
+
+    setRefreshTokenCookie(res, refreshToken);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Account verified and activated successfully!',
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        isVerified: true,
+        currency: user.currency,
+        monthlyBudgetInPaise: user.monthlyBudgetInPaise
+      }
+    });
+  } catch (err: any) {
+    console.error('Email verification error:', err);
+    return res.status(500).json({ error: err.message || 'Verification failed' });
+  }
+});
+
+// 3. RESEND OTP - 60s cooldown, resets attempt counter, sends new code
+router.post('/auth/resend-otp', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email address is required' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const verif = await findEmailVerification(cleanEmail);
+
+    if (!verif) {
+      return res.status(400).json({ error: 'No pending registration found for this email. Please register.' });
+    }
+
+    // 60-second cooldown
+    const elapsed = Date.now() - verif.lastSentAt;
+    if (elapsed < 60000) {
+      const waitSec = Math.ceil((60000 - elapsed) / 1000);
+      return res.status(429).json({ error: `Please wait ${waitSec} seconds before requesting a new code.` });
+    }
+
+    // Generate new OTP & refresh expiration
+    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    verif.otpHash = hashToken(newOtp);
+    verif.expiresAt = Date.now() + 5 * 60 * 1000;
+    verif.attempts = 0;
+    verif.lastSentAt = Date.now();
+    await persistEmailVerification(verif);
+
+    await EmailService.sendVerificationEmail({
+      email: cleanEmail,
+      name: verif.name,
+      otp: newOtp,
+      token: ''
+    });
+
+    return res.json({
+      success: true,
+      message: 'A new verification code has been dispatched to your email.',
+      expiresInSeconds: 300
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to resend verification code' });
+  }
+});
+
+// 4. LOGIN - Credentials check, lockout check, verified check, returns access & refresh tokens
 router.post('/auth/login', async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
@@ -204,23 +392,71 @@ router.post('/auth/login', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanEmail = email.trim().toLowerCase();
     const user = await findUserByEmail(cleanEmail);
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    // Check account temporary lock
+    if (user.lockUntil && user.lockUntil > Date.now()) {
+      const minutesLeft = Math.ceil((user.lockUntil - Date.now()) / 60000);
+      return res.status(403).json({
+        error: `Account is temporarily locked due to multiple failed attempts. Please try again in ${minutesLeft} minute(s).`
+      });
+    }
+
+    // Check email verification status
+    if (!user.isVerified) {
+      return res.status(403).json({
+        error: 'Email not verified. Please verify your email before logging in.',
+        unverified: true,
+        email: user.email
+      });
+    }
+
+    // Validate password
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
+      user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+      if (user.failedLoginAttempts >= 5) {
+        user.lockUntil = Date.now() + 15 * 60 * 1000; // 15 mins lock
+      }
+      await persistUser(user);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+    // Reset failed login counter on success
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
+    await persistUser(user);
+
+    // Issue Access Token (15 minutes) and Refresh Token (7 days)
+    const accessToken = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '15m' });
+    const refreshToken = jwt.sign(
+      { id: user.id, email: user.email, jti: crypto.randomUUID() },
+      JWT_REFRESH_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Store hashed refresh token in database
+    await persistRefreshToken({
+      id: `token-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      userId: user.id,
+      tokenHash: hashToken(refreshToken),
+      expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+      revoked: false,
+      createdAt: new Date().toISOString()
+    });
+
+    setRefreshTokenCookie(res, refreshToken);
+
     return res.json({
       success: true,
       message: 'Login successful',
-      token,
+      accessToken,
+      refreshToken,
       user: {
         id: user.id,
         name: user.name,
@@ -235,85 +471,142 @@ router.post('/auth/login', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/auth/verify-email', async (req: Request, res: Response) => {
+// 5. REFRESH TOKEN - Token rotation, HttpOnly cookie or header fallback, issues fresh access token
+router.post('/auth/refresh', async (req: Request, res: Response) => {
   try {
-    const { email, token, otp } = req.body;
-    const db = getDb();
-    const user = db.users.find(u => u.email.toLowerCase() === (email || '').toLowerCase());
+    const rawRefreshToken =
+      req.cookies?.finpulse_refresh_token ||
+      (req.headers['x-refresh-token'] as string | undefined) ||
+      req.body?.refreshToken;
 
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+    if (!rawRefreshToken) {
+      return res.status(401).json({ error: 'Refresh token required' });
     }
 
-    if (user.isVerified) {
-      return res.json({ message: 'Email is already verified', user });
+    let decoded: any;
+    try {
+      decoded = jwt.verify(rawRefreshToken, JWT_REFRESH_SECRET);
+    } catch (err) {
+      clearRefreshTokenCookie(res);
+      return res.status(401).json({ error: 'Invalid or expired refresh token. Please sign in again.' });
     }
 
-    const matchToken = token && user.verificationToken === token;
-    const matchOtp = otp && user.verificationOtp === otp;
+    // Find active non-revoked refresh token by hash
+    const tokenHash = hashToken(rawRefreshToken);
+    const storedToken = await findRefreshTokenByHash(tokenHash);
 
-    if (!matchToken && !matchOtp) {
-      return res.status(400).json({ error: 'Invalid verification token or OTP' });
+    if (!storedToken || storedToken.revoked) {
+      clearRefreshTokenCookie(res);
+      return res.status(401).json({ error: 'Refresh token revoked or invalid' });
     }
 
-    user.isVerified = true;
-    user.verificationToken = undefined;
-    user.verificationOtp = undefined;
-    saveDatabase();
-
-    res.json({ message: 'Email address verified successfully!', user });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Verification failed' });
-  }
-});
-
-router.post('/auth/resend-verification', async (req: Request, res: Response) => {
-  try {
-    const { email } = req.body;
-    const db = getDb();
-    const user = db.users.find(u => u.email.toLowerCase() === (email || '').toLowerCase());
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+    if (new Date(storedToken.expiresAt) < new Date()) {
+      clearRefreshTokenCookie(res);
+      return res.status(401).json({ error: 'Refresh token expired' });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const token = Buffer.from(`${user.id}-${Date.now()}-${Math.random()}`).toString('base64');
-    user.verificationOtp = otp;
-    user.verificationToken = token;
-    saveDatabase();
+    const user = await findUserById(decoded.id);
+    if (!user || user.accountStatus === 'locked') {
+      clearRefreshTokenCookie(res);
+      return res.status(401).json({ error: 'User account not active' });
+    }
 
-    await EmailService.sendVerificationEmail({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      token,
-      otp
+    // Refresh Token Rotation: Revoke previous token and issue fresh pair
+    await revokeRefreshToken(tokenHash);
+
+    const newAccessToken = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '15m' });
+    const newRefreshToken = jwt.sign(
+      { id: user.id, email: user.email, jti: crypto.randomUUID() },
+      JWT_REFRESH_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    await persistRefreshToken({
+      id: `token-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      userId: user.id,
+      tokenHash: hashToken(newRefreshToken),
+      expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+      revoked: false,
+      createdAt: new Date().toISOString()
     });
 
-    res.json({ message: 'New verification email and code dispatched.', otpPreview: otp });
+    setRefreshTokenCookie(res, newRefreshToken);
+
+    return res.json({
+      success: true,
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        isVerified: user.isVerified,
+        currency: user.currency,
+        monthlyBudgetInPaise: user.monthlyBudgetInPaise
+      }
+    });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Failed to resend' });
+    clearRefreshTokenCookie(res);
+    return res.status(500).json({ error: err.message || 'Token refresh failed' });
   }
 });
 
+// 6. LOGOUT - Revoke active refresh token, clear cookies, terminate session
+router.post('/auth/logout', async (req: Request, res: Response) => {
+  try {
+    const rawRefreshToken =
+      req.cookies?.finpulse_refresh_token ||
+      (req.headers['x-refresh-token'] as string | undefined) ||
+      req.body?.refreshToken;
+
+    if (rawRefreshToken) {
+      await revokeRefreshToken(hashToken(rawRefreshToken));
+    }
+
+    clearRefreshTokenCookie(res);
+    return res.json({ success: true, message: 'Session terminated successfully' });
+  } catch (err: any) {
+    clearRefreshTokenCookie(res);
+    return res.json({ success: true, message: 'Logged out' });
+  }
+});
+
+// 7. GET CURRENT USER PROFILE
+router.get('/auth/me', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await findUserById(req.user!.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const { passwordHash, verificationToken, verificationOtp, ...safeUser } = user;
+    return res.json(safeUser);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to fetch user' });
+  }
+});
+
+// 8. FORGOT PASSWORD - Dispatch reset code securely without exposing code in response
 router.post('/auth/forgot-password', async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
-    const db = getDb();
-    const user = db.users.find(u => u.email.toLowerCase() === (email || '').toLowerCase());
+    if (!email) {
+      return res.status(400).json({ error: 'Email address is required' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await findUserByEmail(cleanEmail);
 
     if (!user) {
-      // Security: return generic success so user enumeration is mitigated
-      return res.json({ message: 'If an account exists, a recovery code has been sent.' });
+      // Mitigate user enumeration
+      return res.json({ success: true, message: 'If an account exists with this email, a recovery code has been dispatched.' });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const token = Buffer.from(`reset-${user.id}-${Date.now()}`).toString('base64');
-    user.resetPasswordOtp = otp;
+    user.resetPasswordOtp = hashToken(otp); // Securely hash reset OTP
     user.resetPasswordToken = token;
     user.resetPasswordExpires = Date.now() + 15 * 60 * 1000; // 15 mins
-    saveDatabase();
+    await persistUser(user);
 
     await EmailService.sendPasswordResetEmail({
       id: user.id,
@@ -323,34 +616,41 @@ router.post('/auth/forgot-password', async (req: Request, res: Response) => {
       otp
     });
 
-    res.json({ message: 'Password recovery email dispatched.', otpPreview: otp });
+    return res.json({
+      success: true,
+      message: 'Password recovery email dispatched. Please check your inbox.',
+      expiresInSeconds: 900
+    });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Forgot password failed' });
+    return res.status(500).json({ error: err.message || 'Forgot password request failed' });
   }
 });
 
+// 9. RESET PASSWORD - Validate hashed OTP and update password
 router.post('/auth/reset-password', async (req: Request, res: Response) => {
   try {
-    const { email, token, otp, newPassword } = req.body;
-    if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    const { email, otp, newPassword } = req.body;
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ error: 'Email, reset code, and new password are required' });
     }
 
-    const db = getDb();
-    const user = db.users.find(u => u.email.toLowerCase() === (email || '').toLowerCase());
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters in length' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await findUserByEmail(cleanEmail);
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
     if (!user.resetPasswordExpires || user.resetPasswordExpires < Date.now()) {
-      return res.status(400).json({ error: 'Password reset code has expired. Request a new one.' });
+      return res.status(400).json({ error: 'Password reset code has expired. Please request a new one.' });
     }
 
-    const matchOtp = otp && user.resetPasswordOtp === otp;
-    const matchToken = token && user.resetPasswordToken === token;
-
-    if (!matchOtp && !matchToken) {
+    const matchOtp = user.resetPasswordOtp === hashToken(otp.trim());
+    if (!matchOtp) {
       return res.status(400).json({ error: 'Invalid or incorrect reset code' });
     }
 
@@ -358,21 +658,34 @@ router.post('/auth/reset-password', async (req: Request, res: Response) => {
     user.resetPasswordOtp = undefined;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
-    saveDatabase();
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
+    await persistUser(user);
 
-    res.json({ message: 'Password reset successfully. You can now log in.' });
+    // Revoke previous refresh tokens for security
+    await revokeAllUserRefreshTokens(user.id);
+
+    return res.json({ success: true, message: 'Password reset successfully. You can now log in.' });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Reset password failed' });
+    return res.status(500).json({ error: err.message || 'Reset password failed' });
   }
 });
 
-router.get('/auth/me', authenticate, (req: AuthRequest, res: Response) => {
-  const db = getDb();
-  const user = db.users.find(u => u.id === req.user?.id);
+router.put('/auth/profile', authenticate, async (req: AuthRequest, res: Response) => {
+  const user = await findUserById(req.user!.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
+  const { name, currency, monthlyBudgetInPaise, reminderDayOfMonth, emailNotificationsEnabled, smtpConfig } = req.body;
+  if (name) user.name = name;
+  if (currency) user.currency = currency;
+  if (monthlyBudgetInPaise !== undefined) user.monthlyBudgetInPaise = monthlyBudgetInPaise;
+  if (reminderDayOfMonth !== undefined) user.reminderDayOfMonth = reminderDayOfMonth;
+  if (emailNotificationsEnabled !== undefined) user.emailNotificationsEnabled = emailNotificationsEnabled;
+  if (smtpConfig !== undefined) user.smtpConfig = smtpConfig;
+
+  await persistUser(user);
   const { passwordHash, ...safeUser } = user;
-  res.json(safeUser);
+  res.json({ message: 'Profile updated successfully', user: safeUser });
 });
 
 router.put('/auth/profile', authenticate, (req: AuthRequest, res: Response) => {

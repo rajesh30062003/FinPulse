@@ -1,0 +1,431 @@
+{
+  "users": [
+    {
+      "id": "user-1794321590913",
+      "name": "rty",
+      "email": "finalsemprojectmail@gmail.com",
+      "passwordHash": "$2b$10$JCGHesqMHeb2dJqCQ92DTeWz3sC/K0jW4kuQv.xQoZjQkB1s46vnO",
+      "isVerified": false,
+      "verificationToken": "dXNlci0xNzk0MzIxNTkwOTEzLTE3OTQzMjE1OTA5MTMtMC40NDEzNzM0NzQxOTEyODk3",
+      "verificationOtp": "914207",
+      "currency": "INR",
+      "monthlyBudgetInPaise": 4000000,
+      "reminderDayOfMonth": 25,
+      "emailNotificationsEnabled": true,
+      "createdAt": "Tue Nov 10 2026 14:39:50 GMT+0000 (Coordinated Universal Time)"
+    },
+    {
+      "id": "user-1794323316803",
+      "name": "Aarav Patel",
+      "email": "aarav@test.local",
+      "passwordHash": "$2b$10$K5OF9iQSIyLXqQvLZigGUu2prDskbQMhiSj8aQQH7QUlWKQP0zZjq",
+      "isVerified": true,
+      "currency": "INR",
+      "monthlyBudgetInPaise": 4000000,
+      "reminderDayOfMonth": 25,
+      "emailNotificationsEnabled": true,
+      "createdAt": "Tue Nov 10 2026 15:08:36 GMT+0000 (Coordinated Universal Time)",
+      "failedLoginAttempts": 1
+    }
+  ],
+  "bankAccounts": [
+    {
+      "id": "bank-hdfc-01",
+      "userId": "demo-user-id",
+      "bankName": "HDFC Bank",
+      "accountHolderName": "Rajesh Sharma",
+      "accountType": "Savings",
+      "accountNickname": "HDFC Salary Account",
+      "accountNumberMasked": "•••• 4892",
+      "openingBalanceInPaise": 0,
+      "balanceInPaise": 6700000,
+      "isActive": true,
+      "notes": "Primary salary account",
+      "createdAt": "2026-11-10T12:49:40.434Z"
+    },
+    {
+      "id": "bank-sbi-01",
+      "userId": "demo-user-id",
+      "bankName": "State Bank of India",
+      "accountHolderName": "Rajesh Sharma",
+      "accountType": "Savings",
+      "accountNickname": "SBI Savings",
+      "accountNumberMasked": "•••• 7120",
+      "openingBalanceInPaise": 1500000,
+      "balanceInPaise": 1800000,
+      "isActive": true,
+      "notes": "Secondary emergency & bill pay account",
+      "createdAt": "2026-11-10T12:49:40.434Z"
+    },
+    {
+      "id": "bank-1794323316955",
+      "userId": "user-1794323316803",
+      "bankName": "Primary Bank",
+      "accountHolderName": "Aarav Patel",
+      "accountType": "Savings",
+      "accountNickname": "Primary Savings",
+      "accountNumberMasked": "•••• 1234",
+      "balanceInPaise": 0,
+      "openingBalanceInPaise": 0,
+      "isActive": true,
+      "createdAt": "2026-11-10T15:08:36.955Z"
+    }
+  ],
+  "cashWallets": [
+    {
+      "id": "cash-wallet-01",
+      "userId": "demo-user-id",
+      "balanceInPaise": 450000,
+      "notes": "Physical cash on hand",
+      "updatedAt": "2026-11-10T12:49:40.434Z"
+    },
+    {
+      "id": "cash-1794323317101",
+      "userId": "user-1794323316803",
+      "balanceInPaise": 0,
+      "updatedAt": "2026-11-10T15:08:37.101Z"
+    }
+  ],
+  "creditCards": [
+    {
+      "id": "cc-hdfc-01",
+      "userId": "demo-user-id",
+      "cardName": "HDFC Regalia Gold",
+      "bankName": "HDFC Bank",
+      "cardNickname": "HDFC Card",
+      "lastFourDigits": "9182",
+      "creditLimitInPaise": 15000000,
+      "outstandingBalanceInPaise": 300000,
+      "availableCreditInPaise": 14700000,
+      "statementDay": 15,
+      "dueDay": 5,
+      "billingCycle": "16th to 15th",
+      "notes": "Rewards on dining & travel",
+      "isActive": true,
+      "lastPaymentDate": "2026-11-08T12:49:40.434Z",
+      "lastPaymentAmountInPaise": 700000
+    }
+  ],
+  "transactions": [
+    {
+      "id": "tx-scenario-1",
+      "userId": "demo-user-id",
+      "date": "2026-10-31T12:49:40.434Z",
+      "type": "income",
+      "mainCategory": "Essential",
+      "subCategory": "Salary",
+      "amountInPaise": 4000000,
+      "paymentMethod": "Bank Account",
+      "destinationAccountId": "bank-hdfc-01",
+      "description": "Monthly Salary Credit",
+      "notes": "Scenario 1: Verified salary inflow directly to HDFC",
+      "status": "Completed",
+      "createdAt": "2026-10-31T12:49:40.434Z"
+    },
+    {
+      "id": "tx-scenario-2",
+      "userId": "demo-user-id",
+      "date": "2026-11-02T12:49:40.434Z",
+      "type": "expense",
+      "mainCategory": "Essential",
+      "subCategory": "Food",
+      "amountInPaise": 50000,
+      "paymentMethod": "Cash",
+      "description": "Grocery & Fresh Food Market",
+      "notes": "Scenario 2: Cash expense deducts cash balance & Essential allocation",
+      "status": "Completed",
+      "createdAt": "2026-11-02T12:49:40.434Z"
+    },
+    {
+      "id": "tx-scenario-3",
+      "userId": "demo-user-id",
+      "date": "2026-11-03T12:49:40.434Z",
+      "type": "credit_card_expense",
+      "mainCategory": "Essential",
+      "subCategory": "Groceries",
+      "amountInPaise": 200000,
+      "paymentMethod": "Credit Card",
+      "creditCardId": "cc-hdfc-01",
+      "description": "Supermarket Household Supplies",
+      "notes": "Scenario 3: Card outstanding increases without deducting bank balance",
+      "status": "Completed",
+      "createdAt": "2026-11-03T12:49:40.434Z"
+    },
+    {
+      "id": "tx-scenario-4",
+      "userId": "demo-user-id",
+      "date": "2026-11-04T12:49:40.434Z",
+      "type": "credit_card_payment",
+      "mainCategory": "Liability Settlement",
+      "subCategory": "Credit Card Bill Payment",
+      "amountInPaise": 200000,
+      "paymentMethod": "Bank Account",
+      "sourceAccountId": "bank-sbi-01",
+      "creditCardId": "cc-hdfc-01",
+      "description": "Bill Settlement for HDFC Card",
+      "notes": "Scenario 4: Paid from SBI; liability settled without duplicate expense",
+      "status": "Completed",
+      "createdAt": "2026-11-04T12:49:40.434Z"
+    },
+    {
+      "id": "tx-scenario-5",
+      "userId": "demo-user-id",
+      "date": "2026-11-05T12:49:40.434Z",
+      "type": "transfer",
+      "mainCategory": "Transfer",
+      "subCategory": "Bank to Bank Transfer",
+      "amountInPaise": 500000,
+      "paymentMethod": "Bank Account",
+      "sourceAccountId": "bank-hdfc-01",
+      "destinationAccountId": "bank-sbi-01",
+      "description": "Fund transfer to SBI for bill coverage",
+      "notes": "Scenario 5: Interbank transfer; total wealth unchanged",
+      "status": "Completed",
+      "createdAt": "2026-11-05T12:49:40.434Z"
+    },
+    {
+      "id": "tx-scenario-6",
+      "userId": "demo-user-id",
+      "date": "2026-11-06T12:49:40.434Z",
+      "type": "investment_deposit",
+      "mainCategory": "Investment",
+      "subCategory": "Mutual Funds",
+      "amountInPaise": 500000,
+      "paymentMethod": "Bank Account",
+      "sourceAccountId": "bank-hdfc-01",
+      "description": "SIP in Parag Parikh Flexi Cap",
+      "notes": "Scenario 6: Asset reallocation into investment holdings",
+      "status": "Completed",
+      "createdAt": "2026-11-06T12:49:40.434Z"
+    },
+    {
+      "id": "tx-scenario-7",
+      "userId": "demo-user-id",
+      "date": "2026-11-07T12:49:40.434Z",
+      "type": "emergency_deposit",
+      "mainCategory": "Emergency Fund",
+      "subCategory": "Emergency Fund Deposit",
+      "amountInPaise": 300000,
+      "paymentMethod": "Bank Account",
+      "sourceAccountId": "bank-hdfc-01",
+      "description": "Monthly emergency cushion deposit",
+      "notes": "Scenario 7: Dedicated reserve build without double expense",
+      "status": "Completed",
+      "createdAt": "2026-11-07T12:49:40.434Z"
+    },
+    {
+      "id": "tx-scenario-8",
+      "userId": "demo-user-id",
+      "date": "2026-11-08T12:49:40.434Z",
+      "type": "credit_card_payment",
+      "mainCategory": "Liability Settlement",
+      "subCategory": "Credit Card Bill Payment",
+      "amountInPaise": 700000,
+      "paymentMethod": "Bank Account",
+      "sourceAccountId": "bank-hdfc-01",
+      "creditCardId": "cc-hdfc-01",
+      "description": "Partial Bill Settlement for HDFC Card",
+      "notes": "Scenario 8: Paid ₹7,000 against ₹10,000 outstanding; ₹3,000 remains",
+      "status": "Completed",
+      "createdAt": "2026-11-08T12:49:40.434Z"
+    }
+  ],
+  "budgetAllocations": [
+    {
+      "id": "budget-demo-user-id-2026-11",
+      "userId": "demo-user-id",
+      "monthYear": "2026-11",
+      "essentialBudgetInPaise": 1800000,
+      "funBudgetInPaise": 400000,
+      "investmentBudgetInPaise": 800000,
+      "emergencyBudgetInPaise": 500000,
+      "savingsBudgetInPaise": 500000,
+      "carryForwardEnabled": false
+    },
+    {
+      "id": "budget-user-1794323316803",
+      "userId": "user-1794323316803",
+      "monthYear": "2026-11",
+      "essentialBudgetInPaise": 2000000,
+      "funBudgetInPaise": 500000,
+      "investmentBudgetInPaise": 500000,
+      "emergencyBudgetInPaise": 500000,
+      "savingsBudgetInPaise": 500000,
+      "carryForwardEnabled": false
+    }
+  ],
+  "investments": [
+    {
+      "id": "inv-mf-01",
+      "userId": "demo-user-id",
+      "name": "Parag Parikh Flexi Cap Fund",
+      "type": "Mutual Funds",
+      "investedAmountInPaise": 500000,
+      "currentValueInPaise": 545000,
+      "investmentDate": "2026-10-26T12:49:40.434Z",
+      "expectedReturnRate": 14.5,
+      "riskLevel": "Moderate Risk",
+      "notes": "Monthly SIP"
+    },
+    {
+      "id": "inv-stocks-01",
+      "userId": "demo-user-id",
+      "name": "NIFTY 50 Index Basket",
+      "type": "Stocks",
+      "investedAmountInPaise": 2500000,
+      "currentValueInPaise": 2820000,
+      "investmentDate": "2026-08-12T12:49:40.434Z",
+      "expectedReturnRate": 12,
+      "riskLevel": "Moderate Risk",
+      "notes": "Long-term equity allocation"
+    }
+  ],
+  "fixedDeposits": [
+    {
+      "id": "fd-hdfc-01",
+      "userId": "demo-user-id",
+      "bankName": "HDFC Bank",
+      "fdName": "HDFC High Yield FD 1-Year",
+      "principalInPaise": 5000000,
+      "interestRate": 7.5,
+      "compoundingFrequency": "Quarterly",
+      "startDate": "2025-12-10T12:49:40.434Z",
+      "maturityDate": "2026-12-10T12:49:40.434Z",
+      "durationMonths": 12,
+      "maturityAmountInPaise": 5385679,
+      "interestEarnedInPaise": 385679,
+      "autoRenewal": false,
+      "status": "Active",
+      "remindersSent": [
+        "30d"
+      ]
+    }
+  ],
+  "emergencyFunds": [
+    {
+      "id": "emergency-fund-01",
+      "userId": "demo-user-id",
+      "targetAmountInPaise": 10000000,
+      "currentBalanceInPaise": 3300000,
+      "updatedAt": "2026-11-10T12:49:40.434Z"
+    },
+    {
+      "id": "ef-1794323317397",
+      "userId": "user-1794323316803",
+      "targetAmountInPaise": 10000000,
+      "currentBalanceInPaise": 0,
+      "updatedAt": "2026-11-10T15:08:37.397Z"
+    }
+  ],
+  "savingsGoals": [
+    {
+      "id": "saving-laptop-01",
+      "userId": "demo-user-id",
+      "name": "MacBook Pro Upgrade",
+      "targetAmountInPaise": 12000000,
+      "savedAmountInPaise": 4500000,
+      "targetDate": "2027-03-31",
+      "monthlyContributionInPaise": 1000000,
+      "notes": "For coding and freelance projects"
+    },
+    {
+      "id": "saving-travel-01",
+      "userId": "demo-user-id",
+      "name": "Annual Family Vacation",
+      "targetAmountInPaise": 6000000,
+      "savedAmountInPaise": 3000000,
+      "targetDate": "2026-12-25",
+      "monthlyContributionInPaise": 500000,
+      "notes": "Year-end holiday"
+    }
+  ],
+  "notifications": [
+    {
+      "id": "notif-fd-01",
+      "userId": "demo-user-id",
+      "title": "Upcoming FD Maturity in 30 Days",
+      "message": "Your HDFC High Yield FD (₹50,000 principal) matures soon. Projected payout: ₹53,854.",
+      "type": "fd_maturity",
+      "isRead": false,
+      "metadata": {
+        "fdId": "fd-hdfc-01",
+        "daysRemaining": 30
+      },
+      "createdAt": "2026-11-09T12:49:40.434Z"
+    },
+    {
+      "id": "notif-cc-01",
+      "userId": "demo-user-id",
+      "title": "Credit Card Bill Reminder",
+      "message": "HDFC Regalia Gold has ₹3,000 outstanding due on the 5th. Avoid late fees.",
+      "type": "bill_reminder",
+      "isRead": false,
+      "metadata": {
+        "cardId": "cc-hdfc-01",
+        "amountInPaise": 300000
+      },
+      "createdAt": "2026-11-10T08:49:40.435Z"
+    }
+  ],
+  "emailLogs": [
+    {
+      "id": "email-1794323281438-scpiq",
+      "to": "aarav@test.local",
+      "subject": "Verify Your FinPulse Account - Code: 709585",
+      "previewText": "Your verification code is 709585. Complete verification to secure your financial portal.",
+      "htmlBody": "\n      <div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;\">\n        <div style=\"background: #0f172a; padding: 28px 32px; color: #ffffff;\">\n          <h1 style=\"margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;\">FinPulse Security</h1>\n          <p style=\"margin: 6px 0 0 0; font-size: 14px; color: #94a3b8;\">Email Address Verification</p>\n        </div>\n        <div style=\"padding: 32px;\">\n          <p style=\"font-size: 16px; color: #334155; margin-top: 0;\">Hello <strong>Aarav Patel</strong>,</p>\n          <p style=\"font-size: 14px; color: #64748b; line-height: 1.6;\">\n            Thank you for creating your FinPulse Smart Money Management account. To secure your financial ledger and enable automated recovery, please verify your email address.\n          </p>\n          \n          <div style=\"background: #f1f5f9; border-radius: 8px; padding: 20px; text-align: center; margin: 24px 0;\">\n            <div style=\"font-size: 12px; text-transform: uppercase; color: #64748b; font-weight: 600; letter-spacing: 1px;\">Your Verification Code</div>\n            <div style=\"font-size: 36px; font-weight: 800; color: #0f172a; letter-spacing: 8px; margin-top: 8px; font-family: monospace;\">709585</div>\n            <div style=\"font-size: 12px; color: #94a3b8; margin-top: 6px;\">Valid for 30 minutes</div>\n          </div>\n\n          <div style=\"text-align: center; margin: 28px 0;\">\n            <a href=\"/verify-email?email=aarav%40test.local\" style=\"background: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 28px; font-size: 14px; font-weight: 600; border-radius: 8px; display: inline-block;\">\n              Verify Email Address Instantly\n            </a>\n          </div>\n\n          <p style=\"font-size: 12px; color: #94a3b8; line-height: 1.5; border-top: 1px solid #e2e8f0; padding-top: 20px; margin-bottom: 0;\">\n            If you did not request this verification, please disregard this email. Your data remains protected with AES and JWT ledger encryption.\n          </p>\n        </div>\n      </div>\n    ",
+      "sentAt": "2026-11-10T15:08:01.438Z",
+      "status": "sent",
+      "triggerType": "verification",
+      "metadata": {
+        "otp": "709585",
+        "token": "",
+        "actionUrl": "/verify-email?email=aarav%40test.local"
+      }
+    },
+    {
+      "id": "email-welcome-01",
+      "userId": "demo-user-id",
+      "to": "rjrajeshpal30@gmail.com",
+      "subject": "Welcome to FinPulse - Verify Your Email",
+      "previewText": "Click here or use code 849201 to complete your email verification.",
+      "htmlBody": "<div style=\"font-family:sans-serif;padding:24px;background:#f8fafc;color:#0f172a;\">\n        <h2 style=\"color:#2563eb;\">FinPulse Security Verification</h2>\n        <p>Hello Rajesh,</p>\n        <p>Thank you for setting up your personal finance management account. Your secure 6-digit verification code is:</p>\n        <div style=\"font-size:32px;font-weight:bold;letter-spacing:6px;background:#e2e8f0;padding:16px;text-align:center;border-radius:8px;margin:16px 0;\">849201</div>\n        <p>You can also verify instantly by clicking the link below:</p>\n        <a href=\"#/verify-email?token=verified-demo-token\" style=\"display:inline-block;background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;\">Verify My Account</a>\n      </div>",
+      "sentAt": "2026-10-31T12:49:40.435Z",
+      "status": "simulated",
+      "triggerType": "verification",
+      "metadata": {
+        "otp": "849201"
+      }
+    },
+    {
+      "id": "email-bill-reminder-01",
+      "userId": "demo-user-id",
+      "to": "rjrajeshpal30@gmail.com",
+      "subject": "Credit Card Statement Alert: HDFC Regalia Gold",
+      "previewText": "Your monthly statement is generated. Outstanding balance: ₹3,000 due by the 5th.",
+      "htmlBody": "<div style=\"font-family:sans-serif;padding:24px;background:#f8fafc;color:#0f172a;\">\n        <h2 style=\"color:#d97706;\">Credit Card Payment Reminder</h2>\n        <p>Hello Rajesh,</p>\n        <p>This is a reminder from FinPulse regarding your <strong>HDFC Regalia Gold (•••• 9182)</strong>.</p>\n        <table style=\"width:100%;border-collapse:collapse;margin:16px 0;\">\n          <tr><td style=\"padding:8px;border-bottom:1px solid #e2e8f0;\">Remaining Outstanding:</td><td style=\"padding:8px;border-bottom:1px solid #e2e8f0;font-weight:bold;\">₹3,000.00</td></tr>\n          <tr><td style=\"padding:8px;border-bottom:1px solid #e2e8f0;\">Payment Due Date:</td><td style=\"padding:8px;border-bottom:1px solid #e2e8f0;\">5th of Month</td></tr>\n        </table>\n        <p>Ensure settlement from your linked bank account before the due date to maintain your credit score.</p>\n      </div>",
+      "sentAt": "2026-11-10T00:49:40.435Z",
+      "status": "simulated",
+      "triggerType": "cc_bill_reminder"
+    }
+  ],
+  "refreshTokens": [
+    {
+      "id": "token-1794323317686-464io",
+      "userId": "user-1794323316803",
+      "tokenHash": "be333850c3b8a2881039382fec967940188a8917e7d9fe684b850b53fd53ce85",
+      "expiresAt": "2026-11-17T15:08:37.686Z",
+      "revoked": true,
+      "createdAt": "2026-11-10T15:08:37.686Z"
+    },
+    {
+      "id": "token-1794323344540-ifket",
+      "userId": "user-1794323316803",
+      "tokenHash": "f2bbc807716d3ec26550efc34a3c70ea72bd3aa5e2f5fe08a933af972d1ffd6e",
+      "expiresAt": "2026-11-17T15:09:04.540Z",
+      "revoked": true,
+      "createdAt": "2026-11-10T15:09:04.540Z"
+    }
+  ],
+  "emailVerifications": []
+}

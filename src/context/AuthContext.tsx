@@ -1,18 +1,22 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { IUser } from '../types';
-import { api } from '../services/api';
+import { api, clearTokens, getRefreshToken } from '../services/api';
+
+export type SessionState = 'checking' | 'authenticated' | 'unauthenticated';
 
 interface AuthContextType {
   user: IUser | null;
-  token: string | null;
+  sessionState: SessionState;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, pass: string) => Promise<void>;
-  register: (name: string, email: string, pass: string) => Promise<{ otpSent?: string }>;
-  logout: () => void;
-  verifyEmail: (token?: string, otp?: string) => Promise<void>;
-  forgotPassword: (email: string) => Promise<{ otpPreview?: string }>;
-  resetPassword: (email: string, pass: string, token?: string, otp?: string) => Promise<void>;
+  register: (name: string, email: string, pass: string, confirmPassword?: string) => Promise<{ success: boolean; message: string; email: string; expiresInSeconds: number }>;
+  verifyEmail: (email: string, otp: string) => Promise<void>;
+  resendOtp: (email: string) => Promise<{ success: boolean; message: string; expiresInSeconds: number }>;
+  logout: () => Promise<void>;
+  forgotPassword: (email: string) => Promise<{ success: boolean; message: string }>;
+  resetPassword: (email: string, pass: string, otp: string, confirmPassword?: string) => Promise<void>;
+  checkSession: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -20,75 +24,112 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<IUser | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('finpulse_token'));
-  const [isLoading, setIsLoading] = useState(true);
+  const [sessionState, setSessionState] = useState<SessionState>('checking');
 
-  const refreshUser = async () => {
+  // Verify and restore session on page mount or refresh
+  const checkSession = useCallback(async () => {
+    setSessionState('checking');
     try {
-      const userData = await api.getMe();
-      setUser(userData);
-    } catch (err) {
-      // If error or token expired, keep demo user from API
-      console.warn('User session check:', err);
-    } finally {
-      setIsLoading(false);
+      // 1. Try refresh endpoint first (uses HttpOnly cookie or x-refresh-token header)
+      const res = await api.refresh();
+      if (res && res.user) {
+        setUser(res.user);
+        setSessionState('authenticated');
+        return;
+      }
+    } catch (refreshErr) {
+      // Refresh token might not exist or might be expired
     }
-  };
+
+    try {
+      // 2. Fallback check: attempt getMe if any valid in-memory/cookie session exists
+      const profile = await api.getMe();
+      if (profile && profile.id) {
+        setUser(profile);
+        setSessionState('authenticated');
+        return;
+      }
+    } catch (profileErr) {
+      // Unauthenticated session confirmed
+    }
+
+    // Unauthenticated state
+    clearTokens();
+    setUser(null);
+    setSessionState('unauthenticated');
+  }, []);
 
   useEffect(() => {
-    refreshUser();
-  }, []);
+    checkSession();
+  }, [checkSession]);
 
   const login = async (email: string, pass: string) => {
     const res = await api.login({ email, password: pass });
-    setToken(res.token);
-    localStorage.setItem('finpulse_token', res.token);
     setUser(res.user);
+    setSessionState('authenticated');
   };
 
-  const register = async (name: string, email: string, pass: string) => {
-    const res = await api.register({ name, email, password: pass });
-    setToken(res.token);
-    localStorage.setItem('finpulse_token', res.token);
-    setUser(res.user);
-    return { otpSent: res.otpSent };
+  const register = async (name: string, email: string, pass: string, confirmPassword?: string) => {
+    const res = await api.register({
+      name,
+      email,
+      password: pass,
+      confirmPassword: confirmPassword || pass
+    });
+    return res;
   };
 
-  const logout = () => {
-    setToken(null);
-    localStorage.removeItem('finpulse_token');
-    refreshUser(); // reload demo state if available
+  const verifyEmail = async (email: string, otp: string) => {
+    const res = await api.verifyEmail({ email, otp });
+    setUser(res.user);
+    setSessionState('authenticated');
   };
 
-  const verifyEmail = async (verifyToken?: string, otp?: string) => {
-    if (!user) throw new Error('No active user to verify');
-    const res = await api.verifyEmail({ email: user.email, token: verifyToken, otp });
-    setUser(res.user);
+  const resendOtp = async (email: string) => {
+    return api.resendOtp(email);
+  };
+
+  const logout = async () => {
+    try {
+      await api.logout();
+    } catch {
+      // Ignore network errors during logout
+    } finally {
+      clearTokens();
+      setUser(null);
+      setSessionState('unauthenticated');
+    }
   };
 
   const forgotPassword = async (email: string) => {
-    const res = await api.forgotPassword(email);
-    return { otpPreview: res.otpPreview };
+    return api.forgotPassword(email);
   };
 
-  const resetPassword = async (email: string, pass: string, resetToken?: string, otp?: string) => {
-    await api.resetPassword({ email, newPassword: pass, token: resetToken, otp });
+  const resetPassword = async (email: string, pass: string, otp: string, confirmPassword?: string) => {
+    await api.resetPassword({
+      email,
+      otp,
+      newPassword: pass,
+      confirmPassword: confirmPassword || pass
+    });
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        token,
-        isAuthenticated: !!user,
-        isLoading,
+        sessionState,
+        isAuthenticated: sessionState === 'authenticated' && !!user,
+        isLoading: sessionState === 'checking',
         login,
         register,
-        logout,
         verifyEmail,
+        resendOtp,
+        logout,
         forgotPassword,
         resetPassword,
-        refreshUser
+        checkSession,
+        refreshUser: checkSession
       }}
     >
       {children}

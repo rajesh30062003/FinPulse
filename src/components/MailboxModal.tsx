@@ -4,14 +4,25 @@ import { useFinancial } from '../context/FinancialContext';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 
-export const MailboxModal: React.FC = () => {
+interface MailboxModalProps {
+  overrideOpen?: boolean;
+  onOverrideClose?: () => void;
+}
+
+export const MailboxModal: React.FC<MailboxModalProps> = ({ overrideOpen, onOverrideClose }) => {
   const { isMailboxOpen, setIsMailboxOpen, mailboxLogs, refreshAll, setIsAuthModalOpen } = useFinancial();
   const { verifyEmail } = useAuth();
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  if (!isMailboxOpen) return null;
+  const isOpen = overrideOpen !== undefined ? overrideOpen : isMailboxOpen;
+  const handleClose = () => {
+    if (onOverrideClose) onOverrideClose();
+    else setIsMailboxOpen(false);
+  };
+
+  if (!isOpen) return null;
 
   const currentEmail = mailboxLogs.find(m => m.id === selectedEmailId) || mailboxLogs[0];
 
@@ -36,9 +47,15 @@ export const MailboxModal: React.FC = () => {
     }
   };
 
-  const handleQuickVerify = async (otp?: string, token?: string) => {
+  const handleQuickVerify = async (otp?: string) => {
+    if (!otp) return;
+    const targetEmail = currentEmail?.to;
+    if (!targetEmail) {
+      setMessage('No recipient email found on message');
+      return;
+    }
     try {
-      await verifyEmail(token, otp);
+      await verifyEmail(targetEmail, otp);
       setMessage('Account verified successfully via sandbox email link!');
       await refreshAll();
     } catch (err: any) {
@@ -77,7 +94,7 @@ export const MailboxModal: React.FC = () => {
               <Trash2 className="w-4 h-4" />
             </button>
             <button
-              onClick={() => setIsMailboxOpen(false)}
+              onClick={handleClose}
               className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg"
             >
               <X className="w-5 h-5" />
@@ -206,7 +223,7 @@ export const MailboxModal: React.FC = () => {
                       </div>
                       {currentEmail.triggerType === 'verification' && (
                         <button
-                          onClick={() => handleQuickVerify(currentEmail.metadata?.otp, currentEmail.metadata?.token)}
+                          onClick={() => handleQuickVerify(currentEmail.metadata?.otp)}
                           className="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs flex items-center gap-1.5"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" />

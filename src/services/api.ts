@@ -1,4 +1,39 @@
-// FinPulse Frontend API Client with Smart URL Normalization and Safe Response Handling
+// FinPulse Frontend API Client with Smart URL Normalization, Session Persistence and Refresh Token Rotation
+
+let inMemoryAccessToken: string | null = null;
+
+export function getAccessToken(): string | null {
+  return inMemoryAccessToken;
+}
+
+export function setAccessToken(token: string | null) {
+  inMemoryAccessToken = token;
+}
+
+export function getRefreshToken(): string | null {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('finpulse_refresh_token');
+  }
+  return null;
+}
+
+export function setRefreshToken(token: string | null) {
+  if (typeof window !== 'undefined') {
+    if (token) {
+      localStorage.setItem('finpulse_refresh_token', token);
+    } else {
+      localStorage.removeItem('finpulse_refresh_token');
+    }
+  }
+}
+
+export function clearTokens() {
+  inMemoryAccessToken = null;
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('finpulse_refresh_token');
+    localStorage.removeItem('finpulse_token');
+  }
+}
 
 export function normalizeApiUrl(rawUrl: string): string {
   let clean = rawUrl.trim().replace(/\/+$/, '');
@@ -45,28 +80,39 @@ export function setCustomApiUrl(url: string | null) {
 }
 
 export function getAuthHeaders(): Record<string, string> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('finpulse_token') : null;
+  const token = inMemoryAccessToken;
+  const refreshToken = getRefreshToken();
+
   return {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {})
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(refreshToken ? { 'x-refresh-token': refreshToken } : {})
   };
 }
 
-export async function apiRequest<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
+// Mutex promise to deduplicate concurrent refresh calls
+let isRefreshingPromise: Promise<any> | null = null;
+
+export async function apiRequest<T = any>(
+  endpoint: string,
+  options: RequestInit = {},
+  isRetry = false
+): Promise<T> {
   const base = getApiBase();
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const fullUrl = `${base}${cleanEndpoint}`;
 
   const headers: Record<string, string> = {
     ...getAuthHeaders(),
-    ...(options.headers as Record<string, string> || {})
+    ...((options.headers as Record<string, string>) || {})
   };
 
   let res: Response;
   try {
     res = await fetch(fullUrl, {
       ...options,
+      credentials: 'include', // Includes HttpOnly cookie in same-origin or CORS
       headers
     });
   } catch (netErr: any) {
@@ -75,6 +121,35 @@ export async function apiRequest<T = any>(endpoint: string, options: RequestInit
       `Cannot connect to FinPulse backend at "${fullUrl}". ` +
       `If using a Render free instance, it may be waking up (please wait 30s) or verify your backend URL.`
     );
+  }
+
+  // Automatically attempt silent refresh on 401 Unauthorized for authenticated endpoints
+  const isAuthEndpoint =
+    cleanEndpoint.startsWith('/auth/login') ||
+    cleanEndpoint.startsWith('/auth/register') ||
+    cleanEndpoint.startsWith('/auth/refresh') ||
+    cleanEndpoint.startsWith('/auth/verify-email') ||
+    cleanEndpoint.startsWith('/auth/resend-otp');
+
+  if (res.status === 401 && !isRetry && !isAuthEndpoint) {
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      try {
+        if (!isRefreshingPromise) {
+          isRefreshingPromise = api.refresh().finally(() => {
+            isRefreshingPromise = null;
+          });
+        }
+        await isRefreshingPromise;
+        // Retry with refreshed access token
+        return apiRequest<T>(endpoint, options, true);
+      } catch (refreshErr) {
+        clearTokens();
+        // Fall through to parse original 401 error
+      }
+    } else {
+      clearTokens();
+    }
   }
 
   const contentType = res.headers.get('content-type') || '';
@@ -113,7 +188,10 @@ export async function apiRequest<T = any>(endpoint: string, options: RequestInit
 
   if (!res.ok) {
     const errorMsg = data?.error || data?.message || `Request to ${cleanEndpoint} failed (Status ${res.status})`;
-    throw new Error(errorMsg);
+    const err = new Error(errorMsg);
+    (err as any).status = res.status;
+    (err as any).data = data;
+    throw err;
   }
 
   return data as T;
@@ -138,44 +216,99 @@ export function formatNumberINR(paise: number): string {
 }
 
 export const api = {
-  // Auth
+  // Authentication & Session
   async login(payload: { email: string; password: string }) {
-    return apiRequest('/auth/login', {
+    const res = await apiRequest<{
+      success: boolean;
+      accessToken: string;
+      refreshToken: string;
+      user: any;
+      message?: string;
+    }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    setAccessToken(res.accessToken);
+    setRefreshToken(res.refreshToken);
+    return res;
+  },
+
+  async register(payload: { name: string; email: string; password: string; confirmPassword?: string }) {
+    return apiRequest<{
+      success: boolean;
+      message: string;
+      email: string;
+      expiresInSeconds: number;
+    }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(payload)
     });
   },
 
-  async register(payload: { name: string; email: string; password: string }) {
-    return apiRequest('/auth/register', {
+  async verifyEmail(payload: { email: string; otp: string }) {
+    const res = await apiRequest<{
+      success: boolean;
+      message: string;
+      accessToken: string;
+      refreshToken: string;
+      user: any;
+    }>('/auth/verify-email', {
       method: 'POST',
       body: JSON.stringify(payload)
     });
+    setAccessToken(res.accessToken);
+    setRefreshToken(res.refreshToken);
+    return res;
   },
 
-  async verifyEmail(payload: { email: string; token?: string; otp?: string }) {
-    return apiRequest('/auth/verify-email', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
-
-  async resendVerification(email: string) {
-    return apiRequest('/auth/resend-verification', {
+  async resendOtp(email: string) {
+    return apiRequest<{
+      success: boolean;
+      message: string;
+      expiresInSeconds: number;
+    }>('/auth/resend-otp', {
       method: 'POST',
       body: JSON.stringify({ email })
     });
+  },
+
+  async refresh() {
+    const res = await apiRequest<{
+      success: boolean;
+      accessToken: string;
+      refreshToken: string;
+      user: any;
+    }>('/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken: getRefreshToken() })
+    });
+    setAccessToken(res.accessToken);
+    setRefreshToken(res.refreshToken);
+    return res;
+  },
+
+  async logout() {
+    try {
+      await apiRequest('/auth/logout', {
+        method: 'POST',
+        body: JSON.stringify({ refreshToken: getRefreshToken() })
+      });
+    } catch (e) {
+      // Ignore logout errors and clean local tokens anyway
+    } finally {
+      clearTokens();
+    }
   },
 
   async forgotPassword(email: string) {
-    return apiRequest('/auth/forgot-password', {
+    return apiRequest<{ success: boolean; message: string; expiresInSeconds?: number }>('/auth/forgot-password', {
       method: 'POST',
       body: JSON.stringify({ email })
     });
   },
 
-  async resetPassword(payload: { email: string; token?: string; otp?: string; newPassword: string }) {
-    return apiRequest('/auth/reset-password', {
+  async resetPassword(payload: { email: string; otp: string; newPassword: string; confirmPassword?: string }) {
+    return apiRequest<{ success: boolean; message: string }>('/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify(payload)
     });

@@ -38,6 +38,9 @@ export interface IUser {
   monthlyBudgetInPaise: number;
   reminderDayOfMonth: number;
   emailNotificationsEnabled: boolean;
+  accountStatus?: 'active' | 'locked';
+  failedLoginAttempts?: number;
+  lockUntil?: number | null;
   smtpConfig?: {
     host: string;
     port: number;
@@ -206,4 +209,26 @@ export interface IEmailLog {
     otp?: string;
     actionUrl?: string;
   };
+}
+
+export interface IRefreshToken {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: string;
+  revoked: boolean;
+  createdAt: string;
+}
+
+export interface IEmailVerification {
+  id: string;
+  email: string;
+  name: string;
+  passwordHash: string;
+  otpHash: string;
+  expiresAt: number;
+  attempts: number;
+  verified: boolean;
+  lastSentAt: number;
+  createdAt: string;
 }

@@ -12,6 +12,7 @@ import {
   IEmailLog
 } from '../types';
 import { api } from '../services/api';
+import { useAuth } from './AuthContext';
 
 interface FinancialContextType {
   summary: IDashboardSummary | null;
@@ -44,12 +45,15 @@ interface FinancialContextType {
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (open: boolean) => void;
   refreshAll: () => Promise<void>;
+  clearFinancialData: () => void;
   isLoading: boolean;
 }
 
 const FinancialContext = createContext<FinancialContextType | undefined>(undefined);
 
 export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { sessionState, isAuthenticated } = useAuth();
+
   const [summary, setSummary] = useState<IDashboardSummary | null>(null);
   const [accounts, setAccounts] = useState<IBankAccount[]>([]);
   const [cash, setCash] = useState<ICashWallet | null>(null);
@@ -64,7 +68,7 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [mailboxLogs, setMailboxLogs] = useState<IEmailLog[]>([]);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Modals
   const [isAddTxOpen, setIsAddTxOpen] = useState(false);
@@ -75,7 +79,28 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [isScenarioModalOpen, setIsScenarioModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
+  const clearFinancialData = useCallback(() => {
+    setSummary(null);
+    setAccounts([]);
+    setCash(null);
+    setCreditCards([]);
+    setTransactions([]);
+    setBudgetData(null);
+    setInvestmentsData(null);
+    setFixedDeposits([]);
+    setEmergencyFund(null);
+    setSavingsGoals([]);
+    setNotifications([]);
+    setUnreadNotificationsCount(0);
+    setMailboxLogs([]);
+  }, []);
+
   const refreshAll = useCallback(async () => {
+    if (!isAuthenticated) {
+      clearFinancialData();
+      return;
+    }
+
     try {
       setIsLoading(true);
       const [
@@ -124,11 +149,16 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isAuthenticated, clearFinancialData]);
 
+  // Sync state when session state changes
   useEffect(() => {
-    refreshAll();
-  }, [refreshAll]);
+    if (sessionState === 'authenticated') {
+      refreshAll();
+    } else {
+      clearFinancialData();
+    }
+  }, [sessionState, refreshAll, clearFinancialData]);
 
   return (
     <FinancialContext.Provider
@@ -163,6 +193,7 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         isAuthModalOpen,
         setIsAuthModalOpen,
         refreshAll,
+        clearFinancialData,
         isLoading
       }}
     >

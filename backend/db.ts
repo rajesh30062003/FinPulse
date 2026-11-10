@@ -14,7 +14,9 @@ import {
   IEmergencyFund,
   ISavingsGoal,
   INotification,
-  IEmailLog
+  IEmailLog,
+  IRefreshToken,
+  IEmailVerification
 } from './types.js';
 
 const DATA_DIR = path.resolve(process.cwd(), '.data');
@@ -33,6 +35,8 @@ export interface DatabaseStore {
   savingsGoals: ISavingsGoal[];
   notifications: INotification[];
   emailLogs: IEmailLog[];
+  refreshTokens: IRefreshToken[];
+  emailVerifications: IEmailVerification[];
 }
 
 let memoryDb: DatabaseStore = {
@@ -47,7 +51,9 @@ let memoryDb: DatabaseStore = {
   emergencyFunds: [],
   savingsGoals: [],
   notifications: [],
-  emailLogs: []
+  emailLogs: [],
+  refreshTokens: [],
+  emailVerifications: []
 };
 
 let mongoConnected = false;
@@ -66,6 +72,9 @@ export const UserSchema = new mongoose.Schema({
   resetPasswordToken: { type: String },
   resetPasswordOtp: { type: String },
   resetPasswordExpires: { type: Number },
+  accountStatus: { type: String, default: 'active' },
+  failedLoginAttempts: { type: Number, default: 0 },
+  lockUntil: { type: Number, default: null },
   currency: { type: String, default: 'INR' },
   monthlyBudgetInPaise: { type: Number, default: 4000000 },
   reminderDayOfMonth: { type: Number, default: 25 },
@@ -222,7 +231,31 @@ export const EmailLogSchema = new mongoose.Schema({
   metadata: { type: mongoose.Schema.Types.Mixed }
 });
 
+export const RefreshTokenSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  userId: { type: String, required: true, index: true },
+  tokenHash: { type: String, required: true, index: true },
+  expiresAt: { type: String, required: true },
+  revoked: { type: Boolean, default: false },
+  createdAt: { type: String, default: () => new Date().toISOString() }
+});
+
+export const EmailVerificationSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  email: { type: String, required: true, lowercase: true, index: true },
+  name: { type: String, required: true },
+  passwordHash: { type: String, required: true },
+  otpHash: { type: String, required: true },
+  expiresAt: { type: Number, required: true },
+  attempts: { type: Number, default: 0 },
+  verified: { type: Boolean, default: false },
+  lastSentAt: { type: Number, default: Date.now },
+  createdAt: { type: String, default: () => new Date().toISOString() }
+});
+
 export const UserModel = mongoose.models.User || mongoose.model('User', UserSchema);
+export const RefreshTokenModel = mongoose.models.RefreshToken || mongoose.model('RefreshToken', RefreshTokenSchema);
+export const EmailVerificationModel = mongoose.models.EmailVerification || mongoose.model('EmailVerification', EmailVerificationSchema);
 export const BankAccountModel = mongoose.models.BankAccount || mongoose.model('BankAccount', BankAccountSchema);
 export const CashWalletModel = mongoose.models.CashWallet || mongoose.model('CashWallet', CashWalletSchema);
 export const CreditCardModel = mongoose.models.CreditCard || mongoose.model('CreditCard', CreditCardSchema);
@@ -253,7 +286,23 @@ export async function initDatabase() {
     if (fs.existsSync(DATA_FILE)) {
       try {
         const raw = fs.readFileSync(DATA_FILE, 'utf-8');
-        memoryDb = JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        memoryDb = {
+          users: parsed.users || [],
+          bankAccounts: parsed.bankAccounts || [],
+          cashWallets: parsed.cashWallets || [],
+          creditCards: parsed.creditCards || [],
+          transactions: parsed.transactions || [],
+          budgetAllocations: parsed.budgetAllocations || [],
+          investments: parsed.investments || [],
+          fixedDeposits: parsed.fixedDeposits || [],
+          emergencyFunds: parsed.emergencyFunds || [],
+          savingsGoals: parsed.savingsGoals || [],
+          notifications: parsed.notifications || [],
+          emailLogs: parsed.emailLogs || [],
+          refreshTokens: parsed.refreshTokens || [],
+          emailVerifications: parsed.emailVerifications || []
+        };
       } catch (err) {
         console.warn('Could not parse existing db.json, initializing fresh store:', err);
       }
@@ -316,6 +365,8 @@ export function saveDatabase() {
 }
 
 export function getDb(): DatabaseStore {
+  if (!memoryDb.emailVerifications) memoryDb.emailVerifications = [];
+  if (!memoryDb.refreshTokens) memoryDb.refreshTokens = [];
   return memoryDb;
 }
 
@@ -580,14 +631,133 @@ export async function persistNotification(notif: INotification): Promise<void> {
 }
 
 export async function persistEmailLog(log: IEmailLog): Promise<void> {
-  memoryDb.emailLogs.unshift(log);
+  try {
+    memoryDb.emailLogs.unshift(log);
+    saveDatabase();
+
+    if (mongoConnected && mongoose.connection.readyState === 1) {
+      try {
+        await EmailLogModel.create(log);
+      } catch (err) {
+        console.error('Error saving email log to MongoDB Atlas:', err);
+      }
+    }
+  } catch (err) {
+    console.error('Failed to log email:', err);
+  }
+}
+
+// ================= REFRESH TOKEN & EMAIL VERIFICATION PERSISTENCE ================= //
+
+export async function persistRefreshToken(token: IRefreshToken): Promise<void> {
+  if (!memoryDb.refreshTokens) memoryDb.refreshTokens = [];
+  const idx = memoryDb.refreshTokens.findIndex(t => t.id === token.id);
+  if (idx >= 0) {
+    memoryDb.refreshTokens[idx] = token;
+  } else {
+    memoryDb.refreshTokens.push(token);
+  }
   saveDatabase();
 
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await EmailLogModel.create(log);
+      await RefreshTokenModel.findOneAndUpdate({ id: token.id }, token, { upsert: true });
     } catch (err) {
-      console.error('Error saving email log to MongoDB Atlas:', err);
+      console.error('Error saving refresh token to MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function findRefreshTokenByHash(tokenHash: string): Promise<IRefreshToken | null> {
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      const doc: any = await RefreshTokenModel.findOne({ tokenHash, revoked: false }).lean();
+      if (doc) return doc;
+    } catch (err) {
+      console.warn('MongoDB RefreshToken lookup warning:', err);
+    }
+  }
+  if (!memoryDb.refreshTokens) memoryDb.refreshTokens = [];
+  const token = memoryDb.refreshTokens.find(t => t.tokenHash === tokenHash && !t.revoked);
+  return token || null;
+}
+
+export async function revokeRefreshToken(tokenHash: string): Promise<void> {
+  if (!memoryDb.refreshTokens) memoryDb.refreshTokens = [];
+  const token = memoryDb.refreshTokens.find(t => t.tokenHash === tokenHash);
+  if (token) {
+    token.revoked = true;
+    saveDatabase();
+  }
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await RefreshTokenModel.updateMany({ tokenHash }, { $set: { revoked: true } });
+    } catch (err) {
+      console.error('Error revoking refresh token in MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function revokeAllUserRefreshTokens(userId: string): Promise<void> {
+  if (!memoryDb.refreshTokens) memoryDb.refreshTokens = [];
+  memoryDb.refreshTokens.forEach(t => {
+    if (t.userId === userId) t.revoked = true;
+  });
+  saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await RefreshTokenModel.updateMany({ userId }, { $set: { revoked: true } });
+    } catch (err) {
+      console.error('Error revoking user refresh tokens in MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function persistEmailVerification(verif: IEmailVerification): Promise<void> {
+  if (!memoryDb.emailVerifications) memoryDb.emailVerifications = [];
+  const idx = memoryDb.emailVerifications.findIndex(v => v.email === verif.email);
+  if (idx >= 0) {
+    memoryDb.emailVerifications[idx] = verif;
+  } else {
+    memoryDb.emailVerifications.push(verif);
+  }
+  saveDatabase();
+
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await EmailVerificationModel.findOneAndUpdate({ email: verif.email }, verif, { upsert: true });
+    } catch (err) {
+      console.error('Error saving email verification to MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function findEmailVerification(email: string): Promise<IEmailVerification | null> {
+  const cleanEmail = email.toLowerCase().trim();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      const doc: any = await EmailVerificationModel.findOne({ email: cleanEmail }).lean();
+      if (doc) return doc;
+    } catch (err) {
+      console.warn('MongoDB findEmailVerification warning:', err);
+    }
+  }
+  if (!memoryDb.emailVerifications) memoryDb.emailVerifications = [];
+  const found = memoryDb.emailVerifications.find(v => v.email === cleanEmail);
+  return found || null;
+}
+
+export async function deleteEmailVerification(email: string): Promise<void> {
+  const cleanEmail = email.toLowerCase().trim();
+  if (!memoryDb.emailVerifications) memoryDb.emailVerifications = [];
+  memoryDb.emailVerifications = memoryDb.emailVerifications.filter(v => v.email !== cleanEmail);
+  saveDatabase();
+
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await EmailVerificationModel.deleteMany({ email: cleanEmail });
+    } catch (err) {
+      console.error('Error deleting email verification from MongoDB Atlas:', err);
     }
   }
 }

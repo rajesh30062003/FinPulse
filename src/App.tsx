@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { FinancialProvider, useFinancial } from './context/FinancialContext';
+import { SessionLoader } from './components/SessionLoader';
+import { AuthView } from './components/AuthView';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { AddTransactionModal } from './components/AddTransactionModal';
@@ -92,12 +94,32 @@ const MainLayout: React.FC = () => {
   );
 };
 
+const AppContent: React.FC = () => {
+  const { sessionState, isAuthenticated } = useAuth();
+
+  // 1. Session verification in progress: Render dedicated SessionLoader
+  // Zero financial metrics, balances, or dashboard layouts are rendered
+  if (sessionState === 'checking') {
+    return <SessionLoader />;
+  }
+
+  // 2. Unauthenticated: Full-screen AuthView with zero financial data exposure
+  if (!isAuthenticated || sessionState === 'unauthenticated') {
+    return <AuthView />;
+  }
+
+  // 3. Authenticated: Mount FinancialProvider and MainLayout
+  return (
+    <FinancialProvider>
+      <MainLayout />
+    </FinancialProvider>
+  );
+};
+
 export default function App() {
   return (
     <AuthProvider>
-      <FinancialProvider>
-        <MainLayout />
-      </FinancialProvider>
+      <AppContent />
     </AuthProvider>
   );
 }
