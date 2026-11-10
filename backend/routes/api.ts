@@ -23,7 +23,7 @@ import {
   deleteEmailVerification
 } from '../db.js';
 import { LedgerService } from '../services/ledgerService.js';
-import { EmailService } from '../services/emailService.js';
+import { EmailService, maskEmail } from '../services/emailService.js';
 import { SchedulerService } from '../services/scheduler.js';
 import {
   ITransaction,
@@ -73,6 +73,17 @@ router.get('/health', (req: Request, res: Response) => {
     database: getMongoStatus(),
     timestamp: new Date().toISOString()
   });
+});
+
+// SMTP Status and Diagnostics (safe; never exposes passwords or secrets)
+router.get('/system/smtp-status', async (req: Request, res: Response) => {
+  const status = await EmailService.verifyConnection();
+  res.json(status);
+});
+
+router.get('/email/diagnostics', async (req: Request, res: Response) => {
+  const status = await EmailService.verifyConnection();
+  res.json(status);
 });
 
 // ================= AUTHENTICATION MIDDLEWARE ================= //
@@ -141,14 +152,14 @@ router.post('/auth/register', async (req: Request, res: Response) => {
       return res.status(429).json({ error: `Please wait ${waitSec} seconds before requesting another code.` });
     }
 
-    // Generate secure 6-digit OTP & hash both OTP and password
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate cryptographically secure 6-digit OTP & hash both OTP and password
+    const otp = crypto.randomInt(100000, 1000000).toString();
     const otpHash = hashToken(otp);
     const passwordHash = await bcrypt.hash(password, 10);
 
     // Save pending verification with 5-minute expiration
     const verificationRecord: IEmailVerification = {
-      id: `verif-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      id: `verif-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
       email: cleanEmail,
       name: cleanName,
       passwordHash,
@@ -161,18 +172,26 @@ router.post('/auth/register', async (req: Request, res: Response) => {
     };
     await persistEmailVerification(verificationRecord);
 
-    // Dispatch verification email via Nodemailer
-    await EmailService.sendVerificationEmail({
-      email: cleanEmail,
-      name: cleanName,
-      otp,
-      token: ''
-    });
+    // Dispatch real email via Nodemailer Gmail SMTP
+    try {
+      await EmailService.sendVerificationEmail({
+        email: cleanEmail,
+        name: cleanName,
+        otp
+      });
+    } catch (smtpErr: any) {
+      // SMTP delivery failed: delete verification record so user can retry safely
+      await deleteEmailVerification(cleanEmail);
+      console.error(`[Registration SMTP Failed] Could not dispatch OTP to ${maskEmail(cleanEmail)}:`, smtpErr?.message);
+      return res.status(503).json({
+        error: "We couldn't send your verification email. Please check your email configuration or try again."
+      });
+    }
 
     // Pure secure JSON response WITHOUT leaking the OTP
     return res.status(200).json({
       success: true,
-      message: 'Verification code sent to your email. Code expires in 5 minutes.',
+      message: `Verification code sent to ${maskEmail(cleanEmail)}`,
       email: cleanEmail,
       expiresInSeconds: 300
     });
@@ -359,24 +378,33 @@ router.post('/auth/resend-otp', async (req: Request, res: Response) => {
       return res.status(429).json({ error: `Please wait ${waitSec} seconds before requesting a new code.` });
     }
 
-    // Generate new OTP & refresh expiration
-    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate cryptographically secure new OTP
+    const newOtp = crypto.randomInt(100000, 1000000).toString();
+
+    // Dispatch via real Gmail SMTP
+    try {
+      await EmailService.sendVerificationEmail({
+        email: cleanEmail,
+        name: verif.name,
+        otp: newOtp
+      });
+    } catch (smtpErr: any) {
+      console.error(`[Resend OTP SMTP Failed] Could not dispatch OTP to ${maskEmail(cleanEmail)}:`, smtpErr?.message);
+      return res.status(503).json({
+        error: "We couldn't send your verification email. Please check your email configuration or try again."
+      });
+    }
+
+    // Update pending record only after SMTP success
     verif.otpHash = hashToken(newOtp);
     verif.expiresAt = Date.now() + 5 * 60 * 1000;
     verif.attempts = 0;
     verif.lastSentAt = Date.now();
     await persistEmailVerification(verif);
 
-    await EmailService.sendVerificationEmail({
-      email: cleanEmail,
-      name: verif.name,
-      otp: newOtp,
-      token: ''
-    });
-
     return res.json({
       success: true,
-      message: 'A new verification code has been dispatched to your email.',
+      message: `Verification code sent to ${maskEmail(cleanEmail)}`,
       expiresInSeconds: 300
     });
   } catch (err: any) {
@@ -601,24 +629,29 @@ router.post('/auth/forgot-password', async (req: Request, res: Response) => {
       return res.json({ success: true, message: 'If an account exists with this email, a recovery code has been dispatched.' });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const token = Buffer.from(`reset-${user.id}-${Date.now()}`).toString('base64');
+    const otp = crypto.randomInt(100000, 1000000).toString();
+
+    // Dispatch via real Gmail SMTP
+    try {
+      await EmailService.sendPasswordResetEmail({
+        email: user.email,
+        name: user.name,
+        otp
+      });
+    } catch (smtpErr: any) {
+      console.error(`[Forgot Password SMTP Failed] Could not dispatch reset code to ${maskEmail(cleanEmail)}:`, smtpErr?.message);
+      return res.status(503).json({
+        error: "We couldn't send your verification email. Please check your email configuration or try again."
+      });
+    }
+
     user.resetPasswordOtp = hashToken(otp); // Securely hash reset OTP
-    user.resetPasswordToken = token;
     user.resetPasswordExpires = Date.now() + 15 * 60 * 1000; // 15 mins
     await persistUser(user);
 
-    await EmailService.sendPasswordResetEmail({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      token,
-      otp
-    });
-
     return res.json({
       success: true,
-      message: 'Password recovery email dispatched. Please check your inbox.',
+      message: `Password reset code sent to ${maskEmail(cleanEmail)}`,
       expiresInSeconds: 900
     });
   } catch (err: any) {
@@ -1658,82 +1691,6 @@ router.post('/notifications/trigger-check', authenticate, async (req: AuthReques
   const db = getDb();
   const list = db.notifications.filter(n => n.userId === req.user!.id);
   res.json({ message: 'Reminders check executed', notifications: list });
-});
-
-// ================= EMAIL SANDBOX MAILBOX ================= //
-
-router.get('/mailbox', (req: Request, res: Response) => {
-  const db = getDb();
-  res.json(db.emailLogs);
-});
-
-router.post('/mailbox/test-send', authenticate, async (req: AuthRequest, res: Response) => {
-  try {
-    const { type } = req.body;
-    const db = getDb();
-    const user = db.users.find(u => u.id === req.user!.id) || db.users[0];
-
-    let emailLog;
-    if (type === 'verification') {
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      emailLog = await EmailService.sendVerificationEmail({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        token: 'test-token-' + Date.now(),
-        otp
-      });
-    } else if (type === 'password_reset') {
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      emailLog = await EmailService.sendPasswordResetEmail({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        token: 'reset-token-' + Date.now(),
-        otp
-      });
-    } else if (type === 'cc_bill_reminder') {
-      const card = db.creditCards.find(c => c.userId === user.id) || {
-        cardName: 'HDFC Regalia Gold',
-        lastFourDigits: '9182',
-        outstandingBalanceInPaise: 300000,
-        dueDay: 5
-      };
-      emailLog = await EmailService.sendCreditCardBillReminder(user, {
-        cardName: card.cardName,
-        lastFourDigits: card.lastFourDigits,
-        outstandingPaise: card.outstandingBalanceInPaise || 300000,
-        dueDay: card.dueDay
-      });
-    } else {
-      const fd = db.fixedDeposits.find(f => f.userId === user.id) || {
-        fdName: 'HDFC High Yield FD',
-        bankName: 'HDFC Bank',
-        principalInPaise: 5000000,
-        maturityAmountInPaise: 5385400,
-        maturityDate: new Date(Date.now() + 30 * 86400000).toISOString()
-      };
-      emailLog = await EmailService.sendFDMaturityAlert(user, {
-        fdName: fd.fdName,
-        bankName: fd.bankName,
-        principalPaise: fd.principalInPaise,
-        maturityAmountPaise: fd.maturityAmountInPaise,
-        maturityDate: fd.maturityDate,
-        daysRemaining: 30
-      });
-    }
-
-    res.json({ message: 'Test email generated and recorded in Mailbox Sandbox', email: emailLog });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.delete('/mailbox', (req: Request, res: Response) => {
-  const db = getDb();
-  db.emailLogs = [];
-  saveDatabase();
-  res.json({ message: 'Mailbox cleared' });
 });
 
 // ================= 9 SCENARIO TESTER & RESET ================= //

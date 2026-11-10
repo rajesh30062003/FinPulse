@@ -528,20 +528,19 @@ export const api = {
     });
   },
 
-  // Mailbox
-  async getMailbox() {
-    return apiRequest('/mailbox');
-  },
-
-  async sendTestMail(type: string) {
-    return apiRequest('/mailbox/test-send', {
-      method: 'POST',
-      body: JSON.stringify({ type })
-    });
-  },
-
-  async clearMailbox() {
-    return apiRequest('/mailbox', { method: 'DELETE' });
+  // SMTP Diagnostics
+  async getSmtpStatus() {
+    return apiRequest<{
+      configured: boolean;
+      host: string;
+      port: number;
+      secure: boolean;
+      userMasked: string;
+      from: string;
+      verified: boolean;
+      message: string;
+      timestamp: string;
+    }>('/system/smtp-status');
   },
 
   // Scenarios

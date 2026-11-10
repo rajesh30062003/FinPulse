@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import apiRouter from './routes/api.js';
 import { initDatabase, getMongoStatus } from './db.js';
 import { SchedulerService } from './services/scheduler.js';
+import { EmailService } from './services/emailService.js';
 
 dotenv.config();
 
@@ -118,6 +119,7 @@ async function start() {
     console.log('Initializing FinPulse backend services...');
     await initDatabase();
     SchedulerService.startScheduledJobs();
+    await EmailService.verifyConnection();
 
     app.listen(port, '0.0.0.0', () => {
       console.log(`FinPulse Backend Server running on port ${port} (0.0.0.0:${port})`);

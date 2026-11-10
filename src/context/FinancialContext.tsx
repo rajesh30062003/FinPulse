@@ -8,8 +8,7 @@ import {
   IFixedDeposit,
   IEmergencyFund,
   ISavingsGoal,
-  INotification,
-  IEmailLog
+  INotification
 } from '../types';
 import { api } from '../services/api';
 import { useAuth } from './AuthContext';
@@ -27,7 +26,6 @@ interface FinancialContextType {
   savingsGoals: ISavingsGoal[];
   notifications: INotification[];
   unreadNotificationsCount: number;
-  mailboxLogs: IEmailLog[];
   activeTab: string;
   setActiveTab: (tab: string) => void;
   isAddTxOpen: boolean;
@@ -38,8 +36,6 @@ interface FinancialContextType {
   setIsPayBillOpen: (open: boolean) => void;
   selectedCardForBill: ICreditCard | null;
   setSelectedCardForBill: (card: ICreditCard | null) => void;
-  isMailboxOpen: boolean;
-  setIsMailboxOpen: (open: boolean) => void;
   isScenarioModalOpen: boolean;
   setIsScenarioModalOpen: (open: boolean) => void;
   isAuthModalOpen: boolean;
@@ -66,7 +62,6 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [savingsGoals, setSavingsGoals] = useState<ISavingsGoal[]>([]);
   const [notifications, setNotifications] = useState<INotification[]>([]);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
-  const [mailboxLogs, setMailboxLogs] = useState<IEmailLog[]>([]);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -75,7 +70,6 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [addTxDefaultType, setAddTxDefaultType] = useState<string | undefined>(undefined);
   const [isPayBillOpen, setIsPayBillOpen] = useState(false);
   const [selectedCardForBill, setSelectedCardForBill] = useState<ICreditCard | null>(null);
-  const [isMailboxOpen, setIsMailboxOpen] = useState(false);
   const [isScenarioModalOpen, setIsScenarioModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
@@ -92,7 +86,6 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setSavingsGoals([]);
     setNotifications([]);
     setUnreadNotificationsCount(0);
-    setMailboxLogs([]);
   }, []);
 
   const refreshAll = useCallback(async () => {
@@ -114,8 +107,7 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         fdData,
         efData,
         saveData,
-        notifData,
-        mailData
+        notifData
       ] = await Promise.all([
         api.getDashboardSummary().catch(() => null),
         api.getAccounts().catch(() => []),
@@ -127,8 +119,7 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         api.getFixedDeposits().catch(() => []),
         api.getEmergencyFund().catch(() => null),
         api.getSavingsGoals().catch(() => []),
-        api.getNotifications().catch(() => ({ notifications: [], unreadCount: 0 })),
-        api.getMailbox().catch(() => [])
+        api.getNotifications().catch(() => ({ notifications: [], unreadCount: 0 }))
       ]);
 
       if (sumData) setSummary(sumData);
@@ -143,7 +134,6 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setSavingsGoals(saveData || []);
       setNotifications(notifData?.notifications || []);
       setUnreadNotificationsCount(notifData?.unreadCount || 0);
-      setMailboxLogs(mailData || []);
     } catch (err) {
       console.error('Error fetching financial datasets:', err);
     } finally {
@@ -175,7 +165,6 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         savingsGoals,
         notifications,
         unreadNotificationsCount,
-        mailboxLogs,
         activeTab,
         setActiveTab,
         isAddTxOpen,
@@ -186,8 +175,6 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setIsPayBillOpen,
         selectedCardForBill,
         setSelectedCardForBill,
-        isMailboxOpen,
-        setIsMailboxOpen,
         isScenarioModalOpen,
         setIsScenarioModalOpen,
         isAuthModalOpen,

@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import apiRouter from './backend/routes/api.js';
 import { initDatabase } from './backend/db.js';
 import { SchedulerService } from './backend/services/scheduler.js';
+import { EmailService } from './backend/services/emailService.js';
 
 dotenv.config();
 
@@ -23,6 +24,7 @@ async function startServer() {
   // Initialize DB and cron jobs
   await initDatabase();
   SchedulerService.startScheduledJobs();
+  await EmailService.verifyConnection();
 
   // Health check endpoints
   app.get('/health', (req, res) => {

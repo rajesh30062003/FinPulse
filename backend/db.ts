@@ -1105,49 +1105,6 @@ export async function seedDemoUserAndScenarios(targetUserId?: string): Promise<s
     }
   ];
 
-  // Simulated Email Logs in Sandbox
-  const emailLogs: IEmailLog[] = [
-    {
-      id: 'email-welcome-01',
-      userId,
-      to: 'rjrajeshpal30@gmail.com',
-      subject: 'Welcome to FinPulse - Verify Your Email',
-      previewText: 'Click here or use code 849201 to complete your email verification.',
-      htmlBody: `<div style="font-family:sans-serif;padding:24px;background:#f8fafc;color:#0f172a;">
-        <h2 style="color:#2563eb;">FinPulse Security Verification</h2>
-        <p>Hello Rajesh,</p>
-        <p>Thank you for setting up your personal finance management account. Your secure 6-digit verification code is:</p>
-        <div style="font-size:32px;font-weight:bold;letter-spacing:6px;background:#e2e8f0;padding:16px;text-align:center;border-radius:8px;margin:16px 0;">849201</div>
-        <p>You can also verify instantly by clicking the link below:</p>
-        <a href="#/verify-email?token=verified-demo-token" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">Verify My Account</a>
-      </div>`,
-      sentAt: new Date(Date.now() - 10 * 86400000).toISOString(),
-      status: 'simulated',
-      triggerType: 'verification',
-      metadata: { otp: '849201' }
-    },
-    {
-      id: 'email-bill-reminder-01',
-      userId,
-      to: 'rjrajeshpal30@gmail.com',
-      subject: 'Credit Card Statement Alert: HDFC Regalia Gold',
-      previewText: 'Your monthly statement is generated. Outstanding balance: ₹3,000 due by the 5th.',
-      htmlBody: `<div style="font-family:sans-serif;padding:24px;background:#f8fafc;color:#0f172a;">
-        <h2 style="color:#d97706;">Credit Card Payment Reminder</h2>
-        <p>Hello Rajesh,</p>
-        <p>This is a reminder from FinPulse regarding your <strong>HDFC Regalia Gold (•••• 9182)</strong>.</p>
-        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
-          <tr><td style="padding:8px;border-bottom:1px solid #e2e8f0;">Remaining Outstanding:</td><td style="padding:8px;border-bottom:1px solid #e2e8f0;font-weight:bold;">₹3,000.00</td></tr>
-          <tr><td style="padding:8px;border-bottom:1px solid #e2e8f0;">Payment Due Date:</td><td style="padding:8px;border-bottom:1px solid #e2e8f0;">5th of Month</td></tr>
-        </table>
-        <p>Ensure settlement from your linked bank account before the due date to maintain your credit score.</p>
-      </div>`,
-      sentAt: new Date(Date.now() - 12 * 3600000).toISOString(),
-      status: 'simulated',
-      triggerType: 'cc_bill_reminder'
-    }
-  ];
-
   // Filter out any existing data for this user and inject seeded items
   memoryDb.users = memoryDb.users.filter(u => u.id !== userId).concat(demoUser);
   memoryDb.bankAccounts = memoryDb.bankAccounts.filter(a => a.userId !== userId).concat([hdfcAccount, sbiAccount]);
@@ -1160,7 +1117,7 @@ export async function seedDemoUserAndScenarios(targetUserId?: string): Promise<s
   memoryDb.fixedDeposits = memoryDb.fixedDeposits.filter(f => f.userId !== userId).concat(fixedDeposits);
   memoryDb.transactions = memoryDb.transactions.filter(t => t.userId !== userId).concat(transactions);
   memoryDb.notifications = memoryDb.notifications.filter(n => n.userId !== userId).concat(notifications);
-  memoryDb.emailLogs = memoryDb.emailLogs.concat(emailLogs);
+  memoryDb.emailLogs = [];
 
   saveDatabase();
   return userId;
