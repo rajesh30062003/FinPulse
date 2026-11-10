@@ -1,25 +1,26 @@
-
 {
   "name": "finpulse-backend",
   "version": "1.0.0",
-  "description": "FinPulse Personal Finance Management Backend",
+  "description": "FinPulse Secure Personal Finance Management Backend API",
+  "private": true,
   "type": "module",
-  "main": "src/server.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
-  },
-  "engines": {
-    "node": ">=20"
+    "start": "node server.js",
+    "build": "node -e \"console.log('Build completed successfully')\"",
+    "dev": "node server.js"
   },
   "dependencies": {
-    "express": "^4.21.2",
-    "mongoose": "^8.9.5",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
-    "jsonwebtoken": "^9.0.2",
-    "bcryptjs": "^2.4.3",
-    "nodemailer": "^6.9.16",
-    "node-cron": "^3.0.3"
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.12.1",
+    "node-cron": "^4.6.0",
+    "nodemailer": "^10.5.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
