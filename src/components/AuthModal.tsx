@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { X, Lock, Mail, User, ShieldCheck, KeyRound, AlertCircle, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Lock, Mail, User, ShieldCheck, KeyRound, AlertCircle, CheckCircle2, Server, Globe, ExternalLink, RefreshCw, Check, Settings2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useFinancial } from '../context/FinancialContext';
+import { getApiBase, setCustomApiUrl, api } from '../services/api';
 
 export const AuthModal: React.FC = () => {
   const { isAuthModalOpen, setIsAuthModalOpen, refreshAll, setIsMailboxOpen } = useFinancial();
@@ -17,6 +18,52 @@ export const AuthModal: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Backend connection state for troubleshooting Vercel -> Render integration
+  const [showServerConfig, setShowServerConfig] = useState(false);
+  const [backendUrlInput, setBackendUrlInput] = useState('');
+  const [isTestingBackend, setIsTestingBackend] = useState(false);
+  const [backendStatus, setBackendStatus] = useState<{ online?: boolean; msg?: string } | null>(null);
+
+  useEffect(() => {
+    if (isAuthModalOpen) {
+      setBackendUrlInput(localStorage.getItem('finpulse_api_url') || (import.meta.env.VITE_API_URL as string) || '');
+    }
+  }, [isAuthModalOpen]);
+
+  const testAndSaveBackend = async () => {
+    setIsTestingBackend(true);
+    setBackendStatus(null);
+    try {
+      const urlToTest = backendUrlInput.trim();
+      if (!urlToTest) {
+        setCustomApiUrl(null);
+        setBackendStatus({ online: true, msg: 'Reset to default relative API (/api)' });
+        return;
+      }
+      let target = urlToTest.replace(/\/+$/, '');
+      if (!target.endsWith('/api')) {
+        target = `${target}/api`;
+      }
+      const testRes = await fetch(`${target}/health`, { headers: { Accept: 'application/json' } });
+      const ct = testRes.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        throw new Error(`Server returned non-JSON response (${testRes.status}). Verify this is your Render backend.`);
+      }
+      const json = await testRes.json();
+      if (json.status === 'ok') {
+        setCustomApiUrl(urlToTest);
+        setBackendStatus({ online: true, msg: `Connected successfully! (${json.service || 'Backend OK'})` });
+        setError(null);
+      } else {
+        throw new Error('Health check returned unexpected payload');
+      }
+    } catch (err: any) {
+      setBackendStatus({ online: false, msg: err.message || 'Failed to connect to Render backend' });
+    } finally {
+      setIsTestingBackend(false);
+    }
+  };
 
   if (!isAuthModalOpen) return null;
 
@@ -140,9 +187,23 @@ export const AuthModal: React.FC = () => {
 
         <div className="p-6 space-y-4 text-xs">
           {error && (
-            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
+            <div className="p-3.5 rounded-lg bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span className="font-medium leading-relaxed">{error}</span>
+              </div>
+              {(error.includes('HTML') || error.includes('Render') || error.includes('Vercel') || error.includes('Cannot connect')) && (
+                <div className="pt-2 border-t border-red-200/60 dark:border-red-800/60">
+                  <button
+                    type="button"
+                    onClick={() => setShowServerConfig(true)}
+                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                  >
+                    <Settings2 className="w-3.5 h-3.5" />
+                    Configure Render Backend URL in Browser
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -150,6 +211,73 @@ export const AuthModal: React.FC = () => {
             <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-300 flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span>{success}</span>
+            </div>
+          )}
+
+          {/* Render Backend Connection Drawer / Panel */}
+          {showServerConfig && (
+            <div className="p-3.5 rounded-lg bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-slate-800 dark:text-slate-200 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-semibold text-blue-900 dark:text-blue-300">
+                  <Server className="w-3.5 h-3.5" />
+                  <span>Render Backend Endpoint</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowServerConfig(false)}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-normal">
+                If your frontend is on Vercel and your backend is on Render, enter your live Render URL below:
+              </p>
+              <div className="space-y-1.5">
+                <input
+                  type="url"
+                  value={backendUrlInput}
+                  onChange={e => setBackendUrlInput(e.target.value)}
+                  placeholder="https://finpulse-backend.onrender.com"
+                  className="w-full px-2.5 py-1.5 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono"
+                />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={testAndSaveBackend}
+                    disabled={isTestingBackend}
+                    className="flex-1 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-medium text-[11px] flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    {isTestingBackend ? (
+                      <>
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                        <span>Testing Health...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3 h-3" />
+                        <span>Test & Connect</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBackendUrlInput('');
+                      setCustomApiUrl(null);
+                      setBackendStatus({ online: true, msg: 'Reset to default relative API (/api)' });
+                    }}
+                    className="px-2 py-1.5 text-[11px] text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-md"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+              {backendStatus && (
+                <div className={`p-2 rounded text-[11px] ${backendStatus.online ? 'bg-emerald-100/80 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-200' : 'bg-red-100/80 dark:bg-red-950/80 text-red-800 dark:text-red-200'}`}>
+                  {backendStatus.msg}
+                </div>
+              )}
             </div>
           )}
 
@@ -425,6 +553,22 @@ export const AuthModal: React.FC = () => {
               </div>
             </form>
           )}
+
+          {/* Footer Info & Backend Status */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px] text-slate-500">
+            <div className="flex items-center gap-1.5 truncate max-w-[240px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+              <span className="truncate">API: {getApiBase()}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowServerConfig(!showServerConfig)}
+              className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 shrink-0"
+            >
+              <Server className="w-3 h-3" />
+              <span>{showServerConfig ? 'Hide Config' : 'Change Backend'}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

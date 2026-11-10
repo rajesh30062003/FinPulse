@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, User, Mail, Database, Save, RotateCcw, ShieldCheck, CheckCircle2, Download } from 'lucide-react';
+import { Settings, User, Mail, Database, Save, RotateCcw, ShieldCheck, CheckCircle2, Download, Server, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useFinancial } from '../context/FinancialContext';
-import { api } from '../services/api';
+import { api, getApiBase, setCustomApiUrl } from '../services/api';
 
 export const SettingsView: React.FC = () => {
   const { user, refreshUser } = useAuth();
@@ -26,6 +26,35 @@ export const SettingsView: React.FC = () => {
   const [dbStatus, setDbStatus] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+
+  // Backend connection & Render config
+  const [backendUrl, setBackendUrl] = useState(
+    typeof window !== 'undefined' ? localStorage.getItem('finpulse_api_url') || (import.meta.env.VITE_API_URL as string) || '' : ''
+  );
+  const [backendMsg, setBackendMsg] = useState<string | null>(null);
+  const [isTestingBackend, setIsTestingBackend] = useState(false);
+
+  const handleUpdateBackendUrl = async () => {
+    setIsTestingBackend(true);
+    setBackendMsg(null);
+    try {
+      if (!backendUrl.trim()) {
+        setCustomApiUrl(null);
+        setBackendMsg('Reset to default relative API (/api)');
+        const status = await api.getHealth();
+        setDbStatus(status.database);
+        return;
+      }
+      setCustomApiUrl(backendUrl.trim());
+      const status = await api.getHealth();
+      setDbStatus(status.database);
+      setBackendMsg(`Successfully connected to ${status.service || 'backend'}!`);
+    } catch (err: any) {
+      setBackendMsg('Connection test failed: ' + (err.message || 'Cannot reach URL'));
+    } finally {
+      setIsTestingBackend(false);
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -273,6 +302,73 @@ export const SettingsView: React.FC = () => {
         </div>
       </form>
 
+      {/* Backend & Cloud Deployment Config */}
+      <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Server className="w-4 h-4 text-blue-600" />
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Backend API & Database Connection</h3>
+          </div>
+          <span className="text-[11px] px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+            Active: {getApiBase()}
+          </span>
+        </div>
+
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          When deployed on Vercel, connect directly to your live Render backend URL so registration, authentication, and MongoDB Atlas persistence operate seamlessly.
+        </p>
+
+        <div className="space-y-2">
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+            Render Backend Service URL
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="url"
+              value={backendUrl}
+              onChange={e => setBackendUrl(e.target.value)}
+              placeholder="https://finpulse-backend.onrender.com"
+              className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono"
+            />
+            <button
+              type="button"
+              onClick={handleUpdateBackendUrl}
+              disabled={isTestingBackend}
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            >
+              {isTestingBackend ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Connecting...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Save & Test Health</span>
+                </>
+              )}
+            </button>
+          </div>
+          {backendMsg && (
+            <div className="p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200 text-xs">
+              {backendMsg}
+            </div>
+          )}
+        </div>
+
+        {dbStatus && (
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-4 text-xs text-slate-600 dark:text-slate-400">
+            <div className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${dbStatus.connected ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+              <span>Atlas Status: <strong>{dbStatus.connected ? 'Connected' : 'Resilient Local Store Active'}</strong></span>
+            </div>
+            <div>
+              <span>Mode: <code className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{dbStatus.activeUri || 'Resilient Ledger'}</code></span>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Maintenance & Reset Tools */}
       <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
         <h3 className="text-sm font-bold text-slate-900 dark:text-white">Demo Data & Audit Verification</h3>
@@ -299,7 +395,7 @@ export const SettingsView: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => window.location.href = '/api/transactions/export/csv'}
+            onClick={() => window.location.href = `${getApiBase()}/transactions/export/csv`}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <Download className="w-3.5 h-3.5 text-emerald-500" />

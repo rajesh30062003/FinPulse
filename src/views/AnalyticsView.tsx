@@ -25,7 +25,7 @@ import {
   Line
 } from 'recharts';
 import { useFinancial } from '../context/FinancialContext';
-import { formatINR } from '../services/api';
+import { formatINR, getApiBase } from '../services/api';
 
 const COLORS = ['#2563eb', '#9333ea', '#059669', '#d97706', '#dc2626', '#0284c7', '#4b5563'];
 
@@ -96,7 +96,7 @@ export const AnalyticsView: React.FC = () => {
   ];
 
   const handleExportCSV = () => {
-    window.location.href = '/api/transactions/export/csv';
+    window.location.href = `${getApiBase()}/transactions/export/csv`;
   };
 
   const handlePrintReport = () => {

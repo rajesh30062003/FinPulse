@@ -2,5 +2,7 @@
   "name": "FinPulse - Smart Personal Finance & Money Management",
   "description": "Production-grade personal finance management system with atomic ledger tracking, budget allocations, credit card liabilities, investment analytics, and automated email reminders.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

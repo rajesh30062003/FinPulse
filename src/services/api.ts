@@ -1,11 +1,122 @@
-export const API_BASE = '/api';
+// FinPulse Frontend API Client with Smart URL Normalization and Safe Response Handling
 
-export function getAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem('finpulse_token');
+export function normalizeApiUrl(rawUrl: string): string {
+  let clean = rawUrl.trim().replace(/\/+$/, '');
+  if (/^https?:\/\//i.test(clean)) {
+    // If user provided base URL without /api, append /api
+    if (!clean.endsWith('/api')) {
+      clean = `${clean}/api`;
+    }
+    return clean;
+  }
+  if (!clean.startsWith('/')) {
+    clean = `/${clean}`;
+  }
+  return clean;
+}
+
+export function getApiBase(): string {
+  // 1. Check user override stored in browser
+  if (typeof window !== 'undefined') {
+    const custom = localStorage.getItem('finpulse_api_url');
+    if (custom && custom.trim()) {
+      return normalizeApiUrl(custom.trim());
+    }
+  }
+
+  // 2. Check Vite environment variable VITE_API_URL
+  const envUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+  if (envUrl) {
+    return normalizeApiUrl(envUrl);
+  }
+
+  // 3. Fallback for same-origin dev server
+  return '/api';
+}
+
+export function setCustomApiUrl(url: string | null) {
+  if (typeof window !== 'undefined') {
+    if (url && url.trim()) {
+      localStorage.setItem('finpulse_api_url', url.trim());
+    } else {
+      localStorage.removeItem('finpulse_api_url');
+    }
+  }
+}
+
+export function getAuthHeaders(): Record<string, string> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('finpulse_token') : null;
   return {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {})
   };
+}
+
+export async function apiRequest<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const base = getApiBase();
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const fullUrl = `${base}${cleanEndpoint}`;
+
+  const headers: Record<string, string> = {
+    ...getAuthHeaders(),
+    ...(options.headers as Record<string, string> || {})
+  };
+
+  let res: Response;
+  try {
+    res = await fetch(fullUrl, {
+      ...options,
+      headers
+    });
+  } catch (netErr: any) {
+    console.error('API Network Error:', fullUrl, netErr);
+    throw new Error(
+      `Cannot connect to FinPulse backend at "${fullUrl}". ` +
+      `If using a Render free instance, it may be waking up (please wait 30s) or verify your backend URL.`
+    );
+  }
+
+  const contentType = res.headers.get('content-type') || '';
+  let data: any = null;
+
+  if (contentType.includes('application/json')) {
+    try {
+      data = await res.json();
+    } catch (parseErr: any) {
+      throw new Error(`Failed to parse backend JSON response: ${parseErr.message}`);
+    }
+  } else {
+    const text = await res.text();
+    const trimmed = text.trim();
+
+    // Check if response is HTML
+    if (trimmed.startsWith('<')) {
+      const isVercel = typeof window !== 'undefined' && window.location.hostname.endsWith('vercel.app');
+      const isRelative = !base.startsWith('http://') && !base.startsWith('https://');
+
+      let explanation = `Backend returned HTML instead of JSON (HTTP ${res.status}). `;
+      if (isVercel && isRelative) {
+        explanation += `Your website is hosted on Vercel but trying to call "${fullUrl}" locally. Set VITE_API_URL to your Render backend URL (e.g. https://your-backend.onrender.com) in Vercel settings, or configure it in the login modal.`;
+      } else {
+        explanation += `The request reached "${fullUrl}", which returned an HTML document. Please verify your Render backend URL and ensure the server is online.`;
+      }
+      throw new Error(explanation);
+    }
+
+    try {
+      data = JSON.parse(trimmed);
+    } catch {
+      data = { message: trimmed };
+    }
+  }
+
+  if (!res.ok) {
+    const errorMsg = data?.error || data?.message || `Request to ${cleanEndpoint} failed (Status ${res.status})`;
+    throw new Error(errorMsg);
+  }
+
+  return data as T;
 }
 
 export function formatINR(paise: number, showDecimals: boolean = false): string {
@@ -29,403 +140,294 @@ export function formatNumberINR(paise: number): string {
 export const api = {
   // Auth
   async login(payload: { email: string; password: string }) {
-    const res = await fetch(`${API_BASE}/auth/login`, {
+    return apiRequest('/auth/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Login failed');
-    }
-    return res.json();
   },
 
   async register(payload: { name: string; email: string; password: string }) {
-    const res = await fetch(`${API_BASE}/auth/register`, {
+    return apiRequest('/auth/register', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Registration failed');
-    }
-    return res.json();
   },
 
   async verifyEmail(payload: { email: string; token?: string; otp?: string }) {
-    const res = await fetch(`${API_BASE}/auth/verify-email`, {
+    return apiRequest('/auth/verify-email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Verification failed');
-    }
-    return res.json();
   },
 
   async resendVerification(email: string) {
-    const res = await fetch(`${API_BASE}/auth/resend-verification`, {
+    return apiRequest('/auth/resend-verification', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
     });
-    if (!res.ok) throw new Error('Resend failed');
-    return res.json();
   },
 
   async forgotPassword(email: string) {
-    const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+    return apiRequest('/auth/forgot-password', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
     });
-    if (!res.ok) throw new Error('Password reset request failed');
-    return res.json();
   },
 
   async resetPassword(payload: { email: string; token?: string; otp?: string; newPassword: string }) {
-    const res = await fetch(`${API_BASE}/auth/reset-password`, {
+    return apiRequest('/auth/reset-password', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Reset failed');
-    }
-    return res.json();
   },
 
   async getMe() {
-    const res = await fetch(`${API_BASE}/auth/me`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Failed to fetch user');
-    return res.json();
+    return apiRequest('/auth/me');
   },
 
   async updateProfile(data: any) {
-    const res = await fetch(`${API_BASE}/auth/profile`, {
+    return apiRequest('/auth/profile', {
       method: 'PUT',
-      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    if (!res.ok) throw new Error('Failed to update profile');
-    return res.json();
   },
 
   // Dashboard
   async getDashboardSummary() {
-    const res = await fetch(`${API_BASE}/dashboard/summary`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Failed to load dashboard summary');
-    return res.json();
+    return apiRequest('/dashboard/summary');
   },
 
   // Accounts
   async getAccounts() {
-    const res = await fetch(`${API_BASE}/accounts`, { headers: getAuthHeaders() });
-    return res.json();
+    return apiRequest('/accounts');
   },
 
   async createAccount(data: any) {
-    const res = await fetch(`${API_BASE}/accounts`, {
+    return apiRequest('/accounts', {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    if (!res.ok) throw new Error('Failed to create account');
-    return res.json();
   },
 
   // Cash
   async getCash() {
-    const res = await fetch(`${API_BASE}/cash`, { headers: getAuthHeaders() });
-    return res.json();
+    return apiRequest('/cash');
   },
 
   async adjustCash(data: { newBalanceInPaise: number; reason: string }) {
-    const res = await fetch(`${API_BASE}/cash/adjust`, {
+    return apiRequest('/cash/adjust', {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    return res.json();
   },
 
   // Credit Cards
   async getCreditCards() {
-    const res = await fetch(`${API_BASE}/credit-cards`, { headers: getAuthHeaders() });
-    return res.json();
+    return apiRequest('/credit-cards');
   },
 
   async createCreditCard(data: any) {
-    const res = await fetch(`${API_BASE}/credit-cards`, {
+    return apiRequest('/credit-cards', {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    if (!res.ok) throw new Error('Failed to create credit card');
-    return res.json();
   },
 
   async payCreditCardBill(data: { creditCardId: string; sourceAccountId: string; paymentAmountInPaise: number; notes?: string }) {
-    const res = await fetch(`${API_BASE}/credit-cards/pay-bill`, {
+    return apiRequest('/credit-cards/pay-bill', {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Bill payment failed');
-    }
-    return res.json();
   },
 
   // Transactions
   async getTransactions(params?: Record<string, string>) {
     const q = params ? '?' + new URLSearchParams(params).toString() : '';
-    const res = await fetch(`${API_BASE}/transactions${q}`, { headers: getAuthHeaders() });
-    return res.json();
+    return apiRequest(`/transactions${q}`);
   },
 
   async createTransaction(data: any) {
-    const res = await fetch(`${API_BASE}/transactions`, {
+    return apiRequest('/transactions', {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Failed to record transaction');
-    }
-    return res.json();
   },
 
   async updateTransaction(id: string, data: any) {
-    const res = await fetch(`${API_BASE}/transactions/${id}`, {
+    return apiRequest(`/transactions/${id}`, {
       method: 'PUT',
-      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Failed to update transaction');
-    }
-    return res.json();
   },
 
   async deleteTransaction(id: string) {
-    const res = await fetch(`${API_BASE}/transactions/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders()
+    return apiRequest(`/transactions/${id}`, {
+      method: 'DELETE'
     });
-    return res.json();
   },
 
   // Budget
   async getBudget() {
-    const res = await fetch(`${API_BASE}/budget`, { headers: getAuthHeaders() });
-    return res.json();
+    return apiRequest('/budget');
   },
 
   async updateBudget(data: any) {
-    const res = await fetch(`${API_BASE}/budget`, {
+    return apiRequest('/budget', {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    return res.json();
   },
 
   // Investments
   async getInvestments() {
-    const res = await fetch(`${API_BASE}/investments`, { headers: getAuthHeaders() });
-    return res.json();
+    return apiRequest('/investments');
   },
 
   async createInvestment(data: any) {
-    const res = await fetch(`${API_BASE}/investments`, {
+    return apiRequest('/investments', {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    return res.json();
   },
 
   async updateInvestmentValuation(id: string, currentValueInPaise: number) {
-    const res = await fetch(`${API_BASE}/investments/${id}/valuation`, {
+    return apiRequest(`/investments/${id}/valuation`, {
       method: 'PUT',
-      headers: getAuthHeaders(),
       body: JSON.stringify({ currentValueInPaise })
     });
-    return res.json();
   },
 
   async deleteInvestment(id: string) {
-    const res = await fetch(`${API_BASE}/investments/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders()
+    return apiRequest(`/investments/${id}`, {
+      method: 'DELETE'
     });
-    return res.json();
   },
 
   // Fixed Deposits
   async getFixedDeposits() {
-    const res = await fetch(`${API_BASE}/fixed-deposits`, { headers: getAuthHeaders() });
-    return res.json();
+    return apiRequest('/fixed-deposits');
   },
 
   async createFixedDeposit(data: any) {
-    const res = await fetch(`${API_BASE}/fixed-deposits`, {
+    return apiRequest('/fixed-deposits', {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    return res.json();
   },
 
   async deleteFixedDeposit(id: string) {
-    const res = await fetch(`${API_BASE}/fixed-deposits/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders()
+    return apiRequest(`/fixed-deposits/${id}`, {
+      method: 'DELETE'
     });
-    return res.json();
   },
 
   // Emergency Fund
   async getEmergencyFund() {
-    const res = await fetch(`${API_BASE}/emergency-fund`, { headers: getAuthHeaders() });
-    return res.json();
+    return apiRequest('/emergency-fund');
   },
 
   async updateEmergencyTarget(targetAmountInPaise: number) {
-    const res = await fetch(`${API_BASE}/emergency-fund/target`, {
+    return apiRequest('/emergency-fund/target', {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify({ targetAmountInPaise })
     });
-    return res.json();
   },
 
   async depositEmergencyFund(data: { amountInPaise: number; sourceAccountId: string; notes?: string }) {
-    const res = await fetch(`${API_BASE}/emergency-fund/deposit`, {
+    return apiRequest('/emergency-fund/deposit', {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    return res.json();
   },
 
   async withdrawEmergencyFund(data: { amountInPaise: number; destinationAccountId: string; notes?: string }) {
-    const res = await fetch(`${API_BASE}/emergency-fund/withdraw`, {
+    return apiRequest('/emergency-fund/withdraw', {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    return res.json();
   },
 
   // Savings
   async getSavingsGoals() {
-    const res = await fetch(`${API_BASE}/savings-goals`, { headers: getAuthHeaders() });
-    return res.json();
+    return apiRequest('/savings-goals');
   },
 
   async createSavingsGoal(data: any) {
-    const res = await fetch(`${API_BASE}/savings-goals`, {
+    return apiRequest('/savings-goals', {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    return res.json();
   },
 
   async contributeSavingsGoal(id: string, data: { amountInPaise: number; sourceAccountId: string }) {
-    const res = await fetch(`${API_BASE}/savings-goals/${id}/contribute`, {
+    return apiRequest(`/savings-goals/${id}/contribute`, {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    return res.json();
   },
 
   async deleteSavingsGoal(id: string) {
-    const res = await fetch(`${API_BASE}/savings-goals/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders()
+    return apiRequest(`/savings-goals/${id}`, {
+      method: 'DELETE'
     });
-    return res.json();
   },
 
   // Notifications
   async getNotifications() {
-    const res = await fetch(`${API_BASE}/notifications`, { headers: getAuthHeaders() });
-    return res.json();
+    return apiRequest('/notifications');
   },
 
   async markNotificationRead(id: string) {
-    const res = await fetch(`${API_BASE}/notifications/${id}/read`, {
-      method: 'POST',
-      headers: getAuthHeaders()
+    return apiRequest(`/notifications/${id}/read`, {
+      method: 'POST'
     });
-    return res.json();
   },
 
   async markAllNotificationsRead() {
-    const res = await fetch(`${API_BASE}/notifications/mark-all-read`, {
-      method: 'POST',
-      headers: getAuthHeaders()
+    return apiRequest('/notifications/mark-all-read', {
+      method: 'POST'
     });
-    return res.json();
   },
 
   async triggerReminderCheck() {
-    const res = await fetch(`${API_BASE}/notifications/trigger-check`, {
-      method: 'POST',
-      headers: getAuthHeaders()
+    return apiRequest('/notifications/trigger-check', {
+      method: 'POST'
     });
-    return res.json();
   },
 
   // Mailbox
   async getMailbox() {
-    const res = await fetch(`${API_BASE}/mailbox`);
-    return res.json();
+    return apiRequest('/mailbox');
   },
 
   async sendTestMail(type: string) {
-    const res = await fetch(`${API_BASE}/mailbox/test-send`, {
+    return apiRequest('/mailbox/test-send', {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify({ type })
     });
-    return res.json();
   },
 
   async clearMailbox() {
-    const res = await fetch(`${API_BASE}/mailbox`, { method: 'DELETE' });
-    return res.json();
+    return apiRequest('/mailbox', { method: 'DELETE' });
   },
 
   // Scenarios
   async resetScenarios() {
-    const res = await fetch(`${API_BASE}/scenarios/reset`, {
-      method: 'POST',
-      headers: getAuthHeaders()
+    return apiRequest('/scenarios/reset', {
+      method: 'POST'
     });
-    return res.json();
   },
 
   async verifyAllScenarios() {
-    const res = await fetch(`${API_BASE}/scenarios/verify-all`, { headers: getAuthHeaders() });
-    return res.json();
+    return apiRequest('/scenarios/verify-all');
   },
 
-  // System
+  // System Health
+  async getHealth() {
+    return apiRequest('/health');
+  },
+
   async getSystemStatus() {
-    const res = await fetch(`${API_BASE}/system/status`);
-    return res.json();
+    return apiRequest('/system/status');
   }
 };

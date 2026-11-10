@@ -1,14 +1,36 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { getDb, saveDatabase, seedDemoUserAndScenarios, getMongoStatus } from '../db.js';
+import {
+  getDb,
+  saveDatabase,
+  seedDemoUserAndScenarios,
+  getMongoStatus,
+  findUserByEmail,
+  findUserById,
+  persistUser,
+  persistBankAccount,
+  persistCashWallet,
+  persistBudgetAllocation,
+  persistEmergencyFund
+} from '../db.js';
 import { LedgerService } from '../services/ledgerService.js';
 import { EmailService } from '../services/emailService.js';
 import { SchedulerService } from '../services/scheduler.js';
-import { ITransaction, IUser } from '../types.js';
+import { ITransaction, IUser, IBankAccount, ICashWallet, IBudgetAllocation, IEmergencyFund } from '../types.js';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'finpulse_jwt_secret_dev_2026';
+
+// Health check endpoint inside API router (/api/health)
+router.get('/health', (req: Request, res: Response) => {
+  res.json({
+    status: 'ok',
+    service: 'FinPulse API Router',
+    database: getMongoStatus(),
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Auth Middleware
 export interface AuthRequest extends Request {
@@ -48,16 +70,31 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
 router.post('/auth/register', async (req: Request, res: Response) => {
   try {
     const { name, email, password } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Name, email, and password are required' });
+
+    // 1. Validate inputs thoroughly
+    if (!name || typeof name !== 'string' || name.trim().length < 2) {
+      return res.status(400).json({ error: 'Full name is required (minimum 2 characters)' });
     }
 
-    const db = getDb();
-    const existing = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || typeof email !== 'string' || !emailRegex.test(email.trim())) {
+      return res.status(400).json({ error: 'A valid email address is required' });
+    }
+
+    if (!password || typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters in length' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
+
+    // 2. Check if user already exists in MongoDB Atlas or local store
+    const existing = await findUserByEmail(cleanEmail);
     if (existing) {
-      return res.status(400).json({ error: 'User with this email already exists' });
+      return res.status(400).json({ error: 'An account with this email address already exists. Please sign in.' });
     }
 
+    // 3. Securely hash password
     const passwordHash = await bcrypt.hash(password, 10);
     const userId = `user-${Date.now()}`;
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -65,8 +102,8 @@ router.post('/auth/register', async (req: Request, res: Response) => {
 
     const newUser: IUser = {
       id: userId,
-      name,
-      email,
+      name: cleanName,
+      email: cleanEmail,
       passwordHash,
       isVerified: false,
       verificationToken: token,
@@ -78,13 +115,15 @@ router.post('/auth/register', async (req: Request, res: Response) => {
       createdAt: new Date().toISOString()
     };
 
-    db.users.push(newUser);
-    // Seed initial bank account and cash wallet for new user
-    db.bankAccounts.push({
+    // 4. Save user to MongoDB Atlas & resilient store
+    await persistUser(newUser);
+
+    // 5. Seed initial accounts for the newly registered user
+    const bankAccount: IBankAccount = {
       id: `bank-${Date.now()}`,
       userId,
       bankName: 'Primary Bank',
-      accountHolderName: name,
+      accountHolderName: cleanName,
       accountType: 'Savings',
       accountNickname: 'Savings Account',
       accountNumberMasked: '•••• 1234',
@@ -92,60 +131,81 @@ router.post('/auth/register', async (req: Request, res: Response) => {
       openingBalanceInPaise: 0,
       isActive: true,
       createdAt: new Date().toISOString()
-    });
-    db.cashWallets.push({
+    };
+    await persistBankAccount(bankAccount);
+
+    const cashWallet: ICashWallet = {
       id: `cash-${Date.now()}`,
       userId,
       balanceInPaise: 0,
       updatedAt: new Date().toISOString()
-    });
-    db.budgetAllocations.push({
+    };
+    await persistCashWallet(cashWallet);
+
+    const now = new Date();
+    const currentMonthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const budgetAllocation: IBudgetAllocation = {
       id: `budget-${userId}`,
       userId,
-      monthYear: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
+      monthYear: currentMonthYear,
       essentialBudgetInPaise: 2000000,
       funBudgetInPaise: 500000,
       investmentBudgetInPaise: 500000,
       emergencyBudgetInPaise: 500000,
       savingsBudgetInPaise: 500000,
       carryForwardEnabled: false
-    });
-    db.emergencyFunds.push({
+    };
+    await persistBudgetAllocation(budgetAllocation);
+
+    const emergencyFund: IEmergencyFund = {
       id: `ef-${Date.now()}`,
       userId,
       targetAmountInPaise: 10000000,
       currentBalanceInPaise: 0,
       updatedAt: new Date().toISOString()
-    });
+    };
+    await persistEmergencyFund(emergencyFund);
 
-    saveDatabase();
-
-    // Send verification email
+    // 6. Send verification email via automated service
     await EmailService.sendVerificationEmail({
       id: userId,
-      email,
-      name,
+      email: cleanEmail,
+      name: cleanName,
       token,
       otp
     });
 
-    const jwtToken = jwt.sign({ id: userId, email }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({
+    const jwtToken = jwt.sign({ id: userId, email: cleanEmail }, JWT_SECRET, { expiresIn: '7d' });
+
+    // 7. Return JSON response with status 201
+    return res.status(201).json({
+      success: true,
       message: 'Registration successful. Verification email sent.',
-      user: { id: userId, name, email, isVerified: false },
+      user: {
+        id: userId,
+        name: cleanName,
+        email: cleanEmail,
+        isVerified: false,
+        currency: 'INR'
+      },
       token: jwtToken,
       otpSent: otp
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Registration failed' });
+    console.error('Registration route error:', err);
+    return res.status(500).json({ error: err.message || 'Registration failed' });
   }
 });
 
 router.post('/auth/login', async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
-    const db = getDb();
-    const user = db.users.find(u => u.email.toLowerCase() === (email || '').toLowerCase());
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const user = await findUserByEmail(cleanEmail);
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
@@ -157,7 +217,8 @@ router.post('/auth/login', async (req: Request, res: Response) => {
     }
 
     const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({
+    return res.json({
+      success: true,
       message: 'Login successful',
       token,
       user: {
@@ -170,7 +231,7 @@ router.post('/auth/login', async (req: Request, res: Response) => {
       }
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Login failed' });
+    return res.status(500).json({ error: err.message || 'Login failed' });
   }
 });
 

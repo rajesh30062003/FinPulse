@@ -10,11 +10,38 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;
 
-// Enable CORS for frontend deployment (e.g. Vercel)
+// Comprehensive CORS configuration supporting Vercel deployments and custom clients
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173'
+];
+if (process.env.CLIENT_URL) {
+  allowedOrigins.push(process.env.CLIENT_URL.trim().replace(/\/+$/, ''));
+}
+
 app.use(cors({
-  origin: process.env.CLIENT_URL ? [process.env.CLIENT_URL, 'http://localhost:3000'] : true,
-  credentials: true
+  origin: (origin, callback) => {
+    // Non-browser clients, same-origin, or curl
+    if (!origin) return callback(null, true);
+    // Any Vercel deployment preview or production domain
+    if (origin.endsWith('.vercel.app') || origin.endsWith('.onrender.com')) {
+      return callback(null, true);
+    }
+    const cleanOrigin = origin.replace(/\/+$/, '');
+    if (allowedOrigins.includes(cleanOrigin)) {
+      return callback(null, true);
+    }
+    // Default allow all origins in SaaS multi-deployment
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
 }));
+
+app.options('*', cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -43,6 +70,7 @@ app.get('/', (req, res) => {
     name: 'FinPulse Financial Management API',
     status: 'online',
     healthCheck: '/api/health',
+    database: getMongoStatus(),
     endpoints: {
       auth: '/api/auth',
       accounts: '/api/accounts',
@@ -59,6 +87,24 @@ app.get('/', (req, res) => {
 
 // Mount all existing financial API routes
 app.use('/api', apiRouter);
+
+// Catch-all 404 handler that returns pure JSON instead of default HTML
+app.use((req, res) => {
+  res.status(404).json({
+    error: `Endpoint not found: ${req.method} ${req.originalUrl}`,
+    status: 404,
+    help: 'Ensure requests include the /api prefix or verify API route spelling'
+  });
+});
+
+// Global error handler guaranteeing valid JSON responses
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Unhandled server error:', err);
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal server error occurred',
+    status: err.status || 500
+  });
+});
 
 // Start server and initialize database & scheduled jobs
 async function start() {

@@ -53,12 +53,194 @@ let memoryDb: DatabaseStore = {
 let mongoConnected = false;
 let mongoError: string | null = null;
 
+// ================= MONGOOSE SCHEMAS & MODELS ================= //
+
+export const UserSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  passwordHash: { type: String, required: true },
+  isVerified: { type: Boolean, default: false },
+  verificationToken: { type: String },
+  verificationOtp: { type: String },
+  resetPasswordToken: { type: String },
+  resetPasswordOtp: { type: String },
+  resetPasswordExpires: { type: Number },
+  currency: { type: String, default: 'INR' },
+  monthlyBudgetInPaise: { type: Number, default: 4000000 },
+  reminderDayOfMonth: { type: Number, default: 25 },
+  emailNotificationsEnabled: { type: Boolean, default: true },
+  createdAt: { type: String, default: () => new Date().toISOString() }
+}, { timestamps: true });
+
+export const BankAccountSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  userId: { type: String, required: true, index: true },
+  bankName: { type: String, required: true },
+  accountHolderName: { type: String, required: true },
+  accountType: { type: String, default: 'Savings' },
+  accountNickname: { type: String, required: true },
+  accountNumberMasked: { type: String, required: true },
+  balanceInPaise: { type: Number, default: 0 },
+  openingBalanceInPaise: { type: Number, default: 0 },
+  isActive: { type: Boolean, default: true },
+  notes: { type: String },
+  createdAt: { type: String, default: () => new Date().toISOString() }
+});
+
+export const CashWalletSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  userId: { type: String, required: true, index: true },
+  balanceInPaise: { type: Number, default: 0 },
+  notes: { type: String },
+  updatedAt: { type: String, default: () => new Date().toISOString() }
+});
+
+export const CreditCardSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  userId: { type: String, required: true, index: true },
+  cardName: { type: String, required: true },
+  bankName: { type: String, required: true },
+  cardNickname: { type: String, required: true },
+  lastFourDigits: { type: String, required: true },
+  creditLimitInPaise: { type: Number, required: true },
+  outstandingBalanceInPaise: { type: Number, default: 0 },
+  availableCreditInPaise: { type: Number, required: true },
+  statementDay: { type: Number, default: 15 },
+  dueDay: { type: Number, default: 5 },
+  billingCycle: { type: String, default: '16th to 15th' },
+  notes: { type: String },
+  isActive: { type: Boolean, default: true },
+  lastPaymentDate: { type: String },
+  lastPaymentAmountInPaise: { type: Number }
+});
+
+export const TransactionSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  userId: { type: String, required: true, index: true },
+  date: { type: String, required: true },
+  type: { type: String, required: true },
+  mainCategory: { type: String, required: true },
+  subCategory: { type: String, required: true },
+  customSubCategory: { type: String },
+  amountInPaise: { type: Number, required: true },
+  paymentMethod: { type: String, required: true },
+  sourceAccountId: { type: String },
+  destinationAccountId: { type: String },
+  creditCardId: { type: String },
+  description: { type: String, required: true },
+  notes: { type: String },
+  status: { type: String, default: 'Completed' },
+  createdAt: { type: String, default: () => new Date().toISOString() }
+});
+
+export const BudgetAllocationSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  userId: { type: String, required: true, index: true },
+  monthYear: { type: String, required: true },
+  essentialBudgetInPaise: { type: Number, default: 0 },
+  funBudgetInPaise: { type: Number, default: 0 },
+  investmentBudgetInPaise: { type: Number, default: 0 },
+  emergencyBudgetInPaise: { type: Number, default: 0 },
+  savingsBudgetInPaise: { type: Number, default: 0 },
+  carryForwardEnabled: { type: Boolean, default: false }
+});
+
+export const EmergencyFundSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  userId: { type: String, required: true, index: true },
+  targetAmountInPaise: { type: Number, default: 0 },
+  currentBalanceInPaise: { type: Number, default: 0 },
+  updatedAt: { type: String, default: () => new Date().toISOString() }
+});
+
+export const SavingsGoalSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  userId: { type: String, required: true, index: true },
+  name: { type: String, required: true },
+  targetAmountInPaise: { type: Number, required: true },
+  savedAmountInPaise: { type: Number, default: 0 },
+  targetDate: { type: String, required: true },
+  monthlyContributionInPaise: { type: Number, default: 0 },
+  notes: { type: String }
+});
+
+export const InvestmentSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  userId: { type: String, required: true, index: true },
+  name: { type: String, required: true },
+  type: { type: String, required: true },
+  investedAmountInPaise: { type: Number, required: true },
+  currentValueInPaise: { type: Number, required: true },
+  investmentDate: { type: String, required: true },
+  durationMonths: { type: Number },
+  maturityDate: { type: String },
+  expectedReturnRate: { type: Number },
+  riskLevel: { type: String, default: 'Moderate Risk' },
+  notes: { type: String }
+});
+
+export const FixedDepositSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  userId: { type: String, required: true, index: true },
+  bankName: { type: String, required: true },
+  fdName: { type: String, required: true },
+  principalInPaise: { type: Number, required: true },
+  interestRate: { type: Number, required: true },
+  compoundingFrequency: { type: String, default: 'Quarterly' },
+  startDate: { type: String, required: true },
+  maturityDate: { type: String, required: true },
+  durationMonths: { type: Number, required: true },
+  maturityAmountInPaise: { type: Number, required: true },
+  interestEarnedInPaise: { type: Number, required: true },
+  autoRenewal: { type: Boolean, default: false },
+  status: { type: String, default: 'Active' },
+  remindersSent: [{ type: String }]
+});
+
+export const NotificationSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  userId: { type: String, required: true, index: true },
+  title: { type: String, required: true },
+  message: { type: String, required: true },
+  type: { type: String, required: true },
+  isRead: { type: Boolean, default: false },
+  metadata: { type: mongoose.Schema.Types.Mixed },
+  createdAt: { type: String, default: () => new Date().toISOString() }
+});
+
+export const EmailLogSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  userId: { type: String },
+  to: { type: String, required: true },
+  subject: { type: String, required: true },
+  htmlBody: { type: String, required: true },
+  previewText: { type: String, required: true },
+  sentAt: { type: String, default: () => new Date().toISOString() },
+  status: { type: String, default: 'sent' },
+  triggerType: { type: String, required: true },
+  metadata: { type: mongoose.Schema.Types.Mixed }
+});
+
+export const UserModel = mongoose.models.User || mongoose.model('User', UserSchema);
+export const BankAccountModel = mongoose.models.BankAccount || mongoose.model('BankAccount', BankAccountSchema);
+export const CashWalletModel = mongoose.models.CashWallet || mongoose.model('CashWallet', CashWalletSchema);
+export const CreditCardModel = mongoose.models.CreditCard || mongoose.model('CreditCard', CreditCardSchema);
+export const TransactionModel = mongoose.models.Transaction || mongoose.model('Transaction', TransactionSchema);
+export const BudgetAllocationModel = mongoose.models.BudgetAllocation || mongoose.model('BudgetAllocation', BudgetAllocationSchema);
+export const EmergencyFundModel = mongoose.models.EmergencyFund || mongoose.model('EmergencyFund', EmergencyFundSchema);
+export const SavingsGoalModel = mongoose.models.SavingsGoal || mongoose.model('SavingsGoal', SavingsGoalSchema);
+export const InvestmentModel = mongoose.models.Investment || mongoose.model('Investment', InvestmentSchema);
+export const FixedDepositModel = mongoose.models.FixedDeposit || mongoose.model('FixedDeposit', FixedDepositSchema);
+export const NotificationModel = mongoose.models.Notification || mongoose.model('Notification', NotificationSchema);
+export const EmailLogModel = mongoose.models.EmailLog || mongoose.model('EmailLog', EmailLogSchema);
+
 export function getMongoStatus() {
   return {
     connected: mongoConnected,
     connectionState: mongoose.connection.readyState,
     error: mongoError,
-    activeUri: process.env.MONGODB_URI ? 'Configured' : 'Not set (Using internal resilient store)'
+    activeUri: process.env.MONGODB_URI ? 'Configured (MongoDB Atlas)' : 'Not set (Using internal resilient store)'
   };
 }
 
@@ -82,10 +264,30 @@ export async function initDatabase() {
     if (mongoUri && mongoUri.startsWith('mongodb')) {
       try {
         console.log('Connecting to MongoDB Atlas...');
-        await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 4000 });
+        await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 });
         mongoConnected = true;
         mongoError = null;
         console.log('Successfully connected to MongoDB Atlas!');
+
+        // Sync from MongoDB Atlas if data exists
+        const atlasUsers = await UserModel.find({}).lean();
+        if (atlasUsers && atlasUsers.length > 0) {
+          console.log(`Loaded ${atlasUsers.length} users from MongoDB Atlas.`);
+          memoryDb.users = atlasUsers.map((u: any) => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            passwordHash: u.passwordHash,
+            isVerified: u.isVerified,
+            verificationToken: u.verificationToken,
+            verificationOtp: u.verificationOtp,
+            currency: u.currency || 'INR',
+            monthlyBudgetInPaise: u.monthlyBudgetInPaise || 4000000,
+            reminderDayOfMonth: u.reminderDayOfMonth || 25,
+            emailNotificationsEnabled: u.emailNotificationsEnabled !== false,
+            createdAt: u.createdAt || new Date().toISOString()
+          }));
+        }
       } catch (err: any) {
         mongoConnected = false;
         mongoError = err.message || 'Connection timeout';
@@ -115,6 +317,279 @@ export function saveDatabase() {
 
 export function getDb(): DatabaseStore {
   return memoryDb;
+}
+
+// ================= ATLAS & RESILIENT PERSISTENCE HELPERS ================= //
+
+export async function findUserByEmail(email: string): Promise<IUser | null> {
+  const cleanEmail = email.trim().toLowerCase();
+  // 1. Check MongoDB Atlas if connected
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      const doc: any = await UserModel.findOne({ email: cleanEmail }).lean();
+      if (doc) {
+        // sync to memory store
+        const existingIdx = memoryDb.users.findIndex(u => u.id === doc.id);
+        const mappedUser: IUser = {
+          id: doc.id,
+          name: doc.name,
+          email: doc.email,
+          passwordHash: doc.passwordHash,
+          isVerified: doc.isVerified,
+          verificationToken: doc.verificationToken,
+          verificationOtp: doc.verificationOtp,
+          resetPasswordToken: doc.resetPasswordToken,
+          resetPasswordOtp: doc.resetPasswordOtp,
+          resetPasswordExpires: doc.resetPasswordExpires,
+          currency: doc.currency || 'INR',
+          monthlyBudgetInPaise: doc.monthlyBudgetInPaise || 4000000,
+          reminderDayOfMonth: doc.reminderDayOfMonth || 25,
+          emailNotificationsEnabled: doc.emailNotificationsEnabled !== false,
+          createdAt: doc.createdAt
+        };
+        if (existingIdx >= 0) {
+          memoryDb.users[existingIdx] = mappedUser;
+        } else {
+          memoryDb.users.push(mappedUser);
+        }
+        return mappedUser;
+      }
+    } catch (err) {
+      console.warn('MongoDB user lookup warning:', err);
+    }
+  }
+  // 2. Check local memory store
+  const found = memoryDb.users.find(u => u.email.toLowerCase() === cleanEmail);
+  return found || null;
+}
+
+export async function findUserById(id: string): Promise<IUser | null> {
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      const doc: any = await UserModel.findOne({ id }).lean();
+      if (doc) return doc;
+    } catch (err) {
+      console.warn('MongoDB findUserById warning:', err);
+    }
+  }
+  return memoryDb.users.find(u => u.id === id) || null;
+}
+
+export async function persistUser(user: IUser): Promise<void> {
+  // Update memory store
+  const idx = memoryDb.users.findIndex(u => u.id === user.id);
+  if (idx >= 0) {
+    memoryDb.users[idx] = user;
+  } else {
+    memoryDb.users.push(user);
+  }
+  saveDatabase();
+
+  // Persist to MongoDB Atlas
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await UserModel.findOneAndUpdate(
+        { id: user.id },
+        { ...user, email: user.email.toLowerCase().trim() },
+        { upsert: true, new: true }
+      );
+    } catch (err) {
+      console.error('Error saving user to MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function persistBankAccount(account: IBankAccount): Promise<void> {
+  const idx = memoryDb.bankAccounts.findIndex(a => a.id === account.id);
+  if (idx >= 0) {
+    memoryDb.bankAccounts[idx] = account;
+  } else {
+    memoryDb.bankAccounts.push(account);
+  }
+  saveDatabase();
+
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await BankAccountModel.findOneAndUpdate({ id: account.id }, account, { upsert: true });
+    } catch (err) {
+      console.error('Error saving bank account to MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function persistCashWallet(wallet: ICashWallet): Promise<void> {
+  const idx = memoryDb.cashWallets.findIndex(w => w.id === wallet.id);
+  if (idx >= 0) {
+    memoryDb.cashWallets[idx] = wallet;
+  } else {
+    memoryDb.cashWallets.push(wallet);
+  }
+  saveDatabase();
+
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await CashWalletModel.findOneAndUpdate({ id: wallet.id }, wallet, { upsert: true });
+    } catch (err) {
+      console.error('Error saving cash wallet to MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function persistCreditCard(card: ICreditCard): Promise<void> {
+  const idx = memoryDb.creditCards.findIndex(c => c.id === card.id);
+  if (idx >= 0) {
+    memoryDb.creditCards[idx] = card;
+  } else {
+    memoryDb.creditCards.push(card);
+  }
+  saveDatabase();
+
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await CreditCardModel.findOneAndUpdate({ id: card.id }, card, { upsert: true });
+    } catch (err) {
+      console.error('Error saving credit card to MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function persistTransaction(tx: ITransaction): Promise<void> {
+  const idx = memoryDb.transactions.findIndex(t => t.id === tx.id);
+  if (idx >= 0) {
+    memoryDb.transactions[idx] = tx;
+  } else {
+    memoryDb.transactions.unshift(tx);
+  }
+  saveDatabase();
+
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await TransactionModel.findOneAndUpdate({ id: tx.id }, tx, { upsert: true });
+    } catch (err) {
+      console.error('Error saving transaction to MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function persistBudgetAllocation(budget: IBudgetAllocation): Promise<void> {
+  const idx = memoryDb.budgetAllocations.findIndex(b => b.id === budget.id);
+  if (idx >= 0) {
+    memoryDb.budgetAllocations[idx] = budget;
+  } else {
+    memoryDb.budgetAllocations.push(budget);
+  }
+  saveDatabase();
+
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await BudgetAllocationModel.findOneAndUpdate({ id: budget.id }, budget, { upsert: true });
+    } catch (err) {
+      console.error('Error saving budget allocation to MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function persistEmergencyFund(ef: IEmergencyFund): Promise<void> {
+  const idx = memoryDb.emergencyFunds.findIndex(e => e.id === ef.id);
+  if (idx >= 0) {
+    memoryDb.emergencyFunds[idx] = ef;
+  } else {
+    memoryDb.emergencyFunds.push(ef);
+  }
+  saveDatabase();
+
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await EmergencyFundModel.findOneAndUpdate({ id: ef.id }, ef, { upsert: true });
+    } catch (err) {
+      console.error('Error saving emergency fund to MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function persistSavingsGoal(goal: ISavingsGoal): Promise<void> {
+  const idx = memoryDb.savingsGoals.findIndex(s => s.id === goal.id);
+  if (idx >= 0) {
+    memoryDb.savingsGoals[idx] = goal;
+  } else {
+    memoryDb.savingsGoals.push(goal);
+  }
+  saveDatabase();
+
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await SavingsGoalModel.findOneAndUpdate({ id: goal.id }, goal, { upsert: true });
+    } catch (err) {
+      console.error('Error saving savings goal to MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function persistInvestment(inv: IInvestment): Promise<void> {
+  const idx = memoryDb.investments.findIndex(i => i.id === inv.id);
+  if (idx >= 0) {
+    memoryDb.investments[idx] = inv;
+  } else {
+    memoryDb.investments.push(inv);
+  }
+  saveDatabase();
+
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await InvestmentModel.findOneAndUpdate({ id: inv.id }, inv, { upsert: true });
+    } catch (err) {
+      console.error('Error saving investment to MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function persistFixedDeposit(fd: IFixedDeposit): Promise<void> {
+  const idx = memoryDb.fixedDeposits.findIndex(f => f.id === fd.id);
+  if (idx >= 0) {
+    memoryDb.fixedDeposits[idx] = fd;
+  } else {
+    memoryDb.fixedDeposits.push(fd);
+  }
+  saveDatabase();
+
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await FixedDepositModel.findOneAndUpdate({ id: fd.id }, fd, { upsert: true });
+    } catch (err) {
+      console.error('Error saving fixed deposit to MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function persistNotification(notif: INotification): Promise<void> {
+  const idx = memoryDb.notifications.findIndex(n => n.id === notif.id);
+  if (idx >= 0) {
+    memoryDb.notifications[idx] = notif;
+  } else {
+    memoryDb.notifications.unshift(notif);
+  }
+  saveDatabase();
+
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await NotificationModel.findOneAndUpdate({ id: notif.id }, notif, { upsert: true });
+    } catch (err) {
+      console.error('Error saving notification to MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function persistEmailLog(log: IEmailLog): Promise<void> {
+  memoryDb.emailLogs.unshift(log);
+  saveDatabase();
+
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await EmailLogModel.create(log);
+    } catch (err) {
+      console.error('Error saving email log to MongoDB Atlas:', err);
+    }
+  }
 }
 
 export async function seedDemoUserAndScenarios(targetUserId?: string): Promise<string> {

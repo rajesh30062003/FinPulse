@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { History, Search, Filter, Download, Trash2, Edit2, ArrowUpDown, ShieldCheck } from 'lucide-react';
 import { useFinancial } from '../context/FinancialContext';
-import { api, formatINR } from '../services/api';
+import { api, formatINR, getApiBase } from '../services/api';
 import { ITransaction } from '../types';
 
 export const TransactionsView: React.FC = () => {
@@ -38,7 +38,7 @@ export const TransactionsView: React.FC = () => {
   };
 
   const handleExportCSV = () => {
-    window.location.href = '/api/transactions/export/csv';
+    window.location.href = `${getApiBase()}/transactions/export/csv`;
   };
 
   return (
