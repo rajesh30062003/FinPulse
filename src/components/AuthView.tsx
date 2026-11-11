@@ -124,9 +124,17 @@ export const AuthView: React.FC = () => {
       setLoading(true);
       await login(email, password);
     } catch (err: any) {
-      if (err.data?.unverified) {
+      if (err.status === 403 && (err.data?.unverified || err.data?.code === 'EMAIL_NOT_VERIFIED')) {
         setTab('verify');
-        setError('Your email is not verified yet. Please enter the 6-digit code or request a new one.');
+        setError('Your email is not verified yet. Please enter the 6-digit verification code sent to your inbox.');
+      } else if (err.status === 403 && err.data?.code === 'ACCOUNT_LOCKED') {
+        setError(err.message || 'Account temporarily locked due to multiple failed login attempts.');
+      } else if (err.status === 403 && err.data?.code === 'ACCOUNT_SUSPENDED') {
+        setError(err.message || 'Account suspended. Please contact support.');
+      } else if (err.status === 401) {
+        setError('Invalid email or password. Please verify your credentials.');
+      } else if (err.status === 503) {
+        setError(err.message || 'Email delivery service temporarily unavailable. Please try again.');
       } else {
         setError(err.message || 'Invalid email or password');
       }
@@ -159,7 +167,15 @@ export const AuthView: React.FC = () => {
       setOtp('');
       setTab('verify');
     } catch (err: any) {
-      setError(err.message || 'Registration failed');
+      if (err.status === 503) {
+        setError(`Email delivery failed (HTTP 503): ${err.message || 'Brevo SMTP connection or authentication failed'}`);
+      } else if (err.status === 400 && err.data?.code === 'EMAIL_EXISTS') {
+        setError('An account with this email address already exists. Please sign in.');
+      } else if (err.status === 429) {
+        setError(err.message || 'Please wait before requesting another code.');
+      } else {
+        setError(err.message || 'Registration failed');
+      }
     } finally {
       setLoading(false);
     }

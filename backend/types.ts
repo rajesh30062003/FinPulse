@@ -38,7 +38,7 @@ export interface IUser {
   monthlyBudgetInPaise: number;
   reminderDayOfMonth: number;
   emailNotificationsEnabled: boolean;
-  accountStatus?: 'active' | 'locked';
+  accountStatus?: 'active' | 'locked' | 'suspended';
   failedLoginAttempts?: number;
   lockUntil?: number | null;
   smtpConfig?: {

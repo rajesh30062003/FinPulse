@@ -11,20 +11,12 @@ export function setAccessToken(token: string | null) {
 }
 
 export function getRefreshToken(): string | null {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('finpulse_refresh_token');
-  }
+  // Refresh token is stored strictly in HttpOnly cookie; never exposed in localStorage
   return null;
 }
 
-export function setRefreshToken(token: string | null) {
-  if (typeof window !== 'undefined') {
-    if (token) {
-      localStorage.setItem('finpulse_refresh_token', token);
-    } else {
-      localStorage.removeItem('finpulse_refresh_token');
-    }
-  }
+export function setRefreshToken(_token: string | null) {
+  // Do not store long-lived refresh tokens in localStorage (enforced by security requirements)
 }
 
 export function clearTokens() {
@@ -81,13 +73,11 @@ export function setCustomApiUrl(url: string | null) {
 
 export function getAuthHeaders(): Record<string, string> {
   const token = inMemoryAccessToken;
-  const refreshToken = getRefreshToken();
 
   return {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(refreshToken ? { 'x-refresh-token': refreshToken } : {})
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
   };
 }
 
@@ -112,7 +102,7 @@ export async function apiRequest<T = any>(
   try {
     res = await fetch(fullUrl, {
       ...options,
-      credentials: 'include', // Includes HttpOnly cookie in same-origin or CORS
+      credentials: 'include', // Includes HttpOnly cookie in same-origin or cross-origin CORS
       headers
     });
   } catch (netErr: any) {
@@ -128,27 +118,26 @@ export async function apiRequest<T = any>(
     cleanEndpoint.startsWith('/auth/login') ||
     cleanEndpoint.startsWith('/auth/register') ||
     cleanEndpoint.startsWith('/auth/refresh') ||
+    cleanEndpoint.startsWith('/auth/logout') ||
     cleanEndpoint.startsWith('/auth/verify-email') ||
     cleanEndpoint.startsWith('/auth/resend-otp');
 
   if (res.status === 401 && !isRetry && !isAuthEndpoint) {
-    const refreshToken = getRefreshToken();
-    if (refreshToken) {
-      try {
-        if (!isRefreshingPromise) {
-          isRefreshingPromise = api.refresh().finally(() => {
-            isRefreshingPromise = null;
-          });
-        }
-        await isRefreshingPromise;
-        // Retry with refreshed access token
-        return apiRequest<T>(endpoint, options, true);
-      } catch (refreshErr) {
-        clearTokens();
-        // Fall through to parse original 401 error
+    try {
+      if (!isRefreshingPromise) {
+        isRefreshingPromise = api.refresh().finally(() => {
+          isRefreshingPromise = null;
+        });
       }
-    } else {
+      await isRefreshingPromise;
+      // Retry original request with refreshed access token
+      return apiRequest<T>(endpoint, options, true);
+    } catch (refreshErr) {
       clearTokens();
+      const err = new Error('Session expired. Please log in again.');
+      (err as any).status = 401;
+      (err as any).code = 'SESSION_EXPIRED';
+      throw err;
     }
   }
 
@@ -229,7 +218,6 @@ export const api = {
       body: JSON.stringify(payload)
     });
     setAccessToken(res.accessToken);
-    setRefreshToken(res.refreshToken);
     return res;
   },
 
@@ -257,7 +245,6 @@ export const api = {
       body: JSON.stringify(payload)
     });
     setAccessToken(res.accessToken);
-    setRefreshToken(res.refreshToken);
     return res;
   },
 
@@ -279,19 +266,16 @@ export const api = {
       refreshToken: string;
       user: any;
     }>('/auth/refresh', {
-      method: 'POST',
-      body: JSON.stringify({ refreshToken: getRefreshToken() })
+      method: 'POST'
     });
     setAccessToken(res.accessToken);
-    setRefreshToken(res.refreshToken);
     return res;
   },
 
   async logout() {
     try {
       await apiRequest('/auth/logout', {
-        method: 'POST',
-        body: JSON.stringify({ refreshToken: getRefreshToken() })
+        method: 'POST'
       });
     } catch (e) {
       // Ignore logout errors and clean local tokens anyway

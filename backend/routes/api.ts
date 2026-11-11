@@ -45,22 +45,20 @@ function hashToken(val: string): string {
 }
 
 function setRefreshTokenCookie(res: Response, token: string) {
-  const isProduction = process.env.NODE_ENV === 'production';
   res.cookie('finpulse_refresh_token', token, {
     httpOnly: true,
-    secure: true,
-    sameSite: isProduction ? 'none' : 'lax',
+    secure: true, // SameSite=None strictly requires Secure=true
+    sameSite: 'none', // Required for cross-origin Vercel frontend <-> Render backend
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: '/'
   });
 }
 
 function clearRefreshTokenCookie(res: Response) {
-  const isProduction = process.env.NODE_ENV === 'production';
   res.clearCookie('finpulse_refresh_token', {
     httpOnly: true,
     secure: true,
-    sameSite: isProduction ? 'none' : 'lax',
+    sameSite: 'none',
     path: '/'
   });
 }
@@ -455,24 +453,25 @@ router.post('/auth/login', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // Check account temporary lock
+    // 1. Check account temporary lockout
     if (user.lockUntil && user.lockUntil > Date.now()) {
       const minutesLeft = Math.ceil((user.lockUntil - Date.now()) / 60000);
       return res.status(403).json({
-        error: `Account is temporarily locked due to multiple failed attempts. Please try again in ${minutesLeft} minute(s).`
+        error: `Account is temporarily locked due to multiple failed attempts. Please try again in ${minutesLeft} minute(s).`,
+        code: 'ACCOUNT_LOCKED',
+        minutesLeft
       });
     }
 
-    // Check email verification status
-    if (!user.isVerified) {
+    // 2. Check account suspension
+    if (user.accountStatus === 'suspended') {
       return res.status(403).json({
-        error: 'Email not verified. Please verify your email before logging in.',
-        unverified: true,
-        email: user.email
+        error: 'Your account has been suspended. Please contact support.',
+        code: 'ACCOUNT_SUSPENDED'
       });
     }
 
-    // Validate password
+    // 3. Validate password FIRST (prevents account enumeration and false unverified triggers)
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
       user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
@@ -480,7 +479,20 @@ router.post('/auth/login', async (req: Request, res: Response) => {
         user.lockUntil = Date.now() + 15 * 60 * 1000; // 15 mins lock
       }
       await persistUser(user);
-      return res.status(401).json({ error: 'Invalid email or password' });
+      return res.status(401).json({
+        error: 'Invalid email or password',
+        code: 'INVALID_CREDENTIALS'
+      });
+    }
+
+    // 4. Password is valid: now enforce email verification
+    if (!user.isVerified) {
+      return res.status(403).json({
+        error: 'Email address is not verified. Please verify your email before logging in.',
+        code: 'EMAIL_NOT_VERIFIED',
+        unverified: true,
+        email: user.email
+      });
     }
 
     // Reset failed login counter on success

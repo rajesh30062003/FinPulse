@@ -1330,7 +1330,7 @@ var EmailService = class _EmailService {
       return `Connection refused by ${host}:${port2}. Ensure host and port are correct.`;
     }
     if (code === "EAUTH" || err?.responseCode === 535) {
-      return "Brevo SMTP authentication failed (535). Please verify SMTP_USER (login) and SMTP_PASS (master SMTP key).";
+      return "Brevo SMTP authentication failed (535). Please verify that SMTP_USER is your exact Brevo SMTP Login and SMTP_PASS is an active Brevo SMTP key (or newly generated Short SMTP key), NOT an API key (xkeysib-...) or account password.";
     }
     if (err?.responseCode === 550 || err?.responseCode === 554) {
       return `Sender address rejected (${err?.responseCode}). Ensure EMAIL_FROM is an authorized sender in your Brevo account.`;
@@ -1770,22 +1770,22 @@ function hashToken(val) {
   return crypto.createHash("sha256").update(val).digest("hex");
 }
 function setRefreshTokenCookie(res, token) {
-  const isProduction = process.env.NODE_ENV === "production";
   res.cookie("finpulse_refresh_token", token, {
     httpOnly: true,
     secure: true,
-    sameSite: isProduction ? "none" : "lax",
+    // SameSite=None strictly requires Secure=true
+    sameSite: "none",
+    // Required for cross-origin Vercel frontend <-> Render backend
     maxAge: 7 * 24 * 60 * 60 * 1e3,
     // 7 days
     path: "/"
   });
 }
 function clearRefreshTokenCookie(res) {
-  const isProduction = process.env.NODE_ENV === "production";
   res.clearCookie("finpulse_refresh_token", {
     httpOnly: true,
     secure: true,
-    sameSite: isProduction ? "none" : "lax",
+    sameSite: "none",
     path: "/"
   });
 }
@@ -2102,14 +2102,15 @@ router.post("/auth/login", async (req, res) => {
     if (user.lockUntil && user.lockUntil > Date.now()) {
       const minutesLeft = Math.ceil((user.lockUntil - Date.now()) / 6e4);
       return res.status(403).json({
-        error: `Account is temporarily locked due to multiple failed attempts. Please try again in ${minutesLeft} minute(s).`
+        error: `Account is temporarily locked due to multiple failed attempts. Please try again in ${minutesLeft} minute(s).`,
+        code: "ACCOUNT_LOCKED",
+        minutesLeft
       });
     }
-    if (!user.isVerified) {
+    if (user.accountStatus === "suspended") {
       return res.status(403).json({
-        error: "Email not verified. Please verify your email before logging in.",
-        unverified: true,
-        email: user.email
+        error: "Your account has been suspended. Please contact support.",
+        code: "ACCOUNT_SUSPENDED"
       });
     }
     const valid = await bcrypt2.compare(password, user.passwordHash);
@@ -2119,7 +2120,18 @@ router.post("/auth/login", async (req, res) => {
         user.lockUntil = Date.now() + 15 * 60 * 1e3;
       }
       await persistUser(user);
-      return res.status(401).json({ error: "Invalid email or password" });
+      return res.status(401).json({
+        error: "Invalid email or password",
+        code: "INVALID_CREDENTIALS"
+      });
+    }
+    if (!user.isVerified) {
+      return res.status(403).json({
+        error: "Email address is not verified. Please verify your email before logging in.",
+        code: "EMAIL_NOT_VERIFIED",
+        unverified: true,
+        email: user.email
+      });
     }
     user.failedLoginAttempts = 0;
     user.lockUntil = null;

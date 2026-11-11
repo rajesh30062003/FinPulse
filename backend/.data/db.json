@@ -1,33 +1,58 @@
 {
   "users": [
     {
-      "id": "demo-user-id",
-      "name": "Rajesh Sharma",
-      "email": "rjrajeshpal30@gmail.com",
-      "passwordHash": "$2b$10$xu/TCv0aM4QX7S.Esi3qLOwmvlrFntTqrHq7ckHsTFnmozTThTCe.",
+      "id": "user-1794321590913",
+      "name": "rty",
+      "email": "finalsemprojectmail@gmail.com",
+      "passwordHash": "$2b$10$JCGHesqMHeb2dJqCQ92DTeWz3sC/K0jW4kuQv.xQoZjQkB1s46vnO",
+      "isVerified": false,
+      "verificationToken": "dXNlci0xNzk0MzIxNTkwOTEzLTE3OTQzMjE1OTA5MTMtMC40NDEzNzM0NzQxOTEyODk3",
+      "verificationOtp": "914207",
+      "currency": "INR",
+      "monthlyBudgetInPaise": 4000000,
+      "reminderDayOfMonth": 25,
+      "emailNotificationsEnabled": true,
+      "createdAt": "Tue Nov 10 2026 14:39:50 GMT+0000 (Coordinated Universal Time)"
+    },
+    {
+      "id": "user-1794323316803",
+      "name": "Aarav Patel",
+      "email": "aarav@test.local",
+      "passwordHash": "$2b$10$vPlImx3GnyfkRsEMv0k6D.iWmpPl/Qz0VXdh/Evzzz6BVNsLp1G.y",
       "isVerified": true,
       "currency": "INR",
       "monthlyBudgetInPaise": 4000000,
       "reminderDayOfMonth": 25,
       "emailNotificationsEnabled": true,
-      "createdAt": "2026-11-10T13:31:31.341Z"
+      "createdAt": "Tue Nov 10 2026 15:08:36 GMT+0000 (Coordinated Universal Time)"
     },
     {
-      "id": "user-1794319659891",
-      "name": "Aarav Patel",
-      "email": "aarav.patel@example.com",
-      "passwordHash": "$2b$10$Ezxf9URzNCt62vn5aj1n0O7h8HNEWQv5VYfcRKnkMbDjPux4bsiaC",
+      "id": "user-unverified-01",
+      "name": "Unverified User",
+      "email": "unverified@test.local",
+      "passwordHash": "$2b$10$vPlImx3GnyfkRsEMv0k6D.iWmpPl/Qz0VXdh/Evzzz6BVNsLp1G.y",
       "isVerified": false,
-      "verificationToken": "dXNlci0xNzk0MzE5NjU5ODkxLTE3OTQzMTk2NTk4OTEtMC4wMDIxNTgxMDA5MjYxNzE1MjQ1",
-      "verificationOtp": "818925",
       "currency": "INR",
       "monthlyBudgetInPaise": 4000000,
       "reminderDayOfMonth": 25,
       "emailNotificationsEnabled": true,
-      "createdAt": "2026-11-10T14:07:39.891Z"
+      "createdAt": "2026-11-11T10:09:32.324Z"
     }
   ],
   "bankAccounts": [
+    {
+      "id": "bank-1794323316955",
+      "userId": "user-1794323316803",
+      "bankName": "Primary Bank",
+      "accountHolderName": "Aarav Patel",
+      "accountType": "Savings",
+      "accountNickname": "Primary Savings",
+      "accountNumberMasked": "•••• 1234",
+      "balanceInPaise": 0,
+      "openingBalanceInPaise": 0,
+      "isActive": true,
+      "createdAt": "2026-11-10T15:08:36.955Z"
+    },
     {
       "id": "bank-hdfc-01",
       "userId": "demo-user-id",
@@ -40,7 +65,7 @@
       "balanceInPaise": 6700000,
       "isActive": true,
       "notes": "Primary salary account",
-      "createdAt": "2026-11-10T13:31:31.341Z"
+      "createdAt": "2026-11-11T10:08:08.138Z"
     },
     {
       "id": "bank-sbi-01",
@@ -54,35 +79,22 @@
       "balanceInPaise": 1800000,
       "isActive": true,
       "notes": "Secondary emergency & bill pay account",
-      "createdAt": "2026-11-10T13:31:31.341Z"
-    },
-    {
-      "id": "bank-1794319659892",
-      "userId": "user-1794319659891",
-      "bankName": "Primary Bank",
-      "accountHolderName": "Aarav Patel",
-      "accountType": "Savings",
-      "accountNickname": "Savings Account",
-      "accountNumberMasked": "•••• 1234",
-      "balanceInPaise": 0,
-      "openingBalanceInPaise": 0,
-      "isActive": true,
-      "createdAt": "2026-11-10T14:07:39.892Z"
+      "createdAt": "2026-11-11T10:08:08.138Z"
     }
   ],
   "cashWallets": [
+    {
+      "id": "cash-1794323317101",
+      "userId": "user-1794323316803",
+      "balanceInPaise": 0,
+      "updatedAt": "2026-11-10T15:08:37.101Z"
+    },
     {
       "id": "cash-wallet-01",
       "userId": "demo-user-id",
       "balanceInPaise": 450000,
       "notes": "Physical cash on hand",
-      "updatedAt": "2026-11-10T13:31:31.341Z"
-    },
-    {
-      "id": "cash-1794319659892",
-      "userId": "user-1794319659891",
-      "balanceInPaise": 0,
-      "updatedAt": "2026-11-10T14:07:39.892Z"
+      "updatedAt": "2026-11-11T10:08:08.138Z"
     }
   ],
   "creditCards": [
@@ -101,7 +113,7 @@
       "billingCycle": "16th to 15th",
       "notes": "Rewards on dining & travel",
       "isActive": true,
-      "lastPaymentDate": "2026-11-08T13:31:31.342Z",
+      "lastPaymentDate": "2026-11-09T10:08:08.139Z",
       "lastPaymentAmountInPaise": 700000
     }
   ],
@@ -109,7 +121,7 @@
     {
       "id": "tx-scenario-1",
       "userId": "demo-user-id",
-      "date": "2026-10-31T13:31:31.342Z",
+      "date": "2026-11-01T10:08:08.139Z",
       "type": "income",
       "mainCategory": "Essential",
       "subCategory": "Salary",
@@ -119,12 +131,12 @@
       "description": "Monthly Salary Credit",
       "notes": "Scenario 1: Verified salary inflow directly to HDFC",
       "status": "Completed",
-      "createdAt": "2026-10-31T13:31:31.342Z"
+      "createdAt": "2026-11-01T10:08:08.139Z"
     },
     {
       "id": "tx-scenario-2",
       "userId": "demo-user-id",
-      "date": "2026-11-02T13:31:31.342Z",
+      "date": "2026-11-03T10:08:08.139Z",
       "type": "expense",
       "mainCategory": "Essential",
       "subCategory": "Food",
@@ -133,12 +145,12 @@
       "description": "Grocery & Fresh Food Market",
       "notes": "Scenario 2: Cash expense deducts cash balance & Essential allocation",
       "status": "Completed",
-      "createdAt": "2026-11-02T13:31:31.342Z"
+      "createdAt": "2026-11-03T10:08:08.139Z"
     },
     {
       "id": "tx-scenario-3",
       "userId": "demo-user-id",
-      "date": "2026-11-03T13:31:31.342Z",
+      "date": "2026-11-04T10:08:08.139Z",
       "type": "credit_card_expense",
       "mainCategory": "Essential",
       "subCategory": "Groceries",
@@ -148,12 +160,12 @@
       "description": "Supermarket Household Supplies",
       "notes": "Scenario 3: Card outstanding increases without deducting bank balance",
       "status": "Completed",
-      "createdAt": "2026-11-03T13:31:31.342Z"
+      "createdAt": "2026-11-04T10:08:08.139Z"
     },
     {
       "id": "tx-scenario-4",
       "userId": "demo-user-id",
-      "date": "2026-11-04T13:31:31.342Z",
+      "date": "2026-11-05T10:08:08.139Z",
       "type": "credit_card_payment",
       "mainCategory": "Liability Settlement",
       "subCategory": "Credit Card Bill Payment",
@@ -164,12 +176,12 @@
       "description": "Bill Settlement for HDFC Card",
       "notes": "Scenario 4: Paid from SBI; liability settled without duplicate expense",
       "status": "Completed",
-      "createdAt": "2026-11-04T13:31:31.342Z"
+      "createdAt": "2026-11-05T10:08:08.139Z"
     },
     {
       "id": "tx-scenario-5",
       "userId": "demo-user-id",
-      "date": "2026-11-05T13:31:31.342Z",
+      "date": "2026-11-06T10:08:08.139Z",
       "type": "transfer",
       "mainCategory": "Transfer",
       "subCategory": "Bank to Bank Transfer",
@@ -180,12 +192,12 @@
       "description": "Fund transfer to SBI for bill coverage",
       "notes": "Scenario 5: Interbank transfer; total wealth unchanged",
       "status": "Completed",
-      "createdAt": "2026-11-05T13:31:31.342Z"
+      "createdAt": "2026-11-06T10:08:08.139Z"
     },
     {
       "id": "tx-scenario-6",
       "userId": "demo-user-id",
-      "date": "2026-11-06T13:31:31.342Z",
+      "date": "2026-11-07T10:08:08.139Z",
       "type": "investment_deposit",
       "mainCategory": "Investment",
       "subCategory": "Mutual Funds",
@@ -195,12 +207,12 @@
       "description": "SIP in Parag Parikh Flexi Cap",
       "notes": "Scenario 6: Asset reallocation into investment holdings",
       "status": "Completed",
-      "createdAt": "2026-11-06T13:31:31.342Z"
+      "createdAt": "2026-11-07T10:08:08.139Z"
     },
     {
       "id": "tx-scenario-7",
       "userId": "demo-user-id",
-      "date": "2026-11-07T13:31:31.342Z",
+      "date": "2026-11-08T10:08:08.139Z",
       "type": "emergency_deposit",
       "mainCategory": "Emergency Fund",
       "subCategory": "Emergency Fund Deposit",
@@ -210,12 +222,12 @@
       "description": "Monthly emergency cushion deposit",
       "notes": "Scenario 7: Dedicated reserve build without double expense",
       "status": "Completed",
-      "createdAt": "2026-11-07T13:31:31.342Z"
+      "createdAt": "2026-11-08T10:08:08.139Z"
     },
     {
       "id": "tx-scenario-8",
       "userId": "demo-user-id",
-      "date": "2026-11-08T13:31:31.342Z",
+      "date": "2026-11-09T10:08:08.139Z",
       "type": "credit_card_payment",
       "mainCategory": "Liability Settlement",
       "subCategory": "Credit Card Bill Payment",
@@ -226,10 +238,21 @@
       "description": "Partial Bill Settlement for HDFC Card",
       "notes": "Scenario 8: Paid ₹7,000 against ₹10,000 outstanding; ₹3,000 remains",
       "status": "Completed",
-      "createdAt": "2026-11-08T13:31:31.342Z"
+      "createdAt": "2026-11-09T10:08:08.139Z"
     }
   ],
   "budgetAllocations": [
+    {
+      "id": "budget-user-1794323316803",
+      "userId": "user-1794323316803",
+      "monthYear": "2026-11",
+      "essentialBudgetInPaise": 2000000,
+      "funBudgetInPaise": 500000,
+      "investmentBudgetInPaise": 500000,
+      "emergencyBudgetInPaise": 500000,
+      "savingsBudgetInPaise": 500000,
+      "carryForwardEnabled": false
+    },
     {
       "id": "budget-demo-user-id-2026-11",
       "userId": "demo-user-id",
@@ -237,17 +260,6 @@
       "essentialBudgetInPaise": 1800000,
       "funBudgetInPaise": 400000,
       "investmentBudgetInPaise": 800000,
-      "emergencyBudgetInPaise": 500000,
-      "savingsBudgetInPaise": 500000,
-      "carryForwardEnabled": false
-    },
-    {
-      "id": "budget-user-1794319659891",
-      "userId": "user-1794319659891",
-      "monthYear": "2026-11",
-      "essentialBudgetInPaise": 2000000,
-      "funBudgetInPaise": 500000,
-      "investmentBudgetInPaise": 500000,
       "emergencyBudgetInPaise": 500000,
       "savingsBudgetInPaise": 500000,
       "carryForwardEnabled": false
@@ -261,7 +273,7 @@
       "type": "Mutual Funds",
       "investedAmountInPaise": 500000,
       "currentValueInPaise": 545000,
-      "investmentDate": "2026-10-26T13:31:31.342Z",
+      "investmentDate": "2026-10-27T10:08:08.139Z",
       "expectedReturnRate": 14.5,
       "riskLevel": "Moderate Risk",
       "notes": "Monthly SIP"
@@ -273,7 +285,7 @@
       "type": "Stocks",
       "investedAmountInPaise": 2500000,
       "currentValueInPaise": 2820000,
-      "investmentDate": "2026-08-12T13:31:31.342Z",
+      "investmentDate": "2026-08-13T10:08:08.139Z",
       "expectedReturnRate": 12,
       "riskLevel": "Moderate Risk",
       "notes": "Long-term equity allocation"
@@ -288,8 +300,8 @@
       "principalInPaise": 5000000,
       "interestRate": 7.5,
       "compoundingFrequency": "Quarterly",
-      "startDate": "2025-12-10T13:31:31.342Z",
-      "maturityDate": "2026-12-10T13:31:31.342Z",
+      "startDate": "2025-12-11T10:08:08.139Z",
+      "maturityDate": "2026-12-11T10:08:08.139Z",
       "durationMonths": 12,
       "maturityAmountInPaise": 5385679,
       "interestEarnedInPaise": 385679,
@@ -302,18 +314,18 @@
   ],
   "emergencyFunds": [
     {
+      "id": "ef-1794323317397",
+      "userId": "user-1794323316803",
+      "targetAmountInPaise": 10000000,
+      "currentBalanceInPaise": 0,
+      "updatedAt": "2026-11-10T15:08:37.397Z"
+    },
+    {
       "id": "emergency-fund-01",
       "userId": "demo-user-id",
       "targetAmountInPaise": 10000000,
       "currentBalanceInPaise": 3300000,
-      "updatedAt": "2026-11-10T13:31:31.341Z"
-    },
-    {
-      "id": "ef-1794319659893",
-      "userId": "user-1794319659891",
-      "targetAmountInPaise": 10000000,
-      "currentBalanceInPaise": 0,
-      "updatedAt": "2026-11-10T14:07:39.893Z"
+      "updatedAt": "2026-11-11T10:08:08.138Z"
     }
   ],
   "savingsGoals": [
@@ -350,7 +362,7 @@
         "fdId": "fd-hdfc-01",
         "daysRemaining": 30
       },
-      "createdAt": "2026-11-09T13:31:31.342Z"
+      "createdAt": "2026-11-10T10:08:08.139Z"
     },
     {
       "id": "notif-cc-01",
@@ -363,50 +375,27 @@
         "cardId": "cc-hdfc-01",
         "amountInPaise": 300000
       },
-      "createdAt": "2026-11-10T09:31:31.342Z"
+      "createdAt": "2026-11-11T06:08:08.139Z"
     }
   ],
-  "emailLogs": [
+  "emailLogs": [],
+  "refreshTokens": [
     {
-      "id": "email-1794319659893-fjj90",
-      "userId": "user-1794319659891",
-      "to": "aarav.patel@example.com",
-      "subject": "Verify Your FinPulse Account - Code: 818925",
-      "previewText": "Your verification code is 818925. Complete verification to secure your financial portal.",
-      "htmlBody": "\n      <div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;\">\n        <div style=\"background: #0f172a; padding: 28px 32px; color: #ffffff;\">\n          <h1 style=\"margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;\">FinPulse Security</h1>\n          <p style=\"margin: 6px 0 0 0; font-size: 14px; color: #94a3b8;\">Email Address Verification</p>\n        </div>\n        <div style=\"padding: 32px;\">\n          <p style=\"font-size: 16px; color: #334155; margin-top: 0;\">Hello <strong>Aarav Patel</strong>,</p>\n          <p style=\"font-size: 14px; color: #64748b; line-height: 1.6;\">\n            Thank you for creating your FinPulse Smart Money Management account. To secure your financial ledger and enable automated recovery, please verify your email address.\n          </p>\n          \n          <div style=\"background: #f1f5f9; border-radius: 8px; padding: 20px; text-align: center; margin: 24px 0;\">\n            <div style=\"font-size: 12px; text-transform: uppercase; color: #64748b; font-weight: 600; letter-spacing: 1px;\">Your Verification Code</div>\n            <div style=\"font-size: 36px; font-weight: 800; color: #0f172a; letter-spacing: 8px; margin-top: 8px; font-family: monospace;\">818925</div>\n            <div style=\"font-size: 12px; color: #94a3b8; margin-top: 6px;\">Valid for 30 minutes</div>\n          </div>\n\n          <div style=\"text-align: center; margin: 28px 0;\">\n            <a href=\"/verify-email?token=dXNlci0xNzk0MzE5NjU5ODkxLTE3OTQzMTk2NTk4OTEtMC4wMDIxNTgxMDA5MjYxNzE1MjQ1&email=aarav.patel%40example.com\" style=\"background: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 28px; font-size: 14px; font-weight: 600; border-radius: 8px; display: inline-block;\">\n              Verify Email Address Instantly\n            </a>\n          </div>\n\n          <p style=\"font-size: 12px; color: #94a3b8; line-height: 1.5; border-top: 1px solid #e2e8f0; padding-top: 20px; margin-bottom: 0;\">\n            If you did not request this verification, please disregard this email. Your data remains protected with AES and JWT ledger encryption.\n          </p>\n        </div>\n      </div>\n    ",
-      "sentAt": "2026-11-10T14:07:39.893Z",
-      "status": "simulated",
-      "triggerType": "verification",
-      "metadata": {
-        "otp": "818925",
-        "token": "dXNlci0xNzk0MzE5NjU5ODkxLTE3OTQzMTk2NTk4OTEtMC4wMDIxNTgxMDA5MjYxNzE1MjQ1",
-        "actionUrl": "/verify-email?token=dXNlci0xNzk0MzE5NjU5ODkxLTE3OTQzMTk2NTk4OTEtMC4wMDIxNTgxMDA5MjYxNzE1MjQ1&email=aarav.patel%40example.com"
-      }
+      "id": "token-1794323317686-464io",
+      "userId": "user-1794323316803",
+      "tokenHash": "be333850c3b8a2881039382fec967940188a8917e7d9fe684b850b53fd53ce85",
+      "expiresAt": "2026-11-17T15:08:37.686Z",
+      "revoked": true,
+      "createdAt": "2026-11-10T15:08:37.686Z"
     },
     {
-      "id": "email-welcome-01",
-      "userId": "demo-user-id",
-      "to": "rjrajeshpal30@gmail.com",
-      "subject": "Welcome to FinPulse - Verify Your Email",
-      "previewText": "Click here or use code 849201 to complete your email verification.",
-      "htmlBody": "<div style=\"font-family:sans-serif;padding:24px;background:#f8fafc;color:#0f172a;\">\n        <h2 style=\"color:#2563eb;\">FinPulse Security Verification</h2>\n        <p>Hello Rajesh,</p>\n        <p>Thank you for setting up your personal finance management account. Your secure 6-digit verification code is:</p>\n        <div style=\"font-size:32px;font-weight:bold;letter-spacing:6px;background:#e2e8f0;padding:16px;text-align:center;border-radius:8px;margin:16px 0;\">849201</div>\n        <p>You can also verify instantly by clicking the link below:</p>\n        <a href=\"#/verify-email?token=verified-demo-token\" style=\"display:inline-block;background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;\">Verify My Account</a>\n      </div>",
-      "sentAt": "2026-10-31T13:31:31.342Z",
-      "status": "simulated",
-      "triggerType": "verification",
-      "metadata": {
-        "otp": "849201"
-      }
-    },
-    {
-      "id": "email-bill-reminder-01",
-      "userId": "demo-user-id",
-      "to": "rjrajeshpal30@gmail.com",
-      "subject": "Credit Card Statement Alert: HDFC Regalia Gold",
-      "previewText": "Your monthly statement is generated. Outstanding balance: ₹3,000 due by the 5th.",
-      "htmlBody": "<div style=\"font-family:sans-serif;padding:24px;background:#f8fafc;color:#0f172a;\">\n        <h2 style=\"color:#d97706;\">Credit Card Payment Reminder</h2>\n        <p>Hello Rajesh,</p>\n        <p>This is a reminder from FinPulse regarding your <strong>HDFC Regalia Gold (•••• 9182)</strong>.</p>\n        <table style=\"width:100%;border-collapse:collapse;margin:16px 0;\">\n          <tr><td style=\"padding:8px;border-bottom:1px solid #e2e8f0;\">Remaining Outstanding:</td><td style=\"padding:8px;border-bottom:1px solid #e2e8f0;font-weight:bold;\">₹3,000.00</td></tr>\n          <tr><td style=\"padding:8px;border-bottom:1px solid #e2e8f0;\">Payment Due Date:</td><td style=\"padding:8px;border-bottom:1px solid #e2e8f0;\">5th of Month</td></tr>\n        </table>\n        <p>Ensure settlement from your linked bank account before the due date to maintain your credit score.</p>\n      </div>",
-      "sentAt": "2026-11-10T01:31:31.342Z",
-      "status": "simulated",
-      "triggerType": "cc_bill_reminder"
+      "id": "token-1794323344540-ifket",
+      "userId": "user-1794323316803",
+      "tokenHash": "f2bbc807716d3ec26550efc34a3c70ea72bd3aa5e2f5fe08a933af972d1ffd6e",
+      "expiresAt": "2026-11-17T15:09:04.540Z",
+      "revoked": true,
+      "createdAt": "2026-11-10T15:09:04.540Z"
     }
-  ]
+  ],
+  "emailVerifications": []
 }

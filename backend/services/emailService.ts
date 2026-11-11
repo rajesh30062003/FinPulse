@@ -179,7 +179,7 @@ export class EmailService {
       return `Connection refused by ${host}:${port}. Ensure host and port are correct.`;
     }
     if (code === 'EAUTH' || err?.responseCode === 535) {
-      return 'Brevo SMTP authentication failed (535). Please verify SMTP_USER (login) and SMTP_PASS (master SMTP key).';
+      return 'Brevo SMTP authentication failed (535). Please verify that SMTP_USER is your exact Brevo SMTP Login and SMTP_PASS is an active Brevo SMTP key (or newly generated Short SMTP key), NOT an API key (xkeysib-...) or account password.';
     }
     if (err?.responseCode === 550 || err?.responseCode === 554) {
       return `Sender address rejected (${err?.responseCode}). Ensure EMAIL_FROM is an authorized sender in your Brevo account.`;
