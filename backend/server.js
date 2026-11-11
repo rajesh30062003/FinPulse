@@ -46,6 +46,9 @@ var UserSchema = new mongoose.Schema({
   resetPasswordToken: { type: String },
   resetPasswordOtp: { type: String },
   resetPasswordExpires: { type: Number },
+  accountStatus: { type: String, default: "active" },
+  failedLoginAttempts: { type: Number, default: 0 },
+  lockUntil: { type: Number, default: null },
   currency: { type: String, default: "INR" },
   monthlyBudgetInPaise: { type: Number, default: 4e6 },
   reminderDayOfMonth: { type: Number, default: 25 },
@@ -900,47 +903,6 @@ async function seedDemoUserAndScenarios(targetUserId) {
       createdAt: new Date(Date.now() - 4 * 36e5).toISOString()
     }
   ];
-  const emailLogs = [
-    {
-      id: "email-welcome-01",
-      userId,
-      to: "rjrajeshpal30@gmail.com",
-      subject: "Welcome to FinPulse - Verify Your Email",
-      previewText: "Click here or use code 849201 to complete your email verification.",
-      htmlBody: `<div style="font-family:sans-serif;padding:24px;background:#f8fafc;color:#0f172a;">
-        <h2 style="color:#2563eb;">FinPulse Security Verification</h2>
-        <p>Hello Rajesh,</p>
-        <p>Thank you for setting up your personal finance management account. Your secure 6-digit verification code is:</p>
-        <div style="font-size:32px;font-weight:bold;letter-spacing:6px;background:#e2e8f0;padding:16px;text-align:center;border-radius:8px;margin:16px 0;">849201</div>
-        <p>You can also verify instantly by clicking the link below:</p>
-        <a href="#/verify-email?token=verified-demo-token" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">Verify My Account</a>
-      </div>`,
-      sentAt: new Date(Date.now() - 10 * 864e5).toISOString(),
-      status: "simulated",
-      triggerType: "verification",
-      metadata: { otp: "849201" }
-    },
-    {
-      id: "email-bill-reminder-01",
-      userId,
-      to: "rjrajeshpal30@gmail.com",
-      subject: "Credit Card Statement Alert: HDFC Regalia Gold",
-      previewText: "Your monthly statement is generated. Outstanding balance: \u20B93,000 due by the 5th.",
-      htmlBody: `<div style="font-family:sans-serif;padding:24px;background:#f8fafc;color:#0f172a;">
-        <h2 style="color:#d97706;">Credit Card Payment Reminder</h2>
-        <p>Hello Rajesh,</p>
-        <p>This is a reminder from FinPulse regarding your <strong>HDFC Regalia Gold (\u2022\u2022\u2022\u2022 9182)</strong>.</p>
-        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
-          <tr><td style="padding:8px;border-bottom:1px solid #e2e8f0;">Remaining Outstanding:</td><td style="padding:8px;border-bottom:1px solid #e2e8f0;font-weight:bold;">\u20B93,000.00</td></tr>
-          <tr><td style="padding:8px;border-bottom:1px solid #e2e8f0;">Payment Due Date:</td><td style="padding:8px;border-bottom:1px solid #e2e8f0;">5th of Month</td></tr>
-        </table>
-        <p>Ensure settlement from your linked bank account before the due date to maintain your credit score.</p>
-      </div>`,
-      sentAt: new Date(Date.now() - 12 * 36e5).toISOString(),
-      status: "simulated",
-      triggerType: "cc_bill_reminder"
-    }
-  ];
   memoryDb.users = memoryDb.users.filter((u) => u.id !== userId).concat(demoUser);
   memoryDb.bankAccounts = memoryDb.bankAccounts.filter((a) => a.userId !== userId).concat([hdfcAccount, sbiAccount]);
   memoryDb.cashWallets = memoryDb.cashWallets.filter((w) => w.userId !== userId).concat(cashWallet);
@@ -952,7 +914,7 @@ async function seedDemoUserAndScenarios(targetUserId) {
   memoryDb.fixedDeposits = memoryDb.fixedDeposits.filter((f) => f.userId !== userId).concat(fixedDeposits);
   memoryDb.transactions = memoryDb.transactions.filter((t2) => t2.userId !== userId).concat(transactions);
   memoryDb.notifications = memoryDb.notifications.filter((n2) => n2.userId !== userId).concat(notifications);
-  memoryDb.emailLogs = memoryDb.emailLogs.concat(emailLogs);
+  memoryDb.emailLogs = [];
   saveDatabase();
   return userId;
 }
@@ -1218,225 +1180,474 @@ var LedgerService = class {
 
 // backend/services/emailService.ts
 import nodemailer from "nodemailer";
-var EmailService = class {
+function maskEmail(email) {
+  if (!email || typeof email !== "string") return "";
+  const parts = email.trim().split("@");
+  if (parts.length !== 2) return email;
+  const [local, domain] = parts;
+  if (local.length <= 2) {
+    return `${local[0]}*@${domain}`;
+  }
+  return `${local[0]}******${local[local.length - 1]}@${domain}`;
+}
+var EmailService = class _EmailService {
+  static {
+    this.cachedTransporter = null;
+  }
+  /**
+   * Builds or returns cached Nodemailer transporter configured for Brevo SMTP.
+   * Uses port 2525 to bypass Render Free outbound port 25/465/587 blocking.
+   */
   static getTransporter() {
-    const host = process.env.SMTP_HOST;
-    const port2 = parseInt(process.env.SMTP_PORT || "587", 10);
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
-    if (host && user && pass) {
-      return nodemailer.createTransport({
+    const user = process.env.SMTP_USER?.trim();
+    const pass = process.env.SMTP_PASS?.trim();
+    if (!user || !pass) {
+      return null;
+    }
+    if (this.cachedTransporter) {
+      return this.cachedTransporter;
+    }
+    const rawHost = process.env.SMTP_HOST?.trim();
+    const host = !rawHost || rawHost.includes("gmail") ? "smtp-relay.brevo.com" : rawHost;
+    const rawPort = parseInt(process.env.SMTP_PORT?.trim() || "2525", 10);
+    const port2 = isNaN(rawPort) || rawPort === 587 || rawPort === 465 || rawPort === 25 ? 2525 : rawPort;
+    this.cachedTransporter = nodemailer.createTransport({
+      host,
+      port: port2,
+      secure: false,
+      requireTLS: true,
+      auth: {
+        user,
+        pass
+      },
+      connectionTimeout: 15e3,
+      // 15 seconds timeout
+      greetingTimeout: 1e4,
+      socketTimeout: 15e3
+    });
+    return this.cachedTransporter;
+  }
+  /**
+   * Resets cached transporter (useful if environment credentials are dynamically modified)
+   */
+  static resetTransporter() {
+    this.cachedTransporter = null;
+  }
+  /**
+   * Diagnostic verification of Brevo SMTP connection.
+   * Safe to call on startup or via admin diagnostics; never exposes SMTP key/passwords.
+   */
+  static async verifyConnection() {
+    const rawHost = process.env.SMTP_HOST?.trim();
+    const host = !rawHost || rawHost.includes("gmail") ? "smtp-relay.brevo.com" : rawHost;
+    const rawPort = parseInt(process.env.SMTP_PORT?.trim() || "2525", 10);
+    const port2 = isNaN(rawPort) || rawPort === 587 || rawPort === 465 || rawPort === 25 ? 2525 : rawPort;
+    const user = process.env.SMTP_USER?.trim() || "";
+    const fromName = process.env.EMAIL_FROM_NAME?.trim() || "FinPulse";
+    const from = process.env.EMAIL_FROM?.trim() || (user ? `${fromName} <${user}>` : `${fromName} <alerts@finpulse.example>`);
+    if (!user || !process.env.SMTP_PASS?.trim()) {
+      return {
+        configured: false,
+        provider: "Brevo SMTP",
         host,
         port: port2,
-        secure: port2 === 465,
-        auth: { user, pass }
-      });
+        secure: false,
+        requireTLS: true,
+        userMasked: maskEmail(user),
+        from,
+        fromName,
+        verified: false,
+        errorCode: "MISSING_CREDENTIALS",
+        message: "Brevo SMTP credentials not configured. Please set SMTP_USER and SMTP_PASS (Brevo SMTP key) in environment variables.",
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      };
     }
-    return null;
-  }
-  static async sendMail(payload) {
-    const db = getDb();
-    let status = "simulated";
     const transporter = this.getTransporter();
-    if (transporter) {
-      try {
-        await transporter.sendMail({
-          from: process.env.EMAIL_FROM || "FinPulse Security <alerts@finpulse.example>",
-          to: payload.to,
-          subject: payload.subject,
-          html: payload.htmlBody
-        });
-        status = "sent";
-      } catch (err) {
-        console.warn("Real SMTP delivery failed, recording email to sandbox mailbox:", err);
-      }
+    if (!transporter) {
+      return {
+        configured: false,
+        provider: "Brevo SMTP",
+        host,
+        port: port2,
+        secure: false,
+        requireTLS: true,
+        userMasked: maskEmail(user),
+        from,
+        fromName,
+        verified: false,
+        errorCode: "INIT_ERROR",
+        message: "Failed to initialize Nodemailer Brevo transporter",
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      };
     }
-    const emailLog = {
-      id: `email-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      userId: payload.userId,
-      to: payload.to,
-      subject: payload.subject,
-      previewText: payload.previewText,
-      htmlBody: payload.htmlBody,
-      sentAt: (/* @__PURE__ */ new Date()).toISOString(),
-      status,
-      triggerType: payload.triggerType,
-      metadata: payload.metadata
-    };
-    db.emailLogs.unshift(emailLog);
-    if (db.emailLogs.length > 100) {
-      db.emailLogs = db.emailLogs.slice(0, 100);
+    try {
+      await transporter.verify();
+      console.log(`[Brevo SMTP Diagnostics] Connection successfully verified with ${host}:${port2} as ${maskEmail(user)}`);
+      return {
+        configured: true,
+        provider: "Brevo SMTP",
+        host,
+        port: port2,
+        secure: false,
+        requireTLS: true,
+        userMasked: maskEmail(user),
+        from,
+        fromName,
+        verified: true,
+        message: `Brevo SMTP connection established and verified on ${host}:${port2}`,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      };
+    } catch (err) {
+      const code = err?.code || "UNKNOWN_SMTP_ERROR";
+      const cleanMessage = _EmailService.formatSmtpErrorMessage(err, host, port2);
+      console.log(`[Brevo SMTP Diagnostics] Verification status on ${host}:${port2} (${code}): ${cleanMessage}`);
+      return {
+        configured: true,
+        provider: "Brevo SMTP",
+        host,
+        port: port2,
+        secure: false,
+        requireTLS: true,
+        userMasked: maskEmail(user),
+        from,
+        fromName,
+        verified: false,
+        errorCode: code,
+        message: cleanMessage,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      };
     }
-    saveDatabase();
-    return emailLog;
   }
+  /**
+   * Helper to format readable SMTP network and auth errors
+   */
+  static formatSmtpErrorMessage(err, host, port2) {
+    const code = err?.code || "";
+    if (code === "ETIMEDOUT" || code === "ESOCKETTIMEDOUT") {
+      return `Connection timed out to ${host}:${port2}. If running on Render Free, verify outbound traffic on port ${port2} is reachable.`;
+    }
+    if (code === "ECONNREFUSED") {
+      return `Connection refused by ${host}:${port2}. Ensure host and port are correct.`;
+    }
+    if (code === "EAUTH" || err?.responseCode === 535) {
+      return "Brevo SMTP authentication failed (535). Please verify SMTP_USER (login) and SMTP_PASS (master SMTP key).";
+    }
+    if (err?.responseCode === 550 || err?.responseCode === 554) {
+      return `Sender address rejected (${err?.responseCode}). Ensure EMAIL_FROM is an authorized sender in your Brevo account.`;
+    }
+    return err?.message || "SMTP transmission failure";
+  }
+  /**
+   * Core mail dispatcher. Throws explicit error if SMTP fails or credentials missing.
+   * Zero simulation or fake fallback.
+   */
+  static async sendMail(payload) {
+    const transporter = this.getTransporter();
+    const maskedRecipient = maskEmail(payload.to);
+    const host = process.env.SMTP_HOST?.trim() || "smtp-relay.brevo.com";
+    const port2 = parseInt(process.env.SMTP_PORT?.trim() || "2525", 10);
+    if (!transporter) {
+      console.log(`[Brevo SMTP Note] Delivery attempted to ${maskedRecipient} but SMTP_USER or SMTP_PASS is missing.`);
+      throw new Error("We couldn't send your verification email. Brevo SMTP credentials (SMTP_USER/SMTP_PASS) are not configured.");
+    }
+    const user = process.env.SMTP_USER?.trim() || "";
+    const fromName = process.env.EMAIL_FROM_NAME?.trim() || "FinPulse";
+    const fromAddress = process.env.EMAIL_FROM?.trim() || user;
+    const from = `${fromName} <${fromAddress}>`;
+    try {
+      const info = await transporter.sendMail({
+        from,
+        to: payload.to,
+        subject: payload.subject,
+        text: payload.text,
+        html: payload.html
+      });
+      console.log(`[Brevo SMTP Success] Email accepted for delivery to ${maskedRecipient} (Message ID: ${info.messageId})`);
+      return { messageId: info.messageId };
+    } catch (err) {
+      const formatted = _EmailService.formatSmtpErrorMessage(err, host, port2);
+      console.log(`[Brevo SMTP Note] Delivery attempted to ${maskedRecipient} [${err?.code || "ERR"}]: ${formatted}`);
+      throw new Error(`Email delivery failed: ${formatted}`);
+    }
+  }
+  /**
+   * Diagnostic test function to test actual email sending to a specified recipient.
+   */
+  static async sendTestEmail(targetEmail) {
+    try {
+      const res = await this.sendMail({
+        to: targetEmail,
+        subject: "FinPulse \u2013 Brevo SMTP Diagnostic Test",
+        text: `This is a diagnostic test email dispatched from FinPulse via Brevo SMTP (smtp-relay.brevo.com:2525) at ${(/* @__PURE__ */ new Date()).toISOString()}.
+
+If you received this message, your Brevo SMTP connection is fully operational!`,
+        html: `
+          <div style="font-family: sans-serif; padding: 24px; background: #0f172a; color: #ffffff; border-radius: 12px; max-width: 500px;">
+            <h2 style="color: #38bdf8; margin-top: 0;">FinPulse Brevo SMTP Operational</h2>
+            <p style="color: #cbd5e1; font-size: 14px;">This is a diagnostic test message dispatched via Brevo SMTP relay on port 2525.</p>
+            <div style="background: #1e293b; padding: 12px 16px; border-radius: 8px; font-family: monospace; font-size: 12px; color: #10b981;">
+              Status: 250 OK (SMTP Handshake & TLS Accepted)
+            </div>
+            <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Timestamp: ${(/* @__PURE__ */ new Date()).toISOString()}</p>
+          </div>
+        `
+      });
+      return { success: true, messageId: res.messageId };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+  /**
+   * Sends the official FinPulse 6-digit verification code.
+   * Subject: "FinPulse – Your Email Verification Code"
+   */
   static async sendVerificationEmail(user) {
-    const tokenParam = user.token ? `token=${encodeURIComponent(user.token)}&` : "";
-    const verifyUrl = `/verify-email?${tokenParam}email=${encodeURIComponent(user.email)}`;
+    const subject = "FinPulse \u2013 Your Email Verification Code";
+    const textBody = `Hello ${user.name},
+
+Your FinPulse email verification code is: ${user.otp}
+
+This verification code expires in 5 minutes.
+
+Security Notice: For your security, never share this one-time code with anyone. FinPulse representatives will never ask for your verification code.
+
+If you did not request this verification code, please disregard this email. No account will be created or activated without entering this code.
+
+Best regards,
+The FinPulse Security Team`;
     const htmlBody = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-        <div style="background: #0f172a; padding: 28px 32px; color: #ffffff;">
-          <h1 style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">FinPulse Security</h1>
-          <p style="margin: 6px 0 0 0; font-size: 14px; color: #94a3b8;">Email Address Verification</p>
-        </div>
-        <div style="padding: 32px;">
-          <p style="font-size: 16px; color: #334155; margin-top: 0;">Hello <strong>${user.name}</strong>,</p>
-          <p style="font-size: 14px; color: #64748b; line-height: 1.6;">
-            Thank you for creating your FinPulse Smart Money Management account. To secure your financial ledger and enable automated recovery, please verify your email address.
-          </p>
-          
-          <div style="background: #f1f5f9; border-radius: 8px; padding: 20px; text-align: center; margin: 24px 0;">
-            <div style="font-size: 12px; text-transform: uppercase; color: #64748b; font-weight: 600; letter-spacing: 1px;">Your Verification Code</div>
-            <div style="font-size: 36px; font-weight: 800; color: #0f172a; letter-spacing: 8px; margin-top: 8px; font-family: monospace;">${user.otp}</div>
-            <div style="font-size: 12px; color: #94a3b8; margin-top: 6px;">Valid for 30 minutes</div>
-          </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0b0f19; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #0b0f19; padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width: 560px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.3); border: 1px solid #1e293b;">
+          <!-- Brand Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); padding: 36px 40px; text-align: center; border-bottom: 2px solid #2563eb;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center">
+                    <div style="display: inline-block; width: 44px; height: 44px; line-height: 44px; border-radius: 12px; background: #2563eb; color: #ffffff; font-weight: 900; font-size: 20px; text-align: center; margin-bottom: 12px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);">
+                      FP
+                    </div>
+                    <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">FinPulse</h1>
+                    <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px;">Cryptographic Financial Ledger</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
 
-          <div style="text-align: center; margin: 28px 0;">
-            <a href="${verifyUrl}" style="background: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 28px; font-size: 14px; font-weight: 600; border-radius: 8px; display: inline-block;">
-              Verify Email Address Instantly
-            </a>
-          </div>
+          <!-- Main Body -->
+          <tr>
+            <td style="padding: 40px 40px 32px 40px;">
+              <h2 style="margin: 0 0 16px 0; color: #0f172a; font-size: 20px; font-weight: 700;">Verify Your Email Address</h2>
+              <p style="margin: 0 0 20px 0; color: #475569; font-size: 15px; line-height: 1.6;">
+                Hello <strong>${escapeHtml(user.name)}</strong>,
+              </p>
+              <p style="margin: 0 0 28px 0; color: #475569; font-size: 15px; line-height: 1.6;">
+                Thank you for choosing FinPulse to manage your financial portfolio. To secure your personal ledger and complete your registration, enter the six-digit verification code below:
+              </p>
 
-          <p style="font-size: 12px; color: #94a3b8; line-height: 1.5; border-top: 1px solid #e2e8f0; padding-top: 20px; margin-bottom: 0;">
-            If you did not request this verification, please disregard this email. Your data remains protected with AES and JWT ledger encryption.
-          </p>
-        </div>
-      </div>
+              <!-- OTP Box -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 28px;">
+                <tr>
+                  <td align="center" style="background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 24px 16px;">
+                    <div style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px;">
+                      Verification Code
+                    </div>
+                    <div style="font-family: 'SF Mono', Consolas, Monaco, 'Courier New', monospace; font-size: 40px; font-weight: 900; letter-spacing: 10px; color: #0f172a; padding: 4px 0;">
+                      ${user.otp}
+                    </div>
+                    <div style="font-size: 13px; font-weight: 600; color: #dc2626; margin-top: 8px;">
+                      \u23F1 Expires in 5 minutes
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Security Notice -->
+              <div style="background-color: #f1f5f9; border-left: 4px solid #2563eb; padding: 14px 16px; border-radius: 4px; margin-bottom: 24px;">
+                <p style="margin: 0; color: #334155; font-size: 13px; line-height: 1.5;">
+                  <strong>Security Warning:</strong> FinPulse representatives will never ask you for this code. Do not share it with anyone.
+                </p>
+              </div>
+
+              <p style="margin: 0; color: #64748b; font-size: 13px; line-height: 1.5;">
+                If you did not initiate this registration, please ignore this email. No financial data has been created and your email address remains secure.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 24px 40px; text-align: center;">
+              <p style="margin: 0; color: #94a3b8; font-size: 12px; line-height: 1.5;">
+                &copy; ${(/* @__PURE__ */ new Date()).getFullYear()} FinPulse Financial Management Engine. All rights reserved.
+              </p>
+              <p style="margin: 6px 0 0 0; color: #cbd5e1; font-size: 11px;">
+                Secured via Brevo SMTP Relay (Port 2525).
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
     `;
     return this.sendMail({
-      userId: user.id,
       to: user.email,
-      subject: "Verify Your FinPulse Account - Code: " + user.otp,
-      previewText: `Your verification code is ${user.otp}. Complete verification to secure your financial portal.`,
-      htmlBody,
-      triggerType: "verification",
-      metadata: { otp: user.otp, token: user.token, actionUrl: verifyUrl }
+      subject,
+      text: textBody,
+      html: htmlBody
     });
   }
+  /**
+   * Sends password recovery authorization code.
+   */
   static async sendPasswordResetEmail(user) {
-    const resetUrl = `/reset-password?token=${encodeURIComponent(user.token)}&email=${encodeURIComponent(user.email)}`;
+    const subject = "FinPulse \u2013 Your Password Reset Code";
+    const textBody = `Hello ${user.name},
+
+We received a request to reset your FinPulse password.
+
+Your 6-digit recovery code is: ${user.otp}
+
+This code expires in 5 minutes.
+
+If you did not request a password reset, please ignore this email and verify your account security.
+
+Best regards,
+The FinPulse Security Team`;
     const htmlBody = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-        <div style="background: #0f172a; padding: 28px 32px; color: #ffffff;">
-          <h1 style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">FinPulse Recovery</h1>
-          <p style="margin: 6px 0 0 0; font-size: 14px; color: #f87171;">Secure Password Reset Request</p>
-        </div>
-        <div style="padding: 32px;">
-          <p style="font-size: 16px; color: #334155; margin-top: 0;">Hello <strong>${user.name}</strong>,</p>
-          <p style="font-size: 14px; color: #64748b; line-height: 1.6;">
-            We received an automated request to reset the password for your personal finance account. Use the one-time code below or click the button to set a new password.
-          </p>
-          
-          <div style="background: #fef2f2; border: 1px solid #fee2e2; border-radius: 8px; padding: 20px; text-align: center; margin: 24px 0;">
-            <div style="font-size: 12px; text-transform: uppercase; color: #ef4444; font-weight: 600; letter-spacing: 1px;">Reset Authorization Code</div>
-            <div style="font-size: 36px; font-weight: 800; color: #991b1b; letter-spacing: 8px; margin-top: 8px; font-family: monospace;">${user.otp}</div>
-            <div style="font-size: 12px; color: #b91c1c; margin-top: 6px;">Expires in 15 minutes</div>
-          </div>
-
-          <div style="text-align: center; margin: 28px 0;">
-            <a href="${resetUrl}" style="background: #dc2626; color: #ffffff; text-decoration: none; padding: 14px 28px; font-size: 14px; font-weight: 600; border-radius: 8px; display: inline-block;">
-              Reset Password Now
-            </a>
-          </div>
-
-          <p style="font-size: 12px; color: #94a3b8; line-height: 1.5; border-top: 1px solid #e2e8f0; padding-top: 20px; margin-bottom: 0;">
-            If you did not request a password recovery, please log in immediately and review your security preferences.
-          </p>
-        </div>
-      </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0b0f19; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width: 560px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
+          <tr>
+            <td style="background: #0f172a; padding: 32px 40px; text-align: center; border-bottom: 2px solid #ef4444;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 800;">FinPulse Security Recovery</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 36px 40px;">
+              <h2 style="margin: 0 0 16px 0; color: #0f172a; font-size: 18px; font-weight: 700;">Password Recovery Authorization</h2>
+              <p style="margin: 0 0 20px 0; color: #475569; font-size: 14px; line-height: 1.6;">
+                Hello <strong>${escapeHtml(user.name)}</strong>,<br>
+                We received an authorized request to reset the password for your FinPulse account. Use the code below:
+              </p>
+              <div style="background: #fef2f2; border: 2px dashed #f87171; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0;">
+                <div style="font-family: monospace; font-size: 36px; font-weight: 900; letter-spacing: 8px; color: #991b1b;">
+                  ${user.otp}
+                </div>
+                <div style="font-size: 12px; font-weight: 600; color: #dc2626; margin-top: 8px;">
+                  \u23F1 Code expires in 5 minutes
+                </div>
+              </div>
+              <p style="margin: 0; color: #64748b; font-size: 13px; line-height: 1.5;">
+                If you did not request this, please ensure your account credentials remain private.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
     `;
     return this.sendMail({
-      userId: user.id,
       to: user.email,
-      subject: "FinPulse Password Reset Code: " + user.otp,
-      previewText: `Password reset request received. Use code ${user.otp} to update credentials.`,
-      htmlBody,
-      triggerType: "password_reset",
-      metadata: { otp: user.otp, token: user.token, actionUrl: resetUrl }
+      subject,
+      text: textBody,
+      html: htmlBody
     });
   }
+  /**
+   * Credit card scheduled bill reminder
+   */
   static async sendCreditCardBillReminder(user, card) {
     const formattedAmount = (card.outstandingPaise / 100).toLocaleString("en-IN", { style: "currency", currency: "INR" });
-    const htmlBody = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-        <div style="background: #0f172a; padding: 24px 32px; color: #ffffff;">
-          <h2 style="margin: 0; font-size: 20px; font-weight: 700;">Credit Card Payment Reminder</h2>
-          <p style="margin: 4px 0 0 0; font-size: 13px; color: #f59e0b;">Scheduled 25th Monthly Alert</p>
-        </div>
-        <div style="padding: 32px;">
-          <p style="font-size: 15px; color: #334155;">Hello <strong>${user.name}</strong>,</p>
-          <p style="font-size: 14px; color: #64748b; line-height: 1.6;">
-            Your upcoming bill for <strong>${card.cardName} (\u2022\u2022\u2022\u2022 ${card.lastFourDigits})</strong> is pending settlement.
-          </p>
-          
-          <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: #f8fafc; border-radius: 8px; overflow: hidden;">
-            <tr>
-              <td style="padding: 14px 16px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">Current Outstanding:</td>
-              <td style="padding: 14px 16px; border-bottom: 1px solid #e2e8f0; font-size: 16px; font-weight: 700; color: #dc2626; text-align: right;">${formattedAmount}</td>
-            </tr>
-            <tr>
-              <td style="padding: 14px 16px; font-size: 13px; color: #64748b;">Payment Due Date:</td>
-              <td style="padding: 14px 16px; font-size: 14px; font-weight: 600; color: #0f172a; text-align: right;">${card.dueDay}th of month</td>
-            </tr>
-          </table>
+    const subject = `FinPulse Bill Reminder: ${formattedAmount} due for ${card.cardName}`;
+    const textBody = `Hello ${user.name},
 
-          <p style="font-size: 13px; color: #64748b;">
-            Remember: Paying your credit card bill through FinPulse settles your card balance without counting as a duplicate monthly expense.
-          </p>
+Your bill for ${card.cardName} (\u2022\u2022\u2022\u2022 ${card.lastFourDigits}) is pending settlement.
+
+Current Outstanding: ${formattedAmount}
+Payment Due Date: ${card.dueDay}th of month
+
+Best regards,
+FinPulse`;
+    const htmlBody = `
+      <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px;">
+        <h2 style="color: #0f172a; margin-top: 0;">Credit Card Payment Reminder</h2>
+        <p>Hello <strong>${escapeHtml(user.name)}</strong>,</p>
+        <p>Your upcoming bill for <strong>${escapeHtml(card.cardName)} (\u2022\u2022\u2022\u2022 ${card.lastFourDigits})</strong> is pending settlement.</p>
+        <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0 0 8px 0;"><strong>Outstanding Balance:</strong> <span style="color: #dc2626; font-size: 18px; font-weight: 700;">${formattedAmount}</span></p>
+          <p style="margin: 0;"><strong>Payment Due Date:</strong> ${card.dueDay}th of the month</p>
         </div>
       </div>
     `;
     return this.sendMail({
-      userId: user.id,
       to: user.email,
-      subject: `Bill Reminder: ${formattedAmount} due for ${card.cardName}`,
-      previewText: `Reminder: ${formattedAmount} outstanding on ${card.cardName} due by the ${card.dueDay}th.`,
-      htmlBody,
-      triggerType: "cc_bill_reminder"
+      subject,
+      text: textBody,
+      html: htmlBody
     });
   }
+  /**
+   * Fixed deposit scheduled maturity reminder
+   */
   static async sendFDMaturityAlert(user, fd) {
-    const formattedPrincipal = (fd.principalPaise / 100).toLocaleString("en-IN", { style: "currency", currency: "INR" });
     const formattedMaturity = (fd.maturityAmountPaise / 100).toLocaleString("en-IN", { style: "currency", currency: "INR" });
-    const htmlBody = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-        <div style="background: #0f172a; padding: 24px 32px; color: #ffffff;">
-          <h2 style="margin: 0; font-size: 20px; font-weight: 700;">Fixed Deposit Maturity Approaching</h2>
-          <p style="margin: 4px 0 0 0; font-size: 13px; color: #3b82f6;">${fd.daysRemaining} Days Until Maturity</p>
-        </div>
-        <div style="padding: 32px;">
-          <p style="font-size: 15px; color: #334155;">Hello <strong>${user.name}</strong>,</p>
-          <p style="font-size: 14px; color: #64748b; line-height: 1.6;">
-            Your Fixed Deposit <strong>${fd.fdName}</strong> with ${fd.bankName} is maturing on <strong>${new Date(fd.maturityDate).toLocaleDateString()}</strong>.
-          </p>
-          
-          <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: #f8fafc; border-radius: 8px;">
-            <tr>
-              <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b;">Principal Invested:</td>
-              <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-size: 14px; font-weight: 600; text-align: right;">${formattedPrincipal}</td>
-            </tr>
-            <tr>
-              <td style="padding: 12px 16px; font-size: 13px; color: #64748b;">Maturity Payout Value:</td>
-              <td style="padding: 12px 16px; font-size: 16px; font-weight: 700; color: #16a34a; text-align: right;">${formattedMaturity}</td>
-            </tr>
-          </table>
+    const subject = `FinPulse Alert: Fixed Deposit ${fd.fdName} Matures Soon`;
+    const textBody = `Hello ${user.name},
 
-          <p style="font-size: 13px; color: #64748b;">
-            Review whether you wish to reinvest upon maturity or transfer funds into your savings or liquid investment portfolio.
-          </p>
+Your Fixed Deposit "${fd.fdName}" with ${fd.bankName} is maturing on ${new Date(fd.maturityDate).toLocaleDateString()}.
+
+Maturity Value: ${formattedMaturity}
+Days Remaining: ${fd.daysRemaining}
+
+Best regards,
+FinPulse`;
+    const htmlBody = `
+      <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px;">
+        <h2 style="color: #0f172a; margin-top: 0;">Fixed Deposit Maturity Approaching</h2>
+        <p>Hello <strong>${escapeHtml(user.name)}</strong>,</p>
+        <p>Your Fixed Deposit <strong>${escapeHtml(fd.fdName)}</strong> with ${escapeHtml(fd.bankName)} reaches maturity on <strong>${new Date(fd.maturityDate).toLocaleDateString()}</strong> (${fd.daysRemaining} days remaining).</p>
+        <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0;"><strong>Maturity Payout Value:</strong> <span style="color: #16a34a; font-size: 18px; font-weight: 700;">${formattedMaturity}</span></p>
         </div>
       </div>
     `;
     return this.sendMail({
-      userId: user.id,
       to: user.email,
-      subject: `FD Maturity Alert: ${fd.fdName} (${formattedMaturity}) matures soon`,
-      previewText: `Your FD of ${formattedPrincipal} reaches maturity on ${new Date(fd.maturityDate).toLocaleDateString()}.`,
-      htmlBody,
-      triggerType: "fd_maturity_reminder"
+      subject,
+      text: textBody,
+      html: htmlBody
     });
   }
 };
+function escapeHtml(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
 
 // backend/services/scheduler.ts
 import cron from "node-cron";
@@ -1586,6 +1797,38 @@ router.get("/health", (req, res) => {
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
+router.get("/system/smtp-status", async (req, res) => {
+  const status = await EmailService.verifyConnection();
+  res.json(status);
+});
+router.get("/email/diagnostics", async (req, res) => {
+  const status = await EmailService.verifyConnection();
+  res.json(status);
+});
+router.post("/system/smtp-test", async (req, res) => {
+  try {
+    const targetEmail = req.body?.email || process.env.SMTP_USER || "rjrajeshpal30@gmail.com";
+    const result = await EmailService.sendTestEmail(targetEmail);
+    if (!result.success) {
+      return res.status(503).json(result);
+    }
+    return res.json(result);
+  } catch (err) {
+    return res.status(503).json({ success: false, error: err.message });
+  }
+});
+router.post("/email/test-send", async (req, res) => {
+  try {
+    const targetEmail = req.body?.email || process.env.SMTP_USER || "rjrajeshpal30@gmail.com";
+    const result = await EmailService.sendTestEmail(targetEmail);
+    if (!result.success) {
+      return res.status(503).json(result);
+    }
+    return res.json(result);
+  } catch (err) {
+    return res.status(503).json({ success: false, error: err.message });
+  }
+});
 function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -1630,11 +1873,11 @@ router.post("/auth/register", async (req, res) => {
       const waitSec = Math.ceil((6e4 - (Date.now() - existingVerif.lastSentAt)) / 1e3);
       return res.status(429).json({ error: `Please wait ${waitSec} seconds before requesting another code.` });
     }
-    const otp = Math.floor(1e5 + Math.random() * 9e5).toString();
+    const otp = crypto.randomInt(1e5, 1e6).toString();
     const otpHash = hashToken(otp);
     const passwordHash = await bcrypt2.hash(password, 10);
     const verificationRecord = {
-      id: `verif-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      id: `verif-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
       email: cleanEmail,
       name: cleanName,
       passwordHash,
@@ -1647,15 +1890,23 @@ router.post("/auth/register", async (req, res) => {
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     };
     await persistEmailVerification(verificationRecord);
-    await EmailService.sendVerificationEmail({
-      email: cleanEmail,
-      name: cleanName,
-      otp,
-      token: ""
-    });
+    try {
+      await EmailService.sendVerificationEmail({
+        email: cleanEmail,
+        name: cleanName,
+        otp
+      });
+    } catch (smtpErr) {
+      await deleteEmailVerification(cleanEmail);
+      console.error(`[Registration SMTP Failed] Could not dispatch OTP to ${maskEmail(cleanEmail)}:`, smtpErr?.message);
+      return res.status(503).json({
+        error: smtpErr?.message || "We couldn't send your verification email via Brevo SMTP. Please check your Brevo SMTP configuration.",
+        code: smtpErr?.code
+      });
+    }
     return res.status(200).json({
       success: true,
-      message: "Verification code sent to your email. Code expires in 5 minutes.",
+      message: `Verification code sent to ${maskEmail(cleanEmail)}`,
       email: cleanEmail,
       expiresInSeconds: 300
     });
@@ -1809,21 +2060,28 @@ router.post("/auth/resend-otp", async (req, res) => {
       const waitSec = Math.ceil((6e4 - elapsed) / 1e3);
       return res.status(429).json({ error: `Please wait ${waitSec} seconds before requesting a new code.` });
     }
-    const newOtp = Math.floor(1e5 + Math.random() * 9e5).toString();
+    const newOtp = crypto.randomInt(1e5, 1e6).toString();
+    try {
+      await EmailService.sendVerificationEmail({
+        email: cleanEmail,
+        name: verif.name,
+        otp: newOtp
+      });
+    } catch (smtpErr) {
+      console.error(`[Resend OTP SMTP Failed] Could not dispatch OTP to ${maskEmail(cleanEmail)}:`, smtpErr?.message);
+      return res.status(503).json({
+        error: smtpErr?.message || "We couldn't send your verification email via Brevo SMTP. Please check your Brevo SMTP configuration.",
+        code: smtpErr?.code
+      });
+    }
     verif.otpHash = hashToken(newOtp);
     verif.expiresAt = Date.now() + 5 * 60 * 1e3;
     verif.attempts = 0;
     verif.lastSentAt = Date.now();
     await persistEmailVerification(verif);
-    await EmailService.sendVerificationEmail({
-      email: cleanEmail,
-      name: verif.name,
-      otp: newOtp,
-      token: ""
-    });
     return res.json({
       success: true,
-      message: "A new verification code has been dispatched to your email.",
+      message: `Verification code sent to ${maskEmail(cleanEmail)}`,
       expiresInSeconds: 300
     });
   } catch (err) {
@@ -1997,22 +2255,26 @@ router.post("/auth/forgot-password", async (req, res) => {
     if (!user) {
       return res.json({ success: true, message: "If an account exists with this email, a recovery code has been dispatched." });
     }
-    const otp = Math.floor(1e5 + Math.random() * 9e5).toString();
-    const token = Buffer.from(`reset-${user.id}-${Date.now()}`).toString("base64");
+    const otp = crypto.randomInt(1e5, 1e6).toString();
+    try {
+      await EmailService.sendPasswordResetEmail({
+        email: user.email,
+        name: user.name,
+        otp
+      });
+    } catch (smtpErr) {
+      console.error(`[Forgot Password SMTP Failed] Could not dispatch reset code to ${maskEmail(cleanEmail)}:`, smtpErr?.message);
+      return res.status(503).json({
+        error: smtpErr?.message || "We couldn't dispatch your password recovery code via Brevo SMTP. Please verify your Brevo credentials.",
+        code: smtpErr?.code
+      });
+    }
     user.resetPasswordOtp = hashToken(otp);
-    user.resetPasswordToken = token;
     user.resetPasswordExpires = Date.now() + 15 * 60 * 1e3;
     await persistUser(user);
-    await EmailService.sendPasswordResetEmail({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      token,
-      otp
-    });
     return res.json({
       success: true,
-      message: "Password recovery email dispatched. Please check your inbox.",
+      message: `Password reset code sent to ${maskEmail(cleanEmail)}`,
       expiresInSeconds: 900
     });
   } catch (err) {
@@ -2062,23 +2324,17 @@ router.put("/auth/profile", authenticate, async (req, res) => {
   if (monthlyBudgetInPaise !== void 0) user.monthlyBudgetInPaise = monthlyBudgetInPaise;
   if (reminderDayOfMonth !== void 0) user.reminderDayOfMonth = reminderDayOfMonth;
   if (emailNotificationsEnabled !== void 0) user.emailNotificationsEnabled = emailNotificationsEnabled;
-  if (smtpConfig !== void 0) user.smtpConfig = smtpConfig;
+  if (smtpConfig !== void 0) {
+    user.smtpConfig = smtpConfig;
+    if (smtpConfig.host) process.env.SMTP_HOST = smtpConfig.host.trim();
+    if (smtpConfig.port) process.env.SMTP_PORT = String(smtpConfig.port).trim();
+    if (smtpConfig.user) process.env.SMTP_USER = smtpConfig.user.trim();
+    if (smtpConfig.pass) process.env.SMTP_PASS = smtpConfig.pass.trim();
+    if (smtpConfig.from) process.env.EMAIL_FROM = smtpConfig.from.trim();
+    if (smtpConfig.fromName) process.env.EMAIL_FROM_NAME = smtpConfig.fromName.trim();
+    EmailService.resetTransporter();
+  }
   await persistUser(user);
-  const { passwordHash, ...safeUser } = user;
-  res.json({ message: "Profile updated successfully", user: safeUser });
-});
-router.put("/auth/profile", authenticate, (req, res) => {
-  const db = getDb();
-  const user = db.users.find((u) => u.id === req.user?.id);
-  if (!user) return res.status(404).json({ error: "User not found" });
-  const { name, currency, monthlyBudgetInPaise, reminderDayOfMonth, emailNotificationsEnabled, smtpConfig } = req.body;
-  if (name) user.name = name;
-  if (currency) user.currency = currency;
-  if (monthlyBudgetInPaise !== void 0) user.monthlyBudgetInPaise = monthlyBudgetInPaise;
-  if (reminderDayOfMonth !== void 0) user.reminderDayOfMonth = reminderDayOfMonth;
-  if (emailNotificationsEnabled !== void 0) user.emailNotificationsEnabled = emailNotificationsEnabled;
-  if (smtpConfig !== void 0) user.smtpConfig = smtpConfig;
-  saveDatabase();
   const { passwordHash, ...safeUser } = user;
   res.json({ message: "Profile updated successfully", user: safeUser });
 });
@@ -2848,75 +3104,6 @@ router.post("/notifications/trigger-check", authenticate, async (req, res) => {
   const list = db.notifications.filter((n) => n.userId === req.user.id);
   res.json({ message: "Reminders check executed", notifications: list });
 });
-router.get("/mailbox", (req, res) => {
-  const db = getDb();
-  res.json(db.emailLogs);
-});
-router.post("/mailbox/test-send", authenticate, async (req, res) => {
-  try {
-    const { type } = req.body;
-    const db = getDb();
-    const user = db.users.find((u) => u.id === req.user.id) || db.users[0];
-    let emailLog;
-    if (type === "verification") {
-      const otp = Math.floor(1e5 + Math.random() * 9e5).toString();
-      emailLog = await EmailService.sendVerificationEmail({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        token: "test-token-" + Date.now(),
-        otp
-      });
-    } else if (type === "password_reset") {
-      const otp = Math.floor(1e5 + Math.random() * 9e5).toString();
-      emailLog = await EmailService.sendPasswordResetEmail({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        token: "reset-token-" + Date.now(),
-        otp
-      });
-    } else if (type === "cc_bill_reminder") {
-      const card = db.creditCards.find((c) => c.userId === user.id) || {
-        cardName: "HDFC Regalia Gold",
-        lastFourDigits: "9182",
-        outstandingBalanceInPaise: 3e5,
-        dueDay: 5
-      };
-      emailLog = await EmailService.sendCreditCardBillReminder(user, {
-        cardName: card.cardName,
-        lastFourDigits: card.lastFourDigits,
-        outstandingPaise: card.outstandingBalanceInPaise || 3e5,
-        dueDay: card.dueDay
-      });
-    } else {
-      const fd = db.fixedDeposits.find((f) => f.userId === user.id) || {
-        fdName: "HDFC High Yield FD",
-        bankName: "HDFC Bank",
-        principalInPaise: 5e6,
-        maturityAmountInPaise: 5385400,
-        maturityDate: new Date(Date.now() + 30 * 864e5).toISOString()
-      };
-      emailLog = await EmailService.sendFDMaturityAlert(user, {
-        fdName: fd.fdName,
-        bankName: fd.bankName,
-        principalPaise: fd.principalInPaise,
-        maturityAmountPaise: fd.maturityAmountInPaise,
-        maturityDate: fd.maturityDate,
-        daysRemaining: 30
-      });
-    }
-    res.json({ message: "Test email generated and recorded in Mailbox Sandbox", email: emailLog });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-router.delete("/mailbox", (req, res) => {
-  const db = getDb();
-  db.emailLogs = [];
-  saveDatabase();
-  res.json({ message: "Mailbox cleared" });
-});
 router.post("/scenarios/reset", async (req, res) => {
   try {
     const userId = req.user?.id || "demo-user-id";
@@ -3112,7 +3299,12 @@ async function start() {
   try {
     console.log("Initializing FinPulse backend services...");
     await initDatabase();
-    SchedulerService.startScheduledJobs();
+    try {
+      const smtpCheck = await EmailService.verifyConnection();
+      console.log(`[Brevo SMTP] Startup check: ${smtpCheck.verified ? "Verified on " + smtpCheck.host + ":" + smtpCheck.port : smtpCheck.message}`);
+    } catch (err) {
+      console.log("[Brevo SMTP] Startup check deferred:", err?.message);
+    }
     app.listen(port, "0.0.0.0", () => {
       console.log(`FinPulse Backend Server running on port ${port} (0.0.0.0:${port})`);
       console.log(`Health check ready at: http://localhost:${port}/api/health`);

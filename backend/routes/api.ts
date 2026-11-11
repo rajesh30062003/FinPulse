@@ -86,6 +86,32 @@ router.get('/email/diagnostics', async (req: Request, res: Response) => {
   res.json(status);
 });
 
+router.post('/system/smtp-test', async (req: Request, res: Response) => {
+  try {
+    const targetEmail = req.body?.email || process.env.SMTP_USER || 'rjrajeshpal30@gmail.com';
+    const result = await EmailService.sendTestEmail(targetEmail);
+    if (!result.success) {
+      return res.status(503).json(result);
+    }
+    return res.json(result);
+  } catch (err: any) {
+    return res.status(503).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/email/test-send', async (req: Request, res: Response) => {
+  try {
+    const targetEmail = req.body?.email || process.env.SMTP_USER || 'rjrajeshpal30@gmail.com';
+    const result = await EmailService.sendTestEmail(targetEmail);
+    if (!result.success) {
+      return res.status(503).json(result);
+    }
+    return res.json(result);
+  } catch (err: any) {
+    return res.status(503).json({ success: false, error: err.message });
+  }
+});
+
 // ================= AUTHENTICATION MIDDLEWARE ================= //
 
 export interface AuthRequest extends Request {
@@ -184,7 +210,8 @@ router.post('/auth/register', async (req: Request, res: Response) => {
       await deleteEmailVerification(cleanEmail);
       console.error(`[Registration SMTP Failed] Could not dispatch OTP to ${maskEmail(cleanEmail)}:`, smtpErr?.message);
       return res.status(503).json({
-        error: "We couldn't send your verification email. Please check your email configuration or try again."
+        error: smtpErr?.message || "We couldn't send your verification email via Brevo SMTP. Please check your Brevo SMTP configuration.",
+        code: smtpErr?.code
       });
     }
 
@@ -391,7 +418,8 @@ router.post('/auth/resend-otp', async (req: Request, res: Response) => {
     } catch (smtpErr: any) {
       console.error(`[Resend OTP SMTP Failed] Could not dispatch OTP to ${maskEmail(cleanEmail)}:`, smtpErr?.message);
       return res.status(503).json({
-        error: "We couldn't send your verification email. Please check your email configuration or try again."
+        error: smtpErr?.message || "We couldn't send your verification email via Brevo SMTP. Please check your Brevo SMTP configuration.",
+        code: smtpErr?.code
       });
     }
 
@@ -641,7 +669,8 @@ router.post('/auth/forgot-password', async (req: Request, res: Response) => {
     } catch (smtpErr: any) {
       console.error(`[Forgot Password SMTP Failed] Could not dispatch reset code to ${maskEmail(cleanEmail)}:`, smtpErr?.message);
       return res.status(503).json({
-        error: "We couldn't send your verification email. Please check your email configuration or try again."
+        error: smtpErr?.message || "We couldn't dispatch your password recovery code via Brevo SMTP. Please verify your Brevo credentials.",
+        code: smtpErr?.code
       });
     }
 
@@ -714,27 +743,18 @@ router.put('/auth/profile', authenticate, async (req: AuthRequest, res: Response
   if (monthlyBudgetInPaise !== undefined) user.monthlyBudgetInPaise = monthlyBudgetInPaise;
   if (reminderDayOfMonth !== undefined) user.reminderDayOfMonth = reminderDayOfMonth;
   if (emailNotificationsEnabled !== undefined) user.emailNotificationsEnabled = emailNotificationsEnabled;
-  if (smtpConfig !== undefined) user.smtpConfig = smtpConfig;
+  if (smtpConfig !== undefined) {
+    user.smtpConfig = smtpConfig;
+    if (smtpConfig.host) process.env.SMTP_HOST = smtpConfig.host.trim();
+    if (smtpConfig.port) process.env.SMTP_PORT = String(smtpConfig.port).trim();
+    if (smtpConfig.user) process.env.SMTP_USER = smtpConfig.user.trim();
+    if (smtpConfig.pass) process.env.SMTP_PASS = smtpConfig.pass.trim();
+    if (smtpConfig.from) process.env.EMAIL_FROM = smtpConfig.from.trim();
+    if (smtpConfig.fromName) process.env.EMAIL_FROM_NAME = smtpConfig.fromName.trim();
+    EmailService.resetTransporter();
+  }
 
   await persistUser(user);
-  const { passwordHash, ...safeUser } = user;
-  res.json({ message: 'Profile updated successfully', user: safeUser });
-});
-
-router.put('/auth/profile', authenticate, (req: AuthRequest, res: Response) => {
-  const db = getDb();
-  const user = db.users.find(u => u.id === req.user?.id);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-
-  const { name, currency, monthlyBudgetInPaise, reminderDayOfMonth, emailNotificationsEnabled, smtpConfig } = req.body;
-  if (name) user.name = name;
-  if (currency) user.currency = currency;
-  if (monthlyBudgetInPaise !== undefined) user.monthlyBudgetInPaise = monthlyBudgetInPaise;
-  if (reminderDayOfMonth !== undefined) user.reminderDayOfMonth = reminderDayOfMonth;
-  if (emailNotificationsEnabled !== undefined) user.emailNotificationsEnabled = emailNotificationsEnabled;
-  if (smtpConfig !== undefined) user.smtpConfig = smtpConfig;
-
-  saveDatabase();
   const { passwordHash, ...safeUser } = user;
   res.json({ message: 'Profile updated successfully', user: safeUser });
 });

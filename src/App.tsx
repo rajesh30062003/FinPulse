@@ -7,7 +7,6 @@ import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { AddTransactionModal } from './components/AddTransactionModal';
 import { CreditCardBillModal } from './components/CreditCardBillModal';
-import { MailboxModal } from './components/MailboxModal';
 import { ScenarioTesterModal } from './components/ScenarioTesterModal';
 import { AuthModal } from './components/AuthModal';
 
@@ -87,7 +86,6 @@ const MainLayout: React.FC = () => {
       {/* Shared Modals */}
       <AddTransactionModal />
       <CreditCardBillModal />
-      <MailboxModal />
       <ScenarioTesterModal />
       <AuthModal />
     </div>

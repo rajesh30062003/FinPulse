@@ -118,8 +118,12 @@ async function start() {
   try {
     console.log('Initializing FinPulse backend services...');
     await initDatabase();
-    SchedulerService.startScheduledJobs();
-    await EmailService.verifyConnection();
+    try {
+      const smtpCheck = await EmailService.verifyConnection();
+      console.log(`[Brevo SMTP] Startup check: ${smtpCheck.verified ? 'Verified on ' + smtpCheck.host + ':' + smtpCheck.port : smtpCheck.message}`);
+    } catch (err: any) {
+      console.log('[Brevo SMTP] Startup check deferred:', err?.message);
+    }
 
     app.listen(port, '0.0.0.0', () => {
       console.log(`FinPulse Backend Server running on port ${port} (0.0.0.0:${port})`);

@@ -16,7 +16,6 @@ import {
   History,
   Bell,
   Settings,
-  Mail,
   FlaskConical,
   X
 } from 'lucide-react';
@@ -45,9 +44,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     activeTab,
     setActiveTab,
     setIsAddTxOpen,
-    setIsMailboxOpen,
     setIsScenarioModalOpen,
-    mailboxLogs,
     unreadNotificationsCount
   } = useFinancial();
 
@@ -179,24 +176,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           ))}
         </div>
 
-        {/* Bottom Utility Tools (Mailbox Sandbox & Scenario Verifier) */}
+        {/* Bottom Utility Tools (Scenario Verifier) */}
         <div className="p-4 border-t border-slate-800 bg-slate-950/60 space-y-2">
-          <button
-            onClick={() => {
-              setIsMailboxOpen(true);
-              if (window.innerWidth < 1024) onClose();
-            }}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700/80 text-xs text-slate-200 transition-colors"
-          >
-            <div className="flex items-center gap-2.5">
-              <Mail className="w-4 h-4 text-emerald-400" />
-              <span>Email Sandbox Mailbox</span>
-            </div>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono">
-              {mailboxLogs.length}
-            </span>
-          </button>
-
           <button
             onClick={() => {
               setIsScenarioModalOpen(true);

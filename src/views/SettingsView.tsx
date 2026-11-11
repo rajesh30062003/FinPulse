@@ -6,7 +6,7 @@ import { api, getApiBase, setCustomApiUrl } from '../services/api';
 
 export const SettingsView: React.FC = () => {
   const { user, refreshUser } = useAuth();
-  const { refreshAll, setIsScenarioModalOpen, setIsMailboxOpen } = useFinancial();
+  const { refreshAll, setIsScenarioModalOpen } = useFinancial();
 
   const [name, setName] = useState(user?.name || '');
   const [currency, setCurrency] = useState(user?.currency || 'INR');
@@ -16,12 +16,16 @@ export const SettingsView: React.FC = () => {
   const [reminderDay, setReminderDay] = useState(user?.reminderDayOfMonth?.toString() || '25');
   const [emailNotifications, setEmailNotifications] = useState(user?.emailNotificationsEnabled ?? true);
 
-  // SMTP Settings
-  const [smtpHost, setSmtpHost] = useState('');
-  const [smtpPort, setSmtpPort] = useState('587');
+  // Brevo SMTP Settings (Defaulted to Brevo SMTP on Port 2525)
+  const [smtpHost, setSmtpHost] = useState('smtp-relay.brevo.com');
+  const [smtpPort, setSmtpPort] = useState('2525');
   const [smtpUser, setSmtpUser] = useState('');
   const [smtpPass, setSmtpPass] = useState('');
   const [smtpFrom, setSmtpFrom] = useState('');
+  const [smtpDiagnostics, setSmtpDiagnostics] = useState<any>(null);
+  const [isTestingSmtp, setIsTestingSmtp] = useState(false);
+  const [testEmailRecipient, setTestEmailRecipient] = useState('');
+  const [smtpTestResult, setSmtpTestResult] = useState<{ success: boolean; msg: string; details?: any } | null>(null);
 
   const [dbStatus, setDbStatus] = useState<any>(null);
   const [saving, setSaving] = useState(false);
@@ -63,10 +67,34 @@ export const SettingsView: React.FC = () => {
       setMonthlyBudgetRupees((user.monthlyBudgetInPaise / 100).toString());
       setReminderDay(user.reminderDayOfMonth?.toString() || '25');
       setEmailNotifications(user.emailNotificationsEnabled ?? true);
+      setTestEmailRecipient(user.email || '');
     }
 
     api.getSystemStatus().then(res => setDbStatus(res.database)).catch(() => null);
+    api.getSmtpStatus().then(res => setSmtpDiagnostics(res)).catch(() => null);
   }, [user]);
+
+  const handleTestSmtp = async () => {
+    setIsTestingSmtp(true);
+    setSmtpTestResult(null);
+    try {
+      const res = await api.testSmtpConnection(testEmailRecipient.trim() || user?.email);
+      setSmtpTestResult({
+        success: res.success,
+        msg: res.message || (res.success ? 'Brevo relay accepted email for delivery.' : 'Brevo relay failed to dispatch'),
+        details: res
+      });
+      const updated = await api.getSmtpStatus();
+      setSmtpDiagnostics(updated);
+    } catch (err: any) {
+      setSmtpTestResult({
+        success: false,
+        msg: err.message || 'SMTP diagnostic request failed'
+      });
+    } finally {
+      setIsTestingSmtp(false);
+    }
+  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,7 +107,7 @@ export const SettingsView: React.FC = () => {
         monthlyBudgetInPaise: Math.round((parseFloat(monthlyBudgetRupees) || 40000) * 100),
         reminderDayOfMonth: parseInt(reminderDay, 10),
         emailNotificationsEnabled: emailNotifications,
-        smtpConfig: smtpHost ? { host: smtpHost, port: parseInt(smtpPort, 10), user: smtpUser, pass: smtpPass, from: smtpFrom } : undefined
+        smtpConfig: smtpUser.trim() && smtpPass.trim() ? { host: smtpHost.trim(), port: parseInt(smtpPort, 10), user: smtpUser.trim(), pass: smtpPass.trim(), from: smtpFrom.trim() } : undefined
       });
       await refreshUser();
       await refreshAll();
@@ -212,80 +240,169 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
 
-        {/* Custom SMTP Configuration */}
+        {/* Brevo SMTP Free (Port 2525) Configuration & Live Diagnostics */}
         <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4 text-xs">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Mail className="w-4 h-4 text-purple-600" />
-              Nodemailer SMTP Configuration (Optional)
+              Brevo SMTP Relay (Port 2525) &amp; Live Delivery
             </h3>
-            <button
-              type="button"
-              onClick={() => setIsMailboxOpen(true)}
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              Open Email Sandbox Mailbox
-            </button>
+            <span className={`text-[11px] font-mono px-2.5 py-0.5 rounded-full font-medium ${
+              smtpDiagnostics?.verified
+                ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                : smtpDiagnostics?.configured
+                ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+            }`}>
+              {smtpDiagnostics?.verified ? 'Brevo SMTP Active (2525)' : smtpDiagnostics?.configured ? 'Configured - Verify Auth' : 'Pending Credentials'}
+            </span>
           </div>
 
-          <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
-            By default, all emails are automatically simulated and viewable in the built-in <strong>Email Sandbox Mailbox</strong>. To send to external inboxes, provide custom SMTP credentials or configure them in `.env`.
-          </p>
+          <div className="p-3.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/50 text-blue-900 dark:text-blue-300 space-y-1">
+            <div className="font-semibold flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <span>Render Free Port 2525 Unblocking</span>
+            </div>
+            <p className="text-[11px] leading-relaxed text-blue-800 dark:text-blue-300/90">
+              Render Free firewalls block outbound connections to ports 25, 465, and 587. FinPulse connects to Brevo SMTP using port <strong>2525</strong> with <code className="px-1 py-0.5 rounded bg-blue-100 dark:bg-blue-900 font-mono text-[10px]">requireTLS: true</code>. Simulated email sandbox functionality has been removed in favor of real Brevo message delivery.
+            </p>
+          </div>
+
+          {/* Active Status Display */}
+          {smtpDiagnostics && (
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 space-y-2 font-mono text-[11px]">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="text-slate-400">Relay Host: </span>
+                  <span className="text-slate-900 dark:text-slate-100 font-bold">{smtpDiagnostics.host}:{smtpDiagnostics.port}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Authenticated Login: </span>
+                  <span className="text-slate-900 dark:text-slate-100">{smtpDiagnostics.userMasked || 'None configured'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Sender Address: </span>
+                  <span className="text-slate-900 dark:text-slate-100">{smtpDiagnostics.from || 'FinPulse <noreply@finpulse.local>'}</span>
+                </div>
+              </div>
+              <div className="text-slate-500 text-[10px] pt-1 border-t border-slate-200 dark:border-slate-700">
+                Diagnostic: {smtpDiagnostics.message}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block font-semibold mb-1">SMTP Host</label>
+              <label className="block font-semibold mb-1">Brevo SMTP Host</label>
               <input
                 type="text"
-                placeholder="smtp.gmail.com"
+                placeholder="smtp-relay.brevo.com"
                 value={smtpHost}
                 onChange={e => setSmtpHost(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
               />
             </div>
             <div>
-              <label className="block font-semibold mb-1">SMTP Port</label>
+              <label className="block font-semibold mb-1">Brevo SMTP Port (Render Free: 2525)</label>
               <input
                 type="number"
-                placeholder="587"
+                placeholder="2525"
                 value={smtpPort}
                 onChange={e => setSmtpPort(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-slate-900 dark:text-white"
               />
             </div>
             <div>
-              <label className="block font-semibold mb-1">From Address</label>
+              <label className="block font-semibold mb-1">Verified Sender Email</label>
               <input
                 type="text"
-                placeholder="alerts@finpulse.example"
+                placeholder="alerts@yourdomain.com"
                 value={smtpFrom}
                 onChange={e => setSmtpFrom(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block font-semibold mb-1">SMTP Username</label>
+              <label className="block font-semibold mb-1">Brevo SMTP Login (Account Email)</label>
               <input
                 type="text"
-                placeholder="notifications@example.com"
+                placeholder="your-brevo-login@example.com"
                 value={smtpUser}
                 onChange={e => setSmtpUser(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
               />
             </div>
             <div>
-              <label className="block font-semibold mb-1">SMTP Password</label>
+              <label className="block font-semibold mb-1">Brevo SMTP Key (xsmtpsib-...)</label>
               <input
                 type="password"
-                placeholder="App password or token"
+                placeholder="xsmtpsib-xxxxxxxxxxxxxxxxxxxx"
                 value={smtpPass}
                 onChange={e => setSmtpPass(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
               />
             </div>
+          </div>
+
+          {/* Test Dispatcher */}
+          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 space-y-3">
+            <h4 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5 text-blue-500" />
+              <span>Dispatch Live Test Email via Brevo Relay</span>
+            </h4>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="email"
+                placeholder="recipient@example.com"
+                value={testEmailRecipient}
+                onChange={e => setTestEmailRecipient(e.target.value)}
+                className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-mono"
+              />
+              <button
+                type="button"
+                onClick={handleTestSmtp}
+                disabled={isTestingSmtp}
+                className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              >
+                {isTestingSmtp ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Verifying Relay...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Dispatch Test Email</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {smtpTestResult && (
+              <div className={`p-3 rounded-lg border text-xs leading-relaxed ${
+                smtpTestResult.success
+                  ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+                  : 'bg-red-50 dark:bg-red-950/60 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'
+              }`}>
+                <div className="font-bold flex items-center gap-1.5">
+                  {smtpTestResult.success ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <ShieldCheck className="w-4 h-4 text-red-600" />}
+                  <span>{smtpTestResult.msg}</span>
+                </div>
+                {smtpTestResult.details?.messageId && (
+                  <div className="font-mono text-[10px] mt-1 text-emerald-600 dark:text-emerald-400">
+                    Message ID: {smtpTestResult.details.messageId}
+                  </div>
+                )}
+                {smtpTestResult.details?.code && (
+                  <div className="font-mono text-[10px] mt-1">
+                    Error Code: {smtpTestResult.details.code}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

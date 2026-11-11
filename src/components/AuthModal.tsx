@@ -5,7 +5,7 @@ import { useFinancial } from '../context/FinancialContext';
 import { getApiBase, setCustomApiUrl, api } from '../services/api';
 
 export const AuthModal: React.FC = () => {
-  const { isAuthModalOpen, setIsAuthModalOpen, refreshAll, setIsMailboxOpen, clearFinancialData } = useFinancial();
+  const { isAuthModalOpen, setIsAuthModalOpen, refreshAll, clearFinancialData } = useFinancial();
   const { user, login, register, logout, verifyEmail, forgotPassword, resetPassword, isAuthenticated } = useAuth();
 
   const [tab, setTab] = useState<'account' | 'login' | 'register' | 'verify' | 'forgot' | 'reset'>('account');
@@ -141,7 +141,7 @@ export const AuthModal: React.FC = () => {
     try {
       setLoading(true);
       await forgotPassword(email);
-      setSuccess('Password recovery code dispatched! Check your email or sandbox mailbox.');
+      setSuccess('Password recovery code dispatched to your email.');
       setTab('reset');
     } catch (err: any) {
       setError(err.message || 'Request failed');
@@ -283,20 +283,13 @@ export const AuthModal: React.FC = () => {
                 />
               </div>
 
-              <div className="flex gap-2">
+              <div>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-colors"
+                  className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-colors"
                 >
                   {loading ? 'Verifying...' : 'Verify Code'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsMailboxOpen(true)}
-                  className="px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                  View in Sandbox
                 </button>
               </div>
             </form>

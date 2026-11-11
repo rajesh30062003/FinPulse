@@ -11,11 +11,9 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const {
     activeTab,
     setIsAddTxOpen,
-    setIsMailboxOpen,
     unreadNotificationsCount,
     setIsAuthModalOpen,
-    setActiveTab,
-    mailboxLogs
+    setActiveTab
   } = useFinancial();
 
   const { user } = useAuth();
@@ -95,18 +93,6 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
 
       {/* Zone 3: Actions & Controls */}
       <div className="flex items-center gap-2.5 shrink-0">
-        {/* Email Sandbox Mailbox shortcut */}
-        <button
-          onClick={() => setIsMailboxOpen(true)}
-          title="Open Automated Email Sandbox"
-          className="relative p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-        >
-          <Mail className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-          {mailboxLogs.length > 0 && (
-            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500" />
-          )}
-        </button>
-
         {/* Notifications */}
         <button
           onClick={() => setActiveTab('notifications')}

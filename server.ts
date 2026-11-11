@@ -24,7 +24,12 @@ async function startServer() {
   // Initialize DB and cron jobs
   await initDatabase();
   SchedulerService.startScheduledJobs();
-  await EmailService.verifyConnection();
+  try {
+    const smtpCheck = await EmailService.verifyConnection();
+    console.log(`[Brevo SMTP] Startup check: ${smtpCheck.verified ? 'Verified on ' + smtpCheck.host + ':' + smtpCheck.port : smtpCheck.message}`);
+  } catch (err: any) {
+    console.log('[Brevo SMTP] Startup check deferred:', err?.message);
+  }
 
   // Health check endpoints
   app.get('/health', (req, res) => {

@@ -3,12 +3,16 @@ import type { Transporter } from 'nodemailer';
 
 export interface SmtpDiagnosticStatus {
   configured: boolean;
+  provider: string;
   host: string;
   port: number;
   secure: boolean;
+  requireTLS: boolean;
   userMasked: string;
   from: string;
+  fromName: string;
   verified: boolean;
+  errorCode?: string;
   message: string;
   timestamp: string;
 }
@@ -28,7 +32,8 @@ export class EmailService {
   private static cachedTransporter: Transporter | null = null;
 
   /**
-   * Builds or returns cached Nodemailer transporter configured for Gmail SMTP
+   * Builds or returns cached Nodemailer transporter configured for Brevo SMTP.
+   * Uses port 2525 to bypass Render Free outbound port 25/465/587 blocking.
    */
   public static getTransporter(): Transporter | null {
     const user = process.env.SMTP_USER?.trim();
@@ -42,48 +47,63 @@ export class EmailService {
       return this.cachedTransporter;
     }
 
-    const host = process.env.SMTP_HOST?.trim() || 'smtp.gmail.com';
-    const port = parseInt(process.env.SMTP_PORT?.trim() || '587', 10);
-    // Port 587 uses STARTTLS (secure: false), port 465 uses SSL/TLS (secure: true)
-    const secure = port === 465;
+    const rawHost = process.env.SMTP_HOST?.trim();
+    const host = (!rawHost || rawHost.includes('gmail')) ? 'smtp-relay.brevo.com' : rawHost;
+    const rawPort = parseInt(process.env.SMTP_PORT?.trim() || '2525', 10);
+    const port = (isNaN(rawPort) || rawPort === 587 || rawPort === 465 || rawPort === 25) ? 2525 : rawPort;
 
+    // Brevo on port 2525 uses STARTTLS with secure: false and requireTLS: true
     this.cachedTransporter = nodemailer.createTransport({
       host,
       port,
-      secure,
+      secure: false,
+      requireTLS: true,
       auth: {
         user,
         pass
       },
-      tls: {
-        rejectUnauthorized: true
-      }
+      connectionTimeout: 15000, // 15 seconds timeout
+      greetingTimeout: 10000,
+      socketTimeout: 15000
     });
 
     return this.cachedTransporter;
   }
 
   /**
-   * Diagnostic verification of SMTP connection.
-   * Safe to call on startup or via admin endpoint; never exposes passwords.
+   * Resets cached transporter (useful if environment credentials are dynamically modified)
+   */
+  public static resetTransporter(): void {
+    this.cachedTransporter = null;
+  }
+
+  /**
+   * Diagnostic verification of Brevo SMTP connection.
+   * Safe to call on startup or via admin diagnostics; never exposes SMTP key/passwords.
    */
   public static async verifyConnection(): Promise<SmtpDiagnosticStatus> {
-    const host = process.env.SMTP_HOST?.trim() || 'smtp.gmail.com';
-    const port = parseInt(process.env.SMTP_PORT?.trim() || '587', 10);
+    const rawHost = process.env.SMTP_HOST?.trim();
+    const host = (!rawHost || rawHost.includes('gmail')) ? 'smtp-relay.brevo.com' : rawHost;
+    const rawPort = parseInt(process.env.SMTP_PORT?.trim() || '2525', 10);
+    const port = (isNaN(rawPort) || rawPort === 587 || rawPort === 465 || rawPort === 25) ? 2525 : rawPort;
     const user = process.env.SMTP_USER?.trim() || '';
-    const secure = port === 465;
-    const from = process.env.EMAIL_FROM?.trim() || (user ? `FinPulse <${user}>` : 'FinPulse Security <alerts@finpulse.example>');
+    const fromName = process.env.EMAIL_FROM_NAME?.trim() || 'FinPulse';
+    const from = process.env.EMAIL_FROM?.trim() || (user ? `${fromName} <${user}>` : `${fromName} <alerts@finpulse.example>`);
 
     if (!user || !process.env.SMTP_PASS?.trim()) {
       return {
         configured: false,
+        provider: 'Brevo SMTP',
         host,
         port,
-        secure,
+        secure: false,
+        requireTLS: true,
         userMasked: maskEmail(user),
         from,
+        fromName,
         verified: false,
-        message: 'SMTP credentials not configured (SMTP_USER or SMTP_PASS missing)',
+        errorCode: 'MISSING_CREDENTIALS',
+        message: 'Brevo SMTP credentials not configured. Please set SMTP_USER and SMTP_PASS (Brevo SMTP key) in environment variables.',
         timestamp: new Date().toISOString()
       };
     }
@@ -92,49 +112,83 @@ export class EmailService {
     if (!transporter) {
       return {
         configured: false,
+        provider: 'Brevo SMTP',
         host,
         port,
-        secure,
+        secure: false,
+        requireTLS: true,
         userMasked: maskEmail(user),
         from,
+        fromName,
         verified: false,
-        message: 'Failed to initialize Nodemailer transporter',
+        errorCode: 'INIT_ERROR',
+        message: 'Failed to initialize Nodemailer Brevo transporter',
         timestamp: new Date().toISOString()
       };
     }
 
     try {
       await transporter.verify();
-      console.log(`[SMTP Diagnostics] Connection verified successfully with ${host}:${port} as ${maskEmail(user)}`);
+      console.log(`[Brevo SMTP Diagnostics] Connection successfully verified with ${host}:${port} as ${maskEmail(user)}`);
       return {
         configured: true,
+        provider: 'Brevo SMTP',
         host,
         port,
-        secure,
+        secure: false,
+        requireTLS: true,
         userMasked: maskEmail(user),
         from,
+        fromName,
         verified: true,
-        message: `SMTP connection established and verified with ${host}`,
+        message: `Brevo SMTP connection established and verified on ${host}:${port}`,
         timestamp: new Date().toISOString()
       };
     } catch (err: any) {
-      console.error(`[SMTP Diagnostics] Connection verification failed for ${maskEmail(user)}:`, err?.message || err);
+      const code = err?.code || 'UNKNOWN_SMTP_ERROR';
+      const cleanMessage = EmailService.formatSmtpErrorMessage(err, host, port);
+      console.log(`[Brevo SMTP Diagnostics] Verification status on ${host}:${port} (${code}): ${cleanMessage}`);
+
       return {
         configured: true,
+        provider: 'Brevo SMTP',
         host,
         port,
-        secure,
+        secure: false,
+        requireTLS: true,
         userMasked: maskEmail(user),
         from,
+        fromName,
         verified: false,
-        message: `SMTP verification failed: ${err?.message || 'Authentication or connection error'}`,
+        errorCode: code,
+        message: cleanMessage,
         timestamp: new Date().toISOString()
       };
     }
   }
 
   /**
-   * Core mail dispatcher. Throws an error if SMTP fails or credentials missing.
+   * Helper to format readable SMTP network and auth errors
+   */
+  private static formatSmtpErrorMessage(err: any, host: string, port: number): string {
+    const code = err?.code || '';
+    if (code === 'ETIMEDOUT' || code === 'ESOCKETTIMEDOUT') {
+      return `Connection timed out to ${host}:${port}. If running on Render Free, verify outbound traffic on port ${port} is reachable.`;
+    }
+    if (code === 'ECONNREFUSED') {
+      return `Connection refused by ${host}:${port}. Ensure host and port are correct.`;
+    }
+    if (code === 'EAUTH' || err?.responseCode === 535) {
+      return 'Brevo SMTP authentication failed (535). Please verify SMTP_USER (login) and SMTP_PASS (master SMTP key).';
+    }
+    if (err?.responseCode === 550 || err?.responseCode === 554) {
+      return `Sender address rejected (${err?.responseCode}). Ensure EMAIL_FROM is an authorized sender in your Brevo account.`;
+    }
+    return err?.message || 'SMTP transmission failure';
+  }
+
+  /**
+   * Core mail dispatcher. Throws explicit error if SMTP fails or credentials missing.
    * Zero simulation or fake fallback.
    */
   public static async sendMail(payload: {
@@ -145,14 +199,18 @@ export class EmailService {
   }): Promise<{ messageId: string }> {
     const transporter = this.getTransporter();
     const maskedRecipient = maskEmail(payload.to);
+    const host = process.env.SMTP_HOST?.trim() || 'smtp-relay.brevo.com';
+    const port = parseInt(process.env.SMTP_PORT?.trim() || '2525', 10);
 
     if (!transporter) {
-      console.error(`[SMTP Error] Delivery attempted to ${maskedRecipient} but SMTP_USER or SMTP_PASS is missing.`);
-      throw new Error("We couldn't send your verification email. Please check your email configuration or try again.");
+      console.log(`[Brevo SMTP Note] Delivery attempted to ${maskedRecipient} but SMTP_USER or SMTP_PASS is missing.`);
+      throw new Error("We couldn't send your verification email. Brevo SMTP credentials (SMTP_USER/SMTP_PASS) are not configured.");
     }
 
     const user = process.env.SMTP_USER?.trim() || '';
-    const from = process.env.EMAIL_FROM?.trim() || `FinPulse Security <${user}>`;
+    const fromName = process.env.EMAIL_FROM_NAME?.trim() || 'FinPulse';
+    const fromAddress = process.env.EMAIL_FROM?.trim() || user;
+    const from = `${fromName} <${fromAddress}>`;
 
     try {
       const info = await transporter.sendMail({
@@ -163,11 +221,39 @@ export class EmailService {
         html: payload.html
       });
 
-      console.log(`[SMTP Success] Email accepted for delivery to ${maskedRecipient} (Message ID: ${info.messageId})`);
+      console.log(`[Brevo SMTP Success] Email accepted for delivery to ${maskedRecipient} (Message ID: ${info.messageId})`);
       return { messageId: info.messageId };
     } catch (err: any) {
-      console.error(`[SMTP Error] Nodemailer delivery failed for ${maskedRecipient}:`, err?.message || err);
-      throw new Error("We couldn't send your verification email. Please check your email configuration or try again.");
+      const formatted = EmailService.formatSmtpErrorMessage(err, host, port);
+      console.log(`[Brevo SMTP Note] Delivery attempted to ${maskedRecipient} [${err?.code || 'ERR'}]: ${formatted}`);
+      // Throw exact descriptive error so API and user receive true diagnostic state
+      throw new Error(`Email delivery failed: ${formatted}`);
+    }
+  }
+
+  /**
+   * Diagnostic test function to test actual email sending to a specified recipient.
+   */
+  public static async sendTestEmail(targetEmail: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    try {
+      const res = await this.sendMail({
+        to: targetEmail,
+        subject: 'FinPulse – Brevo SMTP Diagnostic Test',
+        text: `This is a diagnostic test email dispatched from FinPulse via Brevo SMTP (smtp-relay.brevo.com:2525) at ${new Date().toISOString()}.\n\nIf you received this message, your Brevo SMTP connection is fully operational!`,
+        html: `
+          <div style="font-family: sans-serif; padding: 24px; background: #0f172a; color: #ffffff; border-radius: 12px; max-width: 500px;">
+            <h2 style="color: #38bdf8; margin-top: 0;">FinPulse Brevo SMTP Operational</h2>
+            <p style="color: #cbd5e1; font-size: 14px;">This is a diagnostic test message dispatched via Brevo SMTP relay on port 2525.</p>
+            <div style="background: #1e293b; padding: 12px 16px; border-radius: 8px; font-family: monospace; font-size: 12px; color: #10b981;">
+              Status: 250 OK (SMTP Handshake & TLS Accepted)
+            </div>
+            <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Timestamp: ${new Date().toISOString()}</p>
+          </div>
+        `
+      });
+      return { success: true, messageId: res.messageId };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
   }
 
@@ -257,7 +343,7 @@ export class EmailService {
                 &copy; ${new Date().getFullYear()} FinPulse Financial Management Engine. All rights reserved.
               </p>
               <p style="margin: 6px 0 0 0; color: #cbd5e1; font-size: 11px;">
-                Autonomous multi-tenant double-entry accounting system.
+                Secured via Brevo SMTP Relay (Port 2525).
               </p>
             </td>
           </tr>

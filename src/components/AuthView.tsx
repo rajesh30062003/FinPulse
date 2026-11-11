@@ -14,12 +14,10 @@ import {
   Sparkles,
   Check,
   Eye,
-  EyeOff,
-  Inbox
+  EyeOff
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getApiBase, setCustomApiUrl } from '../services/api';
-import { MailboxModal } from './MailboxModal';
 
 export const AuthView: React.FC = () => {
   const { login, register, verifyEmail, resendOtp, forgotPassword, resetPassword } = useAuth();
@@ -41,7 +39,14 @@ export const AuthView: React.FC = () => {
   // OTP Timer & Resend Cooldown
   const [otpExpirySeconds, setOtpExpirySeconds] = useState(300); // 5 minutes
   const [resendCooldownSeconds, setResendCooldownSeconds] = useState(60); // 60 seconds
-  const [isSandboxMailboxOpen, setIsSandboxMailboxOpen] = useState(false);
+
+  const maskEmail = (raw: string) => {
+    if (!raw || !raw.includes('@')) return raw;
+    const [userPart, domainPart] = raw.split('@');
+    if (userPart.length <= 2) return `${userPart[0]}*@${domainPart}`;
+    const masked = userPart[0] + '*'.repeat(Math.min(userPart.length - 2, 6)) + userPart.slice(-1);
+    return `${masked}@${domainPart}`;
+  };
 
   // Backend connection drawer
   const [showServerConfig, setShowServerConfig] = useState(false);
@@ -272,15 +277,6 @@ export const AuthView: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setIsSandboxMailboxOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors"
-          >
-            <Inbox className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden sm:inline">Email Sandbox</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setShowServerConfig(!showServerConfig)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors"
           >
@@ -323,10 +319,10 @@ export const AuthView: React.FC = () => {
             <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-xs space-y-1.5">
               <div className="flex items-center gap-2 text-white font-semibold text-xs">
                 <Mail className="w-4 h-4 text-blue-400" />
-                <span>Automated Nodemailer OTP</span>
+                <span>Brevo SMTP OTP (Port 2525)</span>
               </div>
               <p className="text-[11px] text-slate-400 leading-normal">
-                Strict 5-minute hashed OTP verification with 60s cooldown and max 5 retry attempts.
+                Strict 5-minute hashed OTP verification dispatched via Brevo SMTP on port 2525 with STARTTLS to safely bypass Render Free port blocks.
               </p>
             </div>
 
@@ -685,7 +681,7 @@ export const AuthView: React.FC = () => {
                     </div>
                     <h3 className="text-sm font-bold text-white">Enter 6-Digit Verification Code</h3>
                     <p className="text-xs text-slate-400">
-                      Code dispatched to <strong className="text-white">{email}</strong>
+                      Code dispatched to <strong className="text-white">{maskEmail(email)}</strong> via Brevo SMTP
                     </p>
                   </div>
 
@@ -740,15 +736,6 @@ export const AuthView: React.FC = () => {
                           <span>Verify &amp; Activate Vault Access</span>
                         </>
                       )}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsSandboxMailboxOpen(true)}
-                      className="w-full py-2.5 rounded-xl border border-slate-800 bg-slate-950/60 hover:bg-slate-800 text-slate-300 font-semibold text-xs flex items-center justify-center gap-2 transition-colors"
-                    >
-                      <Inbox className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Open Sandbox Mailbox to View Simulated Email</span>
                     </button>
                   </div>
 
@@ -893,14 +880,6 @@ export const AuthView: React.FC = () => {
                         </>
                       )}
                     </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsSandboxMailboxOpen(true)}
-                      className="w-full py-2 rounded-xl border border-slate-800 text-slate-300 text-xs hover:bg-slate-800"
-                    >
-                      View Code in Sandbox Mailbox
-                    </button>
                   </div>
                 </form>
               )}
@@ -926,22 +905,8 @@ export const AuthView: React.FC = () => {
 
       {/* Footer */}
       <footer className="relative z-10 w-full max-w-7xl mx-auto px-6 py-6 border-t border-slate-900 text-center text-xs text-slate-500">
-        <p>FinPulse Multi-Tenant Financial Ledger · Secured with Nodemailer OTP &amp; MongoDB Atlas Storage</p>
+        <p>FinPulse Multi-Tenant Financial Ledger · Secured with Brevo SMTP (Port 2525) &amp; MongoDB Atlas Storage</p>
       </footer>
-
-      {/* Sandbox Mailbox Modal (accessible during login/registration/verification) */}
-      {isSandboxMailboxOpen && (
-        <MailboxModalWrapper onClose={() => setIsSandboxMailboxOpen(false)} />
-      )}
-    </div>
-  );
-};
-
-// Lightweight wrapper to display MailboxModal when unauthenticated
-const MailboxModalWrapper: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  return (
-    <div className="relative z-50">
-      <MailboxModal overrideOpen={true} onOverrideClose={onClose} />
     </div>
   );
 };

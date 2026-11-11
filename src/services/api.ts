@@ -543,6 +543,21 @@ export const api = {
     }>('/system/smtp-status');
   },
 
+  async testSmtpConnection(targetEmail?: string) {
+    return apiRequest<{
+      success: boolean;
+      message: string;
+      messageId?: string;
+      error?: string;
+      code?: string;
+      response?: string;
+      details?: any;
+    }>('/system/smtp-test', {
+      method: 'POST',
+      body: JSON.stringify({ email: targetEmail })
+    });
+  },
+
   // Scenarios
   async resetScenarios() {
     return apiRequest('/scenarios/reset', {
