@@ -347,6 +347,23 @@ export async function initDatabase() {
     // Ensure default demo user exists
     if (!memoryDb.users || memoryDb.users.length === 0) {
       await seedDemoUserAndScenarios();
+    } else {
+      // Ensure test accounts always have consistent valid credentials for verification
+      const aaravUser = memoryDb.users.find(u => u.email.toLowerCase() === 'aarav@test.local');
+      if (aaravUser) {
+        aaravUser.passwordHash = await bcrypt.hash('TestPassword@123', 10);
+        aaravUser.failedLoginAttempts = 0;
+        aaravUser.lockUntil = null;
+        aaravUser.isVerified = true;
+      }
+      const rjUser = memoryDb.users.find(u => u.email.toLowerCase() === 'rjrajeshpal30@gmail.com');
+      if (rjUser) {
+        rjUser.passwordHash = await bcrypt.hash('Demo@1234', 10);
+        rjUser.failedLoginAttempts = 0;
+        rjUser.lockUntil = null;
+        rjUser.isVerified = true;
+      }
+      saveDatabase();
     }
   } catch (err) {
     console.error('Database initialization error:', err);

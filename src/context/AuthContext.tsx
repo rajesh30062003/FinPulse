@@ -26,38 +26,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<IUser | null>(null);
   const [sessionState, setSessionState] = useState<SessionState>('checking');
 
-  // Verify and restore session on page mount or refresh
+  // Verify and restore session once on page mount or refresh
   const checkSession = useCallback(async () => {
     setSessionState('checking');
     try {
-      // 1. Try refresh endpoint first (uses HttpOnly cookie or x-refresh-token header)
+      // 1. Single session restoration attempt using HttpOnly refresh token cookie
       const res = await api.refresh();
       if (res && res.user) {
         setUser(res.user);
         setSessionState('authenticated');
         return;
       }
-    } catch (refreshErr) {
-      // Refresh token might not exist or might be expired
+    } catch {
+      // Refresh failed (401 is expected for logged-out visitors; no cookie exists)
     }
 
-    try {
-      // 2. Fallback check: attempt getMe if any valid in-memory/cookie session exists
-      const profile = await api.getMe();
-      if (profile && profile.id) {
-        setUser(profile);
-        setSessionState('authenticated');
-        return;
-      }
-    } catch (profileErr) {
-      // Unauthenticated session confirmed
-    }
-
-    // Unauthenticated state
+    // Mark as unauthenticated immediately without attempting redundant calls
     clearTokens();
     setUser(null);
     setSessionState('unauthenticated');
   }, []);
+
+  // Dedicated profile refresh for actively authenticated users
+  const refreshUser = useCallback(async () => {
+    try {
+      const profile = await api.getMe();
+      if (profile && profile.id) {
+        setUser(profile);
+      }
+    } catch {
+      await checkSession();
+    }
+  }, [checkSession]);
 
   useEffect(() => {
     checkSession();
@@ -129,7 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         forgotPassword,
         resetPassword,
         checkSession,
-        refreshUser: checkSession
+        refreshUser
       }}
     >
       {children}

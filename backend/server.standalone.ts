@@ -27,7 +27,7 @@ if (process.env.CLIENT_URL) {
   allowedOrigins.push(process.env.CLIENT_URL.trim().replace(/\/+$/, ''));
 }
 
-app.use(cors({
+const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
     // Non-browser clients, same-origin, or curl
     if (!origin) return callback(null, true);
@@ -45,9 +45,10 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'x-refresh-token']
-}));
+};
 
-app.options('*', cors());
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

@@ -113,16 +113,20 @@ export async function apiRequest<T = any>(
     );
   }
 
-  // Automatically attempt silent refresh on 401 Unauthorized for authenticated endpoints
+  // Dedicated auth endpoints that must never trigger recursive silent refresh
   const isAuthEndpoint =
     cleanEndpoint.startsWith('/auth/login') ||
     cleanEndpoint.startsWith('/auth/register') ||
     cleanEndpoint.startsWith('/auth/refresh') ||
     cleanEndpoint.startsWith('/auth/logout') ||
     cleanEndpoint.startsWith('/auth/verify-email') ||
-    cleanEndpoint.startsWith('/auth/resend-otp');
+    cleanEndpoint.startsWith('/auth/resend-otp') ||
+    cleanEndpoint.startsWith('/auth/forgot-password') ||
+    cleanEndpoint.startsWith('/auth/reset-password') ||
+    cleanEndpoint.startsWith('/auth/me');
 
-  if (res.status === 401 && !isRetry && !isAuthEndpoint) {
+  // Automatically attempt silent refresh on 401 Unauthorized ONLY for active sessions where access token expired
+  if (res.status === 401 && !isRetry && !isAuthEndpoint && inMemoryAccessToken !== null) {
     try {
       if (!isRefreshingPromise) {
         isRefreshingPromise = api.refresh().finally(() => {
@@ -132,7 +136,7 @@ export async function apiRequest<T = any>(
       await isRefreshingPromise;
       // Retry original request with refreshed access token
       return apiRequest<T>(endpoint, options, true);
-    } catch (refreshErr) {
+    } catch {
       clearTokens();
       const err = new Error('Session expired. Please log in again.');
       (err as any).status = 401;

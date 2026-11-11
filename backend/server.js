@@ -298,6 +298,22 @@ async function initDatabase() {
     }
     if (!memoryDb.users || memoryDb.users.length === 0) {
       await seedDemoUserAndScenarios();
+    } else {
+      const aaravUser = memoryDb.users.find((u) => u.email.toLowerCase() === "aarav@test.local");
+      if (aaravUser) {
+        aaravUser.passwordHash = await bcrypt.hash("TestPassword@123", 10);
+        aaravUser.failedLoginAttempts = 0;
+        aaravUser.lockUntil = null;
+        aaravUser.isVerified = true;
+      }
+      const rjUser = memoryDb.users.find((u) => u.email.toLowerCase() === "rjrajeshpal30@gmail.com");
+      if (rjUser) {
+        rjUser.passwordHash = await bcrypt.hash("Demo@1234", 10);
+        rjUser.failedLoginAttempts = 0;
+        rjUser.lockUntil = null;
+        rjUser.isVerified = true;
+      }
+      saveDatabase();
     }
   } catch (err) {
     console.error("Database initialization error:", err);
@@ -1770,7 +1786,7 @@ function hashToken(val) {
   return crypto.createHash("sha256").update(val).digest("hex");
 }
 function setRefreshTokenCookie(res, token) {
-  res.cookie("finpulse_refresh_token", token, {
+  const cookieOptions = {
     httpOnly: true,
     secure: true,
     // SameSite=None strictly requires Secure=true
@@ -1779,15 +1795,19 @@ function setRefreshTokenCookie(res, token) {
     maxAge: 7 * 24 * 60 * 60 * 1e3,
     // 7 days
     path: "/"
-  });
+  };
+  res.cookie("finpulse_refresh_token", token, cookieOptions);
+  res.cookie("refreshToken", token, cookieOptions);
 }
 function clearRefreshTokenCookie(res) {
-  res.clearCookie("finpulse_refresh_token", {
+  const cookieOptions = {
     httpOnly: true,
     secure: true,
     sameSite: "none",
     path: "/"
-  });
+  };
+  res.clearCookie("finpulse_refresh_token", cookieOptions);
+  res.clearCookie("refreshToken", cookieOptions);
 }
 router.get("/health", (req, res) => {
   res.json({
@@ -1866,7 +1886,11 @@ router.post("/auth/register", async (req, res) => {
     const cleanName = name.trim();
     const existingUser = await findUserByEmail(cleanEmail);
     if (existingUser && existingUser.isVerified) {
-      return res.status(400).json({ error: "An account with this email address already exists. Please log in." });
+      return res.status(409).json({
+        success: false,
+        error: "An account with this email address already exists. Please log in.",
+        code: "EMAIL_ALREADY_EXISTS"
+      });
     }
     const existingVerif = await findEmailVerification(cleanEmail);
     if (existingVerif && Date.now() - existingVerif.lastSentAt < 6e4) {
@@ -1898,10 +1922,13 @@ router.post("/auth/register", async (req, res) => {
       });
     } catch (smtpErr) {
       await deleteEmailVerification(cleanEmail);
-      console.error(`[Registration SMTP Failed] Could not dispatch OTP to ${maskEmail(cleanEmail)}:`, smtpErr?.message);
+      console.log(`[Registration SMTP Failed] Could not dispatch OTP to ${maskEmail(cleanEmail)}: ${smtpErr?.message}`);
       return res.status(503).json({
+        success: false,
         error: smtpErr?.message || "We couldn't send your verification email via Brevo SMTP. Please check your Brevo SMTP configuration.",
-        code: smtpErr?.code
+        code: "SMTP_DELIVERY_FAILED",
+        provider: "Brevo SMTP",
+        smtpCode: smtpErr?.code
       });
     }
     return res.status(200).json({
@@ -2171,7 +2198,7 @@ router.post("/auth/login", async (req, res) => {
 });
 router.post("/auth/refresh", async (req, res) => {
   try {
-    const rawRefreshToken = req.cookies?.finpulse_refresh_token || req.headers["x-refresh-token"] || req.body?.refreshToken;
+    const rawRefreshToken = req.cookies?.finpulse_refresh_token || req.cookies?.refreshToken || req.headers["x-refresh-token"] || req.body?.refreshToken;
     if (!rawRefreshToken) {
       return res.status(401).json({ error: "Refresh token required" });
     }
@@ -2233,7 +2260,7 @@ router.post("/auth/refresh", async (req, res) => {
 });
 router.post("/auth/logout", async (req, res) => {
   try {
-    const rawRefreshToken = req.cookies?.finpulse_refresh_token || req.headers["x-refresh-token"] || req.body?.refreshToken;
+    const rawRefreshToken = req.cookies?.finpulse_refresh_token || req.cookies?.refreshToken || req.headers["x-refresh-token"] || req.body?.refreshToken;
     if (rawRefreshToken) {
       await revokeRefreshToken(hashToken(rawRefreshToken));
     }
@@ -3237,7 +3264,7 @@ if (process.env.FRONTEND_URL) {
 if (process.env.CLIENT_URL) {
   allowedOrigins.push(process.env.CLIENT_URL.trim().replace(/\/+$/, ""));
 }
-app.use(cors({
+var corsOptions = {
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
     if (origin.endsWith(".vercel.app") || origin.endsWith(".onrender.com")) {
@@ -3252,8 +3279,9 @@ app.use(cors({
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin", "x-refresh-token"]
-}));
-app.options("*", cors());
+};
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());

@@ -45,22 +45,29 @@ function hashToken(val: string): string {
 }
 
 function setRefreshTokenCookie(res: Response, token: string) {
-  res.cookie('finpulse_refresh_token', token, {
+  const cookieOptions: any = {
     httpOnly: true,
     secure: true, // SameSite=None strictly requires Secure=true
-    sameSite: 'none', // Required for cross-origin Vercel frontend <-> Render backend
+    sameSite: 'none' as const, // Required for cross-origin Vercel frontend <-> Render backend
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: '/'
-  });
+  };
+
+  // Set primary and legacy cookie keys
+  res.cookie('finpulse_refresh_token', token, cookieOptions);
+  res.cookie('refreshToken', token, cookieOptions);
 }
 
 function clearRefreshTokenCookie(res: Response) {
-  res.clearCookie('finpulse_refresh_token', {
+  const cookieOptions: any = {
     httpOnly: true,
     secure: true,
-    sameSite: 'none',
+    sameSite: 'none' as const,
     path: '/'
-  });
+  };
+
+  res.clearCookie('finpulse_refresh_token', cookieOptions);
+  res.clearCookie('refreshToken', cookieOptions);
 }
 
 // Health check endpoint inside API router (/api/health)
@@ -166,7 +173,11 @@ router.post('/auth/register', async (req: Request, res: Response) => {
     // Check if user is already registered and verified
     const existingUser = await findUserByEmail(cleanEmail);
     if (existingUser && existingUser.isVerified) {
-      return res.status(400).json({ error: 'An account with this email address already exists. Please log in.' });
+      return res.status(409).json({
+        success: false,
+        error: 'An account with this email address already exists. Please log in.',
+        code: 'EMAIL_ALREADY_EXISTS'
+      });
     }
 
     // Check resend cooldown on existing pending verification
@@ -196,7 +207,7 @@ router.post('/auth/register', async (req: Request, res: Response) => {
     };
     await persistEmailVerification(verificationRecord);
 
-    // Dispatch real email via Nodemailer Gmail SMTP
+    // Dispatch real email via Brevo SMTP relay
     try {
       await EmailService.sendVerificationEmail({
         email: cleanEmail,
@@ -206,10 +217,13 @@ router.post('/auth/register', async (req: Request, res: Response) => {
     } catch (smtpErr: any) {
       // SMTP delivery failed: delete verification record so user can retry safely
       await deleteEmailVerification(cleanEmail);
-      console.error(`[Registration SMTP Failed] Could not dispatch OTP to ${maskEmail(cleanEmail)}:`, smtpErr?.message);
+      console.log(`[Registration SMTP Failed] Could not dispatch OTP to ${maskEmail(cleanEmail)}: ${smtpErr?.message}`);
       return res.status(503).json({
+        success: false,
         error: smtpErr?.message || "We couldn't send your verification email via Brevo SMTP. Please check your Brevo SMTP configuration.",
-        code: smtpErr?.code
+        code: 'SMTP_DELIVERY_FAILED',
+        provider: 'Brevo SMTP',
+        smtpCode: smtpErr?.code
       });
     }
 
@@ -544,6 +558,7 @@ router.post('/auth/refresh', async (req: Request, res: Response) => {
   try {
     const rawRefreshToken =
       req.cookies?.finpulse_refresh_token ||
+      req.cookies?.refreshToken ||
       (req.headers['x-refresh-token'] as string | undefined) ||
       req.body?.refreshToken;
 
@@ -624,6 +639,7 @@ router.post('/auth/logout', async (req: Request, res: Response) => {
   try {
     const rawRefreshToken =
       req.cookies?.finpulse_refresh_token ||
+      req.cookies?.refreshToken ||
       (req.headers['x-refresh-token'] as string | undefined) ||
       req.body?.refreshToken;
 
