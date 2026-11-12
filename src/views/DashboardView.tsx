@@ -63,6 +63,9 @@ export const DashboardView: React.FC = () => {
     monthlySpendingSummary: { essentialPaise: 0, funPaise: 0, otherPaise: 0 }
   };
 
+  const activeAccounts = accounts.filter(a => a.isActive !== false && a.status !== 'Closed');
+  const activeCards = creditCards.filter(c => c.isActive !== false && c.status !== 'Closed');
+
   const investmentGainPaise = s.totalCurrentInvestmentsPaise - s.totalInvestedPaise;
   const investmentGainPercent = s.totalInvestedPaise > 0
     ? ((investmentGainPaise / s.totalInvestedPaise) * 100).toFixed(1)
@@ -127,7 +130,7 @@ export const DashboardView: React.FC = () => {
             {formatINR(s.totalBankPaise)}
           </div>
           <div className="text-[11px] text-slate-400">
-            {accounts.length} active account{accounts.length !== 1 ? 's' : ''}
+            {activeAccounts.length} active account{activeAccounts.length !== 1 ? 's' : ''}
           </div>
         </div>
 
@@ -161,7 +164,7 @@ export const DashboardView: React.FC = () => {
             {formatINR(s.totalCCOutstandingPaise)}
           </div>
           <div className="text-[11px] text-slate-400">
-            {creditCards.length} registered card{creditCards.length !== 1 ? 's' : ''}
+            {activeCards.length} active card{activeCards.length !== 1 ? 's' : ''}
           </div>
         </div>
 

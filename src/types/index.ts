@@ -46,6 +46,7 @@ export interface IBankAccount {
   balanceInPaise: number;
   openingBalanceInPaise: number;
   isActive: boolean;
+  status?: 'Active' | 'Closed';
   notes?: string;
   createdAt: string;
 }
@@ -73,6 +74,7 @@ export interface ICreditCard {
   billingCycle: string;
   notes?: string;
   isActive: boolean;
+  status?: 'Active' | 'Closed';
   lastPaymentDate?: string;
   lastPaymentAmountInPaise?: number;
 }

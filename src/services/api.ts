@@ -335,6 +335,38 @@ export const api = {
     });
   },
 
+  async updateAccount(id: string, data: any) {
+    return apiRequest(`/accounts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async closeAccount(id: string) {
+    return apiRequest(`/accounts/${id}/close`, {
+      method: 'POST'
+    });
+  },
+
+  async reopenAccount(id: string) {
+    return apiRequest(`/accounts/${id}/reopen`, {
+      method: 'POST'
+    });
+  },
+
+  async deleteAccount(id: string) {
+    return apiRequest(`/accounts/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  async resetBankAndCardSetup(confirmation: string = 'RESET') {
+    return apiRequest<{ success: boolean; message: string; closedBankCount: number; closedCardCount: number }>('/accounts/reset-financial-setup', {
+      method: 'POST',
+      body: JSON.stringify({ confirmation })
+    });
+  },
+
   // Cash
   async getCash() {
     return apiRequest('/cash');
@@ -356,6 +388,31 @@ export const api = {
     return apiRequest('/credit-cards', {
       method: 'POST',
       body: JSON.stringify(data)
+    });
+  },
+
+  async updateCreditCard(id: string, data: any) {
+    return apiRequest(`/credit-cards/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async closeCreditCard(id: string) {
+    return apiRequest(`/credit-cards/${id}/close`, {
+      method: 'POST'
+    });
+  },
+
+  async reopenCreditCard(id: string) {
+    return apiRequest(`/credit-cards/${id}/reopen`, {
+      method: 'POST'
+    });
+  },
+
+  async deleteCreditCard(id: string) {
+    return apiRequest(`/credit-cards/${id}`, {
+      method: 'DELETE'
     });
   },
 

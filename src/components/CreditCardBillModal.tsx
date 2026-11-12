@@ -20,18 +20,21 @@ export const CreditCardBillModal: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const activeAccounts = accounts.filter(a => a.isActive !== false && a.status !== 'Closed');
+  const eligibleCards = creditCards.filter(c => (c.isActive !== false && c.status !== 'Closed') || c.outstandingBalanceInPaise > 0);
+
   useEffect(() => {
     if (selectedCardForBill) {
       setCardId(selectedCardForBill.id);
       setPaymentAmountRupees((selectedCardForBill.outstandingBalanceInPaise / 100).toFixed(2));
-    } else if (creditCards.length > 0) {
-      const firstCardWithOutstanding = creditCards.find(c => c.outstandingBalanceInPaise > 0) || creditCards[0];
+    } else if (eligibleCards.length > 0) {
+      const firstCardWithOutstanding = eligibleCards.find(c => c.outstandingBalanceInPaise > 0) || eligibleCards[0];
       setCardId(firstCardWithOutstanding.id);
       setPaymentAmountRupees((firstCardWithOutstanding.outstandingBalanceInPaise / 100).toFixed(2));
     }
 
-    if (accounts.length > 0 && !sourceAccountId) {
-      setSourceAccountId(accounts[0].id);
+    if (activeAccounts.length > 0 && (!sourceAccountId || !activeAccounts.some(a => a.id === sourceAccountId))) {
+      setSourceAccountId(activeAccounts[0].id);
     }
   }, [selectedCardForBill, creditCards, accounts, isPayBillOpen]);
 
@@ -56,7 +59,12 @@ export const CreditCardBillModal: React.FC = () => {
       return;
     }
 
-    if (selectedBank && selectedBank.balanceInPaise < paymentAmountInPaise) {
+    if (!selectedBank || selectedBank.isActive === false || selectedBank.status === 'Closed') {
+      setError('Please select an active paying bank account');
+      return;
+    }
+
+    if (selectedBank.balanceInPaise < paymentAmountInPaise) {
       setError(`Insufficient bank balance. ${selectedBank.bankName} balance is ${formatINR(selectedBank.balanceInPaise)}`);
       return;
     }
@@ -121,21 +129,30 @@ export const CreditCardBillModal: React.FC = () => {
             <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
               Select Credit Card
             </label>
-            <select
-              value={cardId}
-              onChange={e => {
-                setCardId(e.target.value);
-                const c = creditCards.find(item => item.id === e.target.value);
-                if (c) setPaymentAmountRupees((c.outstandingBalanceInPaise / 100).toFixed(2));
-              }}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-            >
-              {creditCards.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.cardName} (•••• {c.lastFourDigits}) - Outstanding: {formatINR(c.outstandingBalanceInPaise)}
-                </option>
-              ))}
-            </select>
+            {eligibleCards.length === 0 ? (
+              <div className="p-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 text-xs">
+                No credit cards with outstanding balances or active limits found.
+              </div>
+            ) : (
+              <select
+                value={cardId}
+                onChange={e => {
+                  setCardId(e.target.value);
+                  const c = creditCards.find(item => item.id === e.target.value);
+                  if (c) setPaymentAmountRupees((c.outstandingBalanceInPaise / 100).toFixed(2));
+                }}
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+              >
+                {eligibleCards.map(c => {
+                  const isClosed = c.isActive === false || c.status === 'Closed';
+                  return (
+                    <option key={c.id} value={c.id}>
+                      {c.cardName} (•••• {c.lastFourDigits}) {isClosed ? '[Closed Card] ' : ''}- Outstanding: {formatINR(c.outstandingBalanceInPaise)}
+                    </option>
+                  );
+                })}
+              </select>
+            )}
           </div>
 
           {/* Card Status Snapshot */}
@@ -186,17 +203,23 @@ export const CreditCardBillModal: React.FC = () => {
             <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
               Pay From Bank Account
             </label>
-            <select
-              value={sourceAccountId}
-              onChange={e => setSourceAccountId(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-            >
-              {accounts.map(a => (
-                <option key={a.id} value={a.id}>
-                  {a.bankName} - {a.accountNickname} (Available: {formatINR(a.balanceInPaise)})
-                </option>
-              ))}
-            </select>
+            {activeAccounts.length === 0 ? (
+              <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-xs">
+                No active bank accounts available to fund payment. Please add or reopen a bank account.
+              </div>
+            ) : (
+              <select
+                value={sourceAccountId}
+                onChange={e => setSourceAccountId(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+              >
+                {activeAccounts.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.bankName} - {a.accountNickname} (Available: {formatINR(a.balanceInPaise)})
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Reference Notes */}
@@ -215,8 +238,8 @@ export const CreditCardBillModal: React.FC = () => {
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-xs transition-colors"
+            disabled={loading || activeAccounts.length === 0}
+            className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold shadow-xs transition-colors cursor-pointer"
           >
             {loading ? 'Processing Settlement...' : 'Confirm Bill Payment'}
           </button>

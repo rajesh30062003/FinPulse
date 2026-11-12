@@ -6,6 +6,8 @@ import { api, formatINR } from '../services/api';
 export const FixedDepositsView: React.FC = () => {
   const { fixedDeposits, accounts, refreshAll } = useFinancial();
 
+  const activeAccounts = accounts.filter(a => a.isActive !== false && a.status !== 'Closed');
+
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [bankName, setBankName] = useState('HDFC Bank');
   const [fdName, setFdName] = useState('');
@@ -13,7 +15,7 @@ export const FixedDepositsView: React.FC = () => {
   const [interestRate, setInterestRate] = useState('7.5');
   const [compoundingFrequency, setCompoundingFrequency] = useState<'Monthly' | 'Quarterly' | 'Half-Yearly' | 'Annually'>('Quarterly');
   const [durationMonths, setDurationMonths] = useState('12');
-  const [sourceAccountId, setSourceAccountId] = useState(accounts[0]?.id || '');
+  const [sourceAccountId, setSourceAccountId] = useState(activeAccounts[0]?.id || '');
   const [autoRenewal, setAutoRenewal] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -295,7 +297,7 @@ export const FixedDepositsView: React.FC = () => {
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
                 >
                   <option value="">No bank deduction (already booked)</option>
-                  {accounts.map(a => <option key={a.id} value={a.id}>{a.bankName} ({formatINR(a.balanceInPaise)})</option>)}
+                  {activeAccounts.map(a => <option key={a.id} value={a.id}>{a.bankName} ({formatINR(a.balanceInPaise)})</option>)}
                 </select>
               </div>
 

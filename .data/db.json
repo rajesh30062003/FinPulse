@@ -113,20 +113,6 @@
       "updatedAt": "2026-11-12T09:16:19.242Z"
     },
     {
-      "id": "user-rjrajeshpal30",
-      "name": "Rajesh Pal",
-      "email": "rjrajeshpal30@gmail.com",
-      "passwordHash": "$2b$10$0L42kmR7sk3hadA6iiG0i.5f0PDpLvYlL1lI1JvWjiKJTQT0Q0b.y",
-      "isVerified": true,
-      "currency": "INR",
-      "monthlyBudgetInPaise": 4500000,
-      "reminderDayOfMonth": 25,
-      "emailNotificationsEnabled": true,
-      "createdAt": "Thu Nov 12 2026 09:53:58 GMT+0000 (Coordinated Universal Time)",
-      "failedLoginAttempts": 0,
-      "lockUntil": null
-    },
-    {
       "id": "user-1794473436793-0d16c1",
       "name": "Rajesh Sharma",
       "email": "rjrajeshpal30@gmail.com",
@@ -165,7 +151,7 @@
       "isActive": true,
       "notes": "Primary salary account",
       "openingBalanceInPaise": 0,
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "bank-sbi-01",
@@ -179,7 +165,7 @@
       "isActive": true,
       "notes": "Secondary emergency & bill pay account",
       "openingBalanceInPaise": 1500000,
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "bank-1794473018154",
@@ -257,7 +243,7 @@
       "createdAt": "2026-11-12T08:50:37.044Z",
       "isActive": true,
       "openingBalanceInPaise": 0,
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "bank-1794477883701",
@@ -271,11 +257,11 @@
       "isActive": true,
       "notes": "",
       "openingBalanceInPaise": 0,
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "bank-hdfc-01",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "bankName": "HDFC Bank",
       "accountHolderName": "Rajesh Sharma",
       "accountType": "Savings",
@@ -289,7 +275,7 @@
     },
     {
       "id": "bank-sbi-01",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "bankName": "State Bank of India",
       "accountHolderName": "Rajesh Sharma",
       "accountType": "Savings",
@@ -388,7 +374,7 @@
       "notes": "Rewards on dining & travel",
       "outstandingBalanceInPaise": 300000,
       "statementDay": 15,
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "cc-1794474970150",
@@ -464,11 +450,11 @@
       "notes": "",
       "outstandingBalanceInPaise": 493750,
       "statementDay": 22,
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "cc-hdfc-01",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "cardName": "HDFC Regalia Gold",
       "bankName": "HDFC Bank",
       "cardNickname": "HDFC Card",
@@ -580,7 +566,7 @@
       "status": "Completed",
       "subCategory": "Food",
       "type": "expense",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-scenario-3",
@@ -595,7 +581,7 @@
       "status": "Completed",
       "subCategory": "Groceries",
       "type": "credit_card_expense",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-scenario-4",
@@ -611,7 +597,7 @@
       "status": "Completed",
       "subCategory": "Credit Card Bill Payment",
       "type": "credit_card_payment",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-scenario-5",
@@ -627,7 +613,7 @@
       "status": "Completed",
       "subCategory": "Bank to Bank Transfer",
       "type": "transfer",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-scenario-6",
@@ -642,7 +628,7 @@
       "status": "Completed",
       "subCategory": "Mutual Funds",
       "type": "investment_deposit",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-scenario-7",
@@ -657,7 +643,7 @@
       "status": "Completed",
       "subCategory": "Emergency Fund Deposit",
       "type": "emergency_deposit",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-scenario-8",
@@ -673,7 +659,7 @@
       "status": "Completed",
       "subCategory": "Credit Card Bill Payment",
       "type": "credit_card_payment",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-1794475727617-3dfh",
@@ -688,7 +674,7 @@
       "status": "Completed",
       "subCategory": "Groceries",
       "type": "credit_card_expense",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-1794475847930-bknk",
@@ -703,7 +689,7 @@
       "status": "Completed",
       "subCategory": "Household",
       "type": "credit_card_expense",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-1794475910376-cx5r",
@@ -718,7 +704,7 @@
       "status": "Completed",
       "subCategory": "Food",
       "type": "credit_card_expense",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-1794475965150-eatl",
@@ -733,7 +719,7 @@
       "status": "Completed",
       "subCategory": "Food",
       "type": "credit_card_expense",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-1794475983932-c07l",
@@ -748,7 +734,7 @@
       "status": "Completed",
       "subCategory": "Food",
       "type": "credit_card_expense",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-1794476053929-8r9n",
@@ -763,7 +749,7 @@
       "status": "Completed",
       "subCategory": "Food",
       "type": "credit_card_expense",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-1794476119037-4mrs",
@@ -778,7 +764,7 @@
       "status": "Completed",
       "subCategory": "Food",
       "type": "credit_card_expense",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-1794476304135-195w",
@@ -793,7 +779,7 @@
       "status": "Completed",
       "subCategory": "Food",
       "type": "credit_card_expense",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-1794476353898-7nv6",
@@ -808,7 +794,7 @@
       "status": "Completed",
       "subCategory": "Food",
       "type": "credit_card_expense",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-1794476399772-xfou",
@@ -823,7 +809,7 @@
       "status": "Completed",
       "subCategory": "Food",
       "type": "credit_card_expense",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-1794476449155-zjlt",
@@ -838,7 +824,7 @@
       "status": "Completed",
       "subCategory": "Groceries",
       "type": "credit_card_expense",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-1794477274500-2erl",
@@ -853,7 +839,7 @@
       "status": "Completed",
       "subCategory": "Groceries",
       "type": "credit_card_expense",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-scenario-1",
@@ -868,7 +854,7 @@
       "status": "Completed",
       "subCategory": "Salary",
       "type": "income",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-1794477686443-t0fd",
@@ -882,7 +868,7 @@
       "status": "Completed",
       "subCategory": "Food",
       "type": "expense",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-fd-1794478147227",
@@ -896,11 +882,11 @@
       "status": "Completed",
       "subCategory": "Fixed Deposit",
       "type": "investment_deposit",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "tx-scenario-1",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "date": "2026-11-02T10:09:44.065Z",
       "type": "income",
       "mainCategory": "Essential",
@@ -915,7 +901,7 @@
     },
     {
       "id": "tx-scenario-2",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "date": "2026-11-04T10:09:44.065Z",
       "type": "expense",
       "mainCategory": "Essential",
@@ -929,7 +915,7 @@
     },
     {
       "id": "tx-scenario-3",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "date": "2026-11-05T10:09:44.066Z",
       "type": "credit_card_expense",
       "mainCategory": "Essential",
@@ -944,7 +930,7 @@
     },
     {
       "id": "tx-scenario-4",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "date": "2026-11-06T10:09:44.066Z",
       "type": "credit_card_payment",
       "mainCategory": "Liability Settlement",
@@ -960,7 +946,7 @@
     },
     {
       "id": "tx-scenario-5",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "date": "2026-11-07T10:09:44.066Z",
       "type": "transfer",
       "mainCategory": "Transfer",
@@ -976,7 +962,7 @@
     },
     {
       "id": "tx-scenario-6",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "date": "2026-11-08T10:09:44.066Z",
       "type": "investment_deposit",
       "mainCategory": "Investment",
@@ -991,7 +977,7 @@
     },
     {
       "id": "tx-scenario-7",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "date": "2026-11-09T10:09:44.066Z",
       "type": "emergency_deposit",
       "mainCategory": "Emergency Fund",
@@ -1006,7 +992,7 @@
     },
     {
       "id": "tx-scenario-8",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "date": "2026-11-10T10:09:44.066Z",
       "type": "credit_card_payment",
       "mainCategory": "Liability Settlement",
@@ -1035,15 +1021,15 @@
     },
     {
       "id": "budget-demo-user-id-2026-11",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "monthYear": "2026-11",
-      "essentialBudgetInPaise": 1800000,
-      "funBudgetInPaise": 400000,
+      "totalBudgetInPaise": 4500000,
+      "essentialBudgetInPaise": 2000000,
+      "funBudgetInPaise": 500000,
       "investmentBudgetInPaise": 800000,
       "emergencyBudgetInPaise": 500000,
       "savingsBudgetInPaise": 500000,
-      "carryForwardEnabled": false,
-      "totalBudgetInPaise": 4500000
+      "carryForwardEnabled": false
     },
     {
       "id": "budget-user-1794473018005-1c1b67",
@@ -1101,41 +1087,8 @@
       "userId": "user-1794321590913"
     },
     {
-      "id": "budget-user-1794473436793-0d16c1",
-      "carryForwardEnabled": false,
-      "emergencyBudgetInPaise": 500000,
-      "essentialBudgetInPaise": 2000000,
-      "funBudgetInPaise": 500000,
-      "investmentBudgetInPaise": 500000,
-      "monthYear": "2026-11",
-      "savingsBudgetInPaise": 500000,
-      "userId": "user-rjrajeshpal30"
-    },
-    {
-      "id": "budget-user-1794473436793-0d16c1-2026-11",
-      "carryForwardEnabled": false,
-      "emergencyBudgetInPaise": 500000,
-      "essentialBudgetInPaise": 1800000,
-      "funBudgetInPaise": 400000,
-      "investmentBudgetInPaise": 800000,
-      "monthYear": "2026-11",
-      "savingsBudgetInPaise": 500000,
-      "userId": "user-rjrajeshpal30"
-    },
-    {
-      "id": "budget-user-1794473436793-0d16c1-2026-11",
-      "userId": "user-rjrajeshpal30",
-      "monthYear": "2026-11",
-      "essentialBudgetInPaise": 1800000,
-      "funBudgetInPaise": 400000,
-      "investmentBudgetInPaise": 800000,
-      "emergencyBudgetInPaise": 500000,
-      "savingsBudgetInPaise": 500000,
-      "carryForwardEnabled": false
-    },
-    {
       "id": "budget-user-rjrajeshpal30-2026-12",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "monthYear": "2026-12",
       "totalBudgetInPaise": 5500000,
       "essentialBudgetInPaise": 1800000,
@@ -1157,7 +1110,7 @@
       "notes": "Monthly SIP",
       "riskLevel": "Moderate Risk",
       "type": "Mutual Funds",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "inv-stocks-01",
@@ -1169,11 +1122,11 @@
       "notes": "Long-term equity allocation",
       "riskLevel": "Moderate Risk",
       "type": "Stocks",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "inv-mf-01",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "name": "Parag Parikh Flexi Cap Fund",
       "type": "Mutual Funds",
       "investedAmountInPaise": 500000,
@@ -1185,7 +1138,7 @@
     },
     {
       "id": "inv-stocks-01",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "name": "NIFTY 50 Index Basket",
       "type": "Stocks",
       "investedAmountInPaise": 2500000,
@@ -1214,7 +1167,7 @@
       ],
       "startDate": "2025-12-12T10:02:55.261Z",
       "status": "Active",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "fd-1794478147227",
@@ -1231,11 +1184,11 @@
       "remindersSent": [],
       "startDate": "2026-11-12T10:09:07.227Z",
       "status": "Active",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "fd-hdfc-01",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "bankName": "HDFC Bank",
       "fdName": "HDFC High Yield FD 1-Year",
       "principalInPaise": 5000000,
@@ -1334,7 +1287,7 @@
       "savedAmountInPaise": 4500000,
       "targetAmountInPaise": 12000000,
       "targetDate": "2027-03-31",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "saving-travel-01",
@@ -1344,11 +1297,11 @@
       "savedAmountInPaise": 3000000,
       "targetAmountInPaise": 6000000,
       "targetDate": "2026-12-25",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "saving-laptop-01",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "name": "MacBook Pro Upgrade",
       "targetAmountInPaise": 12000000,
       "savedAmountInPaise": 4500000,
@@ -1358,7 +1311,7 @@
     },
     {
       "id": "saving-travel-01",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "name": "Annual Family Vacation",
       "targetAmountInPaise": 6000000,
       "savedAmountInPaise": 3000000,
@@ -1379,7 +1332,7 @@
       },
       "title": "Upcoming FD Maturity in 30 Days",
       "type": "fd_maturity",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "notif-cc-01",
@@ -1392,11 +1345,11 @@
       },
       "title": "Credit Card Bill Reminder",
       "type": "bill_reminder",
-      "userId": "user-rjrajeshpal30"
+      "userId": "user-1794473436793-0d16c1"
     },
     {
       "id": "notif-fd-01",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "title": "Upcoming FD Maturity in 30 Days",
       "message": "Your HDFC High Yield FD (₹50,000 principal) matures soon. Projected payout: ₹53,854.",
       "type": "fd_maturity",
@@ -1409,7 +1362,7 @@
     },
     {
       "id": "notif-cc-01",
-      "userId": "user-rjrajeshpal30",
+      "userId": "user-1794473436793-0d16c1",
       "title": "Credit Card Bill Reminder",
       "message": "HDFC Regalia Gold has ₹3,000 outstanding due on the 5th. Avoid late fees.",
       "type": "bill_reminder",
@@ -1419,6 +1372,34 @@
         "amountInPaise": 300000
       },
       "createdAt": "2026-11-12T06:09:44.066Z"
+    }
+  ],
+  "migrations": [
+    {
+      "id": "migration-v1-canonical-ownership",
+      "name": "canonical_ownership_reconciliation_v1",
+      "version": 1,
+      "status": "completed",
+      "executedAt": "2026-11-12T12:24:55.812Z",
+      "details": {
+        "canonicalUserId": "user-1794473436793-0d16c1",
+        "canonicalEmail": "rjrajeshpal30062003@gmail.com",
+        "legacyIds": [
+          "demo-user-id",
+          "user-rjrajeshpal30"
+        ],
+        "resolvedDuplicateBudgetsCount": 3,
+        "authoritativeBudgetsCount": 2,
+        "reassigned": {
+          "bankAccounts": 6,
+          "creditCards": 3,
+          "transactions": 30,
+          "investments": 4,
+          "fixedDeposits": 3,
+          "savingsGoals": 4,
+          "notifications": 4
+        }
+      }
     }
   ],
   "emailLogs": [],

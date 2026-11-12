@@ -14,6 +14,9 @@ export const AddTransactionModal: React.FC = () => {
     refreshAll
   } = useFinancial();
 
+  const activeAccounts = accounts.filter(a => a.isActive !== false && a.status !== 'Closed');
+  const activeCards = creditCards.filter(c => c.isActive !== false && c.status !== 'Closed');
+
   const [mode, setMode] = useState<'expense' | 'income' | 'transfer'>(
     addTxDefaultType === 'income' ? 'income' : 'expense'
   );
@@ -22,9 +25,9 @@ export const AddTransactionModal: React.FC = () => {
   const [customSubCategory, setCustomSubCategory] = useState('');
   const [amountRupees, setAmountRupees] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>('Bank Account');
-  const [sourceAccountId, setSourceAccountId] = useState(accounts[0]?.id || '');
-  const [destinationAccountId, setDestinationAccountId] = useState(accounts[1]?.id || accounts[0]?.id || '');
-  const [creditCardId, setCreditCardId] = useState(creditCards[0]?.id || '');
+  const [sourceAccountId, setSourceAccountId] = useState(activeAccounts[0]?.id || '');
+  const [destinationAccountId, setDestinationAccountId] = useState(activeAccounts[1]?.id || activeAccounts[0]?.id || '');
+  const [creditCardId, setCreditCardId] = useState(activeCards[0]?.id || '');
   const [description, setDescription] = useState('');
   const [notes, setNotes] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -34,30 +37,30 @@ export const AddTransactionModal: React.FC = () => {
 
   // Synchronize creditCardId when creditCards load or update
   useEffect(() => {
-    if (creditCards.length > 0) {
-      if (!creditCardId || !creditCards.some(c => c.id === creditCardId)) {
-        setCreditCardId(creditCards[0].id);
+    if (activeCards.length > 0) {
+      if (!creditCardId || !activeCards.some(c => c.id === creditCardId)) {
+        setCreditCardId(activeCards[0].id);
       }
     } else {
       setCreditCardId('');
     }
-  }, [creditCards, creditCardId]);
+  }, [activeCards, creditCardId]);
 
   // Synchronize bank accounts when accounts load or update
   useEffect(() => {
-    if (accounts.length > 0) {
-      if (!sourceAccountId || !accounts.some(a => a.id === sourceAccountId)) {
-        setSourceAccountId(accounts[0].id);
+    if (activeAccounts.length > 0) {
+      if (!sourceAccountId || !activeAccounts.some(a => a.id === sourceAccountId)) {
+        setSourceAccountId(activeAccounts[0].id);
       }
-      if (!destinationAccountId || !accounts.some(a => a.id === destinationAccountId)) {
-        const otherAccount = accounts.find(a => a.id !== sourceAccountId) || accounts[1] || accounts[0];
+      if (!destinationAccountId || !activeAccounts.some(a => a.id === destinationAccountId)) {
+        const otherAccount = activeAccounts.find(a => a.id !== sourceAccountId) || activeAccounts[1] || activeAccounts[0];
         setDestinationAccountId(otherAccount.id);
       }
     } else {
       setSourceAccountId('');
       setDestinationAccountId('');
     }
-  }, [accounts, sourceAccountId, destinationAccountId]);
+  }, [activeAccounts, sourceAccountId, destinationAccountId]);
 
   // Reset modal state when opened
   useEffect(() => {
@@ -65,11 +68,11 @@ export const AddTransactionModal: React.FC = () => {
       setError(null);
       setLoading(false);
       setMode(addTxDefaultType === 'income' ? 'income' : 'expense');
-      if (creditCards.length > 0 && (!creditCardId || !creditCards.some(c => c.id === creditCardId))) {
-        setCreditCardId(creditCards[0].id);
+      if (activeCards.length > 0 && (!creditCardId || !activeCards.some(c => c.id === creditCardId))) {
+        setCreditCardId(activeCards[0].id);
       }
-      if (accounts.length > 0 && (!sourceAccountId || !accounts.some(a => a.id === sourceAccountId))) {
-        setSourceAccountId(accounts[0].id);
+      if (activeAccounts.length > 0 && (!sourceAccountId || !activeAccounts.some(a => a.id === sourceAccountId))) {
+        setSourceAccountId(activeAccounts[0].id);
       }
     }
   }, [isAddTxOpen, addTxDefaultType]);
@@ -126,8 +129,8 @@ export const AddTransactionModal: React.FC = () => {
       txType = 'income';
       finalMainCategory = 'Essential';
       finalSubCategory = incomeSource;
-      if (!sourceAccountId || !accounts.some(a => a.id === sourceAccountId)) {
-        setError('Please select a receiving bank account');
+      if (!sourceAccountId || !activeAccounts.some(a => a.id === sourceAccountId)) {
+        setError('Please select an active receiving bank account');
         return;
       }
     } else if (mode === 'transfer') {
@@ -135,21 +138,21 @@ export const AddTransactionModal: React.FC = () => {
       finalMainCategory = 'Transfer';
       finalSubCategory = 'Bank to Bank Transfer';
       if (!sourceAccountId || !destinationAccountId || sourceAccountId === destinationAccountId) {
-        setError('Select two different accounts for transfer');
+        setError('Select two different active bank accounts for transfer');
         return;
       }
     } else {
       // Expense mode
       if (paymentMethod === 'Credit Card') {
         txType = 'credit_card_expense';
-        if (!creditCardId || !creditCards.some(c => c.id === creditCardId)) {
-          setError('Please select a credit card');
+        if (!creditCardId || !activeCards.some(c => c.id === creditCardId)) {
+          setError('Please select an active credit card');
           return;
         }
       } else if (paymentMethod === 'Bank Account') {
         txType = 'expense';
-        if (!sourceAccountId || !accounts.some(a => a.id === sourceAccountId)) {
-          setError('Please select a source bank account');
+        if (!sourceAccountId || !activeAccounts.some(a => a.id === sourceAccountId)) {
+          setError('Please select an active source bank account');
           return;
         }
       } else {
@@ -299,7 +302,7 @@ export const AddTransactionModal: React.FC = () => {
                   onChange={e => setSourceAccountId(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                 >
-                  {accounts.map(a => (
+                  {activeAccounts.map(a => (
                     <option key={a.id} value={a.id}>
                       {a.bankName} - {a.accountNickname} (₹{(a.balanceInPaise / 100).toLocaleString('en-IN')})
                     </option>
@@ -321,7 +324,7 @@ export const AddTransactionModal: React.FC = () => {
                   onChange={e => setSourceAccountId(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                 >
-                  {accounts.map(a => (
+                  {activeAccounts.map(a => (
                     <option key={a.id} value={a.id}>
                       {a.bankName} (₹{(a.balanceInPaise / 100).toLocaleString('en-IN')})
                     </option>
@@ -337,7 +340,7 @@ export const AddTransactionModal: React.FC = () => {
                   onChange={e => setDestinationAccountId(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                 >
-                  {accounts.map(a => (
+                  {activeAccounts.map(a => (
                     <option key={a.id} value={a.id}>
                       {a.bankName} (₹{(a.balanceInPaise / 100).toLocaleString('en-IN')})
                     </option>
@@ -474,9 +477,9 @@ export const AddTransactionModal: React.FC = () => {
                   <label htmlFor="payingBankAccountSelect" className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                     Paying Bank Account
                   </label>
-                  {accounts.length === 0 ? (
+                  {activeAccounts.length === 0 ? (
                     <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-xs">
-                      No bank accounts registered. Please add a bank account first.
+                      No active bank accounts available. Please add or reopen a bank account first.
                     </div>
                   ) : (
                     <select
@@ -489,7 +492,7 @@ export const AddTransactionModal: React.FC = () => {
                       }}
                       className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                     >
-                      {accounts.map(a => (
+                      {activeAccounts.map(a => (
                         <option key={a.id} value={a.id}>
                           {a.bankName} - {a.accountNickname} (₹{(a.balanceInPaise / 100).toLocaleString('en-IN')})
                         </option>
@@ -504,9 +507,9 @@ export const AddTransactionModal: React.FC = () => {
                   <label htmlFor="creditCardSelect" className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                     Select Credit Card (Will increase card outstanding)
                   </label>
-                  {creditCards.length === 0 ? (
+                  {activeCards.length === 0 ? (
                     <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-xs">
-                      No active credit cards registered. Please add a credit card in the Credit Cards section first.
+                      No active credit cards available. Please register or reopen a credit card first.
                     </div>
                   ) : (
                     <select
@@ -519,7 +522,7 @@ export const AddTransactionModal: React.FC = () => {
                       }}
                       className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                     >
-                      {creditCards.map(c => (
+                      {activeCards.map(c => (
                         <option key={c.id} value={c.id}>
                           {c.cardName} (•••• {c.lastFourDigits}) - Avail: ₹{(c.availableCreditInPaise / 100).toLocaleString('en-IN')}
                         </option>

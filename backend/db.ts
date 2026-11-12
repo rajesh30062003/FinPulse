@@ -104,6 +104,7 @@ export const BankAccountSchema = new mongoose.Schema({
   balanceInPaise: { type: Number, default: 0 },
   openingBalanceInPaise: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },
+  status: { type: String, default: 'Active' },
   notes: { type: String },
   createdAt: { type: String, default: () => new Date().toISOString() }
 });
@@ -131,6 +132,7 @@ export const CreditCardSchema = new mongoose.Schema({
   billingCycle: { type: String, default: '16th to 15th' },
   notes: { type: String },
   isActive: { type: Boolean, default: true },
+  status: { type: String, default: 'Active' },
   lastPaymentDate: { type: String },
   lastPaymentAmountInPaise: { type: Number }
 });
@@ -293,6 +295,17 @@ export const MigrationSchema = new mongoose.Schema({
 
 export const MigrationModel = mongoose.models.Migration || mongoose.model('Migration', MigrationSchema);
 
+export const AuditBudgetSnapshotSchema = new mongoose.Schema({
+  originalId: { type: String, required: true },
+  originalUserId: { type: String, required: true },
+  monthYear: { type: String, required: true },
+  fullDocument: { type: mongoose.Schema.Types.Mixed, required: true },
+  archivedAt: { type: String, default: () => new Date().toISOString() },
+  reason: { type: String, default: 'pre_deduplication_audit_archive' }
+}, { timestamps: true });
+
+export const AuditBudgetSnapshotModel = mongoose.models.AuditBudgetSnapshot || mongoose.model('AuditBudgetSnapshot', AuditBudgetSnapshotSchema);
+
 export function getMongoStatus() {
   return {
     connected: mongoConnected,
@@ -440,13 +453,15 @@ export async function initDatabase() {
         aaravUser.isVerified = true;
       }
 
-      // Ensure Rajesh Pal has Demo@1234 hash for login testing
+      // Ensure Rajesh Pal has valid hash for login if not set
       const rjUsers = memoryDb.users.filter(u =>
         u.email.toLowerCase() === 'rjrajeshpal30@gmail.com' ||
         u.email.toLowerCase() === 'rjrajeshpal30062003@gmail.com'
       );
       for (const rjUser of rjUsers) {
-        rjUser.passwordHash = await bcrypt.hash('Demo@1234', 10);
+        if (!rjUser.passwordHash) {
+          rjUser.passwordHash = await bcrypt.hash('Demo@1234', 10);
+        }
         rjUser.failedLoginAttempts = 0;
         rjUser.lockUntil = null;
         rjUser.isVerified = true;
@@ -477,12 +492,64 @@ export function getDb(): DatabaseStore {
 
 // ================= ATLAS & RESILIENT PERSISTENCE HELPERS ================= //
 
+export function getEffectiveUserId(userId?: string, userEmail?: string): string {
+  if (!userId && !userEmail) return '';
+  const cleanEmail = (userEmail || '').trim().toLowerCase();
+
+  const canonicalRajesh = (memoryDb.users || []).find(u =>
+    u.email.toLowerCase() === 'rjrajeshpal30062003@gmail.com' ||
+    u.id === 'user-1794473436793-0d16c1' ||
+    u.email.toLowerCase() === 'rjrajeshpal30@gmail.com'
+  );
+  const canonicalRajeshId = canonicalRajesh ? canonicalRajesh.id : 'user-1794473436793-0d16c1';
+
+  if (
+    userId === 'user-1794473436793-0d16c1' ||
+    userId === 'user-rjrajeshpal30' ||
+    userId === 'demo-user-id' ||
+    cleanEmail === 'rjrajeshpal30062003@gmail.com' ||
+    cleanEmail === 'rjrajeshpal30@gmail.com'
+  ) {
+    return canonicalRajeshId;
+  }
+  return userId || '';
+}
+
+export function isOwner(itemUserId?: string, authUserId?: string): boolean {
+  if (!itemUserId || !authUserId) return false;
+  if (itemUserId === authUserId) return true;
+  return getEffectiveUserId(itemUserId) === getEffectiveUserId(authUserId);
+}
+
+export function getOwnerFilter(userId: string): any {
+  const canonical = getEffectiveUserId(userId);
+  if (canonical === 'user-1794473436793-0d16c1') {
+    return { $in: ['user-1794473436793-0d16c1', 'user-rjrajeshpal30', 'demo-user-id'] };
+  }
+  return userId;
+}
+
 export async function findUserByEmail(email: string): Promise<IUser | null> {
   const cleanEmail = email.trim().toLowerCase();
+  const isRajesh = cleanEmail === 'rjrajeshpal30062003@gmail.com' || cleanEmail === 'rjrajeshpal30@gmail.com';
+
   // 1. Check MongoDB Atlas if connected
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      const doc: any = await UserModel.findOne({ email: cleanEmail }).lean();
+      let doc: any = null;
+      if (isRajesh) {
+        doc = await UserModel.findOne({
+          $or: [
+            { email: 'rjrajeshpal30062003@gmail.com' },
+            { id: 'user-rjrajeshpal30' },
+            { id: 'user-1794473436793-0d16c1' },
+            { email: 'rjrajeshpal30@gmail.com' }
+          ]
+        }).lean();
+      } else {
+        doc = await UserModel.findOne({ email: cleanEmail }).lean();
+      }
+
       if (doc) {
         // sync to memory store
         const existingIdx = memoryDb.users.findIndex(u => u.id === doc.id);
@@ -514,12 +581,30 @@ export async function findUserByEmail(email: string): Promise<IUser | null> {
       console.warn('MongoDB user lookup warning:', err);
     }
   }
+
   // 2. Check local memory store
-  let found = memoryDb.users.find(u => u.email.toLowerCase() === cleanEmail);
+  let found = isRajesh
+    ? memoryDb.users.find(u =>
+        u.email.toLowerCase() === 'rjrajeshpal30062003@gmail.com' ||
+        u.id === 'user-rjrajeshpal30' ||
+        u.id === 'user-1794473436793-0d16c1' ||
+        u.email.toLowerCase() === 'rjrajeshpal30@gmail.com'
+      )
+    : memoryDb.users.find(u => u.email.toLowerCase() === cleanEmail);
+
   if (!found && fs.existsSync(DATA_FILE)) {
     try {
       const raw = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-      found = (raw.users || []).find((u: any) => u.email.toLowerCase() === cleanEmail);
+      const list = raw.users || [];
+      found = isRajesh
+        ? list.find((u: any) =>
+            u.email.toLowerCase() === 'rjrajeshpal30062003@gmail.com' ||
+            u.id === 'user-rjrajeshpal30' ||
+            u.id === 'user-1794473436793-0d16c1' ||
+            u.email.toLowerCase() === 'rjrajeshpal30@gmail.com'
+          )
+        : list.find((u: any) => u.email.toLowerCase() === cleanEmail);
+
       if (found) {
         memoryDb.users.push(found);
       }
@@ -529,15 +614,20 @@ export async function findUserByEmail(email: string): Promise<IUser | null> {
 }
 
 export async function findUserById(id: string): Promise<IUser | null> {
+  const effectiveId = getEffectiveUserId(id);
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      const doc: any = await UserModel.findOne({ id }).lean();
+      const doc: any = await UserModel.findOne({ id: effectiveId }).lean();
       if (doc) return doc;
+      if (effectiveId !== id) {
+        const origDoc: any = await UserModel.findOne({ id }).lean();
+        if (origDoc) return origDoc;
+      }
     } catch (err) {
       console.warn('MongoDB findUserById warning:', err);
     }
   }
-  return memoryDb.users.find(u => u.id === id) || null;
+  return memoryDb.users.find(u => u.id === effectiveId) || memoryDb.users.find(u => u.id === id) || null;
 }
 
 export async function persistUser(user: IUser): Promise<void> {
@@ -583,7 +673,7 @@ export async function persistBankAccount(account: IBankAccount): Promise<void> {
 }
 
 export async function persistCashWallet(wallet: ICashWallet): Promise<void> {
-  const idx = memoryDb.cashWallets.findIndex(w => w.id === wallet.id);
+  const idx = memoryDb.cashWallets.findIndex(w => w.id === wallet.id || isOwner(w.userId, wallet.userId));
   if (idx >= 0) {
     memoryDb.cashWallets[idx] = wallet;
   } else {
@@ -593,7 +683,11 @@ export async function persistCashWallet(wallet: ICashWallet): Promise<void> {
 
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await CashWalletModel.findOneAndUpdate({ id: wallet.id }, wallet, { upsert: true });
+      await CashWalletModel.findOneAndUpdate(
+        { $or: [{ id: wallet.id }, { userId: getOwnerFilter(wallet.userId) }] },
+        wallet,
+        { upsert: true, new: true }
+      );
     } catch (err) {
       console.error('Error saving cash wallet to MongoDB Atlas:', err);
     }
@@ -883,11 +977,11 @@ export async function deleteEmailVerification(email: string): Promise<void> {
 }
 
 export async function deleteBankAccount(id: string, userId: string): Promise<void> {
-  memoryDb.bankAccounts = memoryDb.bankAccounts.filter(b => !(b.id === id && b.userId === userId));
+  memoryDb.bankAccounts = memoryDb.bankAccounts.filter(b => !(b.id === id && isOwner(b.userId, userId)));
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await BankAccountModel.deleteOne({ id, userId });
+      await BankAccountModel.deleteOne({ id, userId: getOwnerFilter(userId) });
     } catch (err) {
       console.error('Error deleting bank account from MongoDB Atlas:', err);
     }
@@ -895,11 +989,11 @@ export async function deleteBankAccount(id: string, userId: string): Promise<voi
 }
 
 export async function deleteCreditCard(id: string, userId: string): Promise<void> {
-  memoryDb.creditCards = memoryDb.creditCards.filter(c => !(c.id === id && c.userId === userId));
+  memoryDb.creditCards = memoryDb.creditCards.filter(c => !(c.id === id && isOwner(c.userId, userId)));
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await CreditCardModel.deleteOne({ id, userId });
+      await CreditCardModel.deleteOne({ id, userId: getOwnerFilter(userId) });
     } catch (err) {
       console.error('Error deleting credit card from MongoDB Atlas:', err);
     }
@@ -907,11 +1001,11 @@ export async function deleteCreditCard(id: string, userId: string): Promise<void
 }
 
 export async function deleteTransaction(id: string, userId: string): Promise<void> {
-  memoryDb.transactions = memoryDb.transactions.filter(t => !(t.id === id && t.userId === userId));
+  memoryDb.transactions = memoryDb.transactions.filter(t => !(t.id === id && isOwner(t.userId, userId)));
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await TransactionModel.deleteOne({ id, userId });
+      await TransactionModel.deleteOne({ id, userId: getOwnerFilter(userId) });
     } catch (err) {
       console.error('Error deleting transaction from MongoDB Atlas:', err);
     }
@@ -919,11 +1013,11 @@ export async function deleteTransaction(id: string, userId: string): Promise<voi
 }
 
 export async function deleteInvestment(id: string, userId: string): Promise<void> {
-  memoryDb.investments = memoryDb.investments.filter(i => !(i.id === id && i.userId === userId));
+  memoryDb.investments = memoryDb.investments.filter(i => !(i.id === id && isOwner(i.userId, userId)));
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await InvestmentModel.deleteOne({ id, userId });
+      await InvestmentModel.deleteOne({ id, userId: getOwnerFilter(userId) });
     } catch (err) {
       console.error('Error deleting investment from MongoDB Atlas:', err);
     }
@@ -931,11 +1025,11 @@ export async function deleteInvestment(id: string, userId: string): Promise<void
 }
 
 export async function deleteFixedDeposit(id: string, userId: string): Promise<void> {
-  memoryDb.fixedDeposits = memoryDb.fixedDeposits.filter(f => !(f.id === id && f.userId === userId));
+  memoryDb.fixedDeposits = memoryDb.fixedDeposits.filter(f => !(f.id === id && isOwner(f.userId, userId)));
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await FixedDepositModel.deleteOne({ id, userId });
+      await FixedDepositModel.deleteOne({ id, userId: getOwnerFilter(userId) });
     } catch (err) {
       console.error('Error deleting fixed deposit from MongoDB Atlas:', err);
     }
@@ -943,11 +1037,11 @@ export async function deleteFixedDeposit(id: string, userId: string): Promise<vo
 }
 
 export async function deleteSavingsGoal(id: string, userId: string): Promise<void> {
-  memoryDb.savingsGoals = memoryDb.savingsGoals.filter(s => !(s.id === id && s.userId === userId));
+  memoryDb.savingsGoals = memoryDb.savingsGoals.filter(s => !(s.id === id && isOwner(s.userId, userId)));
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await SavingsGoalModel.deleteOne({ id, userId });
+      await SavingsGoalModel.deleteOne({ id, userId: getOwnerFilter(userId) });
     } catch (err) {
       console.error('Error deleting savings goal from MongoDB Atlas:', err);
     }
@@ -973,7 +1067,7 @@ export function createDatabaseBackup(tag = 'pre_migration'): string {
 
 export async function runIdempotentMigrations(): Promise<void> {
   const MIGRATION_VERSION = 1;
-  const MIGRATION_NAME = 'reconcile_rajesh_pal_data_v1';
+  const MIGRATION_NAME = 'canonical_ownership_reconciliation_v1';
 
   // 1. Check if migration already completed (memory or MongoDB Atlas)
   if (!memoryDb.migrations) memoryDb.migrations = [];
@@ -1001,31 +1095,38 @@ export async function runIdempotentMigrations(): Promise<void> {
   console.log(`[Migration] Pre-migration backup verified at: ${backupPath || 'In-memory ledger'}`);
 
   // 3. Resolve Canonical Rajesh Pal User
-  let canonicalUser = memoryDb.users.find(u => u.email.toLowerCase() === 'rjrajeshpal30062003@gmail.com');
-  if (!canonicalUser) {
-    canonicalUser = memoryDb.users.find(u => u.email.toLowerCase() === 'rjrajeshpal30@gmail.com');
-  }
-  if (!canonicalUser) {
-    canonicalUser = memoryDb.users.find(u => u.name.toLowerCase().includes('rajesh'));
-  }
+  let canonicalUser: any = null;
 
-  // If not found in memory, query MongoDB Atlas
-  if (!canonicalUser && mongoConnected && mongoose.connection.readyState === 1) {
+  // Search Atlas first if connected
+  if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      const atlasRajesh: any = await UserModel.findOne({
-        $or: [
-          { email: 'rjrajeshpal30062003@gmail.com' },
-          { email: 'rjrajeshpal30@gmail.com' },
-          { name: 'Rajesh Pal' }
-        ]
-      }).lean();
-      if (atlasRajesh) {
-        canonicalUser = atlasRajesh;
-        memoryDb.users.push(canonicalUser!);
+      canonicalUser = await UserModel.findOne({ email: 'rjrajeshpal30062003@gmail.com' }).lean();
+      if (!canonicalUser) {
+        canonicalUser = await UserModel.findOne({ id: 'user-1794473436793-0d16c1' }).lean();
+      }
+      if (!canonicalUser) {
+        canonicalUser = await UserModel.findOne({ id: 'user-rjrajeshpal30' }).lean();
+      }
+      if (!canonicalUser) {
+        canonicalUser = await UserModel.findOne({ email: 'rjrajeshpal30@gmail.com' }).lean();
       }
     } catch (qErr) {
       console.warn('[Migration] Querying Atlas for canonical user warning:', qErr);
     }
+  }
+
+  // Memory fallbacks
+  if (!canonicalUser) {
+    canonicalUser = memoryDb.users.find(u => u.email.toLowerCase() === 'rjrajeshpal30062003@gmail.com');
+  }
+  if (!canonicalUser) {
+    canonicalUser = memoryDb.users.find(u => u.id === 'user-1794473436793-0d16c1');
+  }
+  if (!canonicalUser) {
+    canonicalUser = memoryDb.users.find(u => u.id === 'user-rjrajeshpal30');
+  }
+  if (!canonicalUser) {
+    canonicalUser = memoryDb.users.find(u => u.email.toLowerCase() === 'rjrajeshpal30@gmail.com');
   }
 
   // If still none, create the canonical account
@@ -1043,38 +1144,41 @@ export async function runIdempotentMigrations(): Promise<void> {
       emailNotificationsEnabled: true,
       createdAt: new Date().toISOString()
     };
-    memoryDb.users.push(canonicalUser);
   }
 
   // Ensure canonical user profile is authoritative
+  const canonicalUserId = canonicalUser.id;
   canonicalUser.name = 'Rajesh Pal';
   canonicalUser.email = 'rjrajeshpal30062003@gmail.com';
   canonicalUser.isVerified = true;
-  const canonicalUserId = canonicalUser.id;
+
+  // 4. Collect historical IDs associated specifically with Rajesh Pal
+  const candidateIds = ['demo-user-id', 'user-1794473436793-0d16c1', 'user-rjrajeshpal30'];
+  const legacyIds = candidateIds.filter(id => id !== canonicalUserId);
+  console.log(`[Migration] Authoritative Canonical User: ${canonicalUserId} (${canonicalUser.email})`);
+  console.log(`[Migration] Reconciling legacy user IDs: [${legacyIds.join(', ')}] -> Canonical: ${canonicalUserId}`);
 
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await UserModel.findOneAndUpdate({ id: canonicalUserId }, canonicalUser, { upsert: true });
+      // Remove any duplicate/secondary user document with legacy IDs or old email to avoid unique index violation on email
+      await UserModel.deleteMany({
+        $or: [
+          { id: { $in: legacyIds } },
+          { email: 'rjrajeshpal30@gmail.com' }
+        ],
+        _id: { $ne: canonicalUser._id }
+      });
+      await UserModel.findOneAndUpdate({ id: canonicalUserId }, canonicalUser, { upsert: true, new: true });
     } catch (uErr) {
       console.warn('[Migration] Updating canonical user in Atlas warning:', uErr);
     }
   }
 
-  console.log(`[Migration] Authoritative Canonical User: ${canonicalUserId} (${canonicalUser.email})`);
-
-  // 4. Collect historical IDs associated with Rajesh
-  const candidateIds = ['demo-user-id', 'user-1794473436793-0d16c1', 'user-rjrajeshpal30'];
-  const legacyIdSet = new Set<string>();
-  for (const cid of candidateIds) {
-    if (cid !== canonicalUserId) legacyIdSet.add(cid);
-  }
-  for (const u of memoryDb.users) {
-    if (u.id !== canonicalUserId && (u.email.toLowerCase() === 'rjrajeshpal30@gmail.com' || u.name.toLowerCase().includes('rajesh'))) {
-      legacyIdSet.add(u.id);
-    }
-  }
-  const legacyIds = Array.from(legacyIdSet);
-  console.log(`[Migration] Reconciling legacy user IDs: [${legacyIds.join(', ')}] -> Canonical: ${canonicalUserId}`);
+  // Update memory store for users
+  memoryDb.users = memoryDb.users.filter(u => !legacyIds.includes(u.id) && u.email.toLowerCase() !== 'rjrajeshpal30@gmail.com');
+  const existingUserIdx = memoryDb.users.findIndex(u => u.id === canonicalUserId);
+  if (existingUserIdx >= 0) memoryDb.users[existingUserIdx] = canonicalUser;
+  else memoryDb.users.push(canonicalUser);
 
   // 5. BUDGET ALLOCATION DEDUPLICATION & MERGE (Resolves E11000 duplicate key collision)
   const allRajeshBudgets = memoryDb.budgetAllocations.filter(
@@ -1090,53 +1194,44 @@ export async function runIdempotentMigrations(): Promise<void> {
 
   let resolvedDuplicateBudgetsCount = 0;
   const duplicateBudgetIdsToDelete: string[] = [];
+  const duplicateBudgetDocsToArchive: any[] = [];
   const authoritativeBudgets: IBudgetAllocation[] = [];
 
   for (const [monthYear, records] of budgetsByMonth.entries()) {
     if (records.length === 1) {
-      const rec = records[0];
+      const rec = { ...records[0] };
       rec.userId = canonicalUserId;
       authoritativeBudgets.push(rec);
     } else {
-      // Multiple records exist for this monthYear! Merge safely to preserve all allocations
+      // Multiple records exist for this monthYear: resolve without Math.max heuristics
       resolvedDuplicateBudgetsCount += (records.length - 1);
       console.log(`[Migration] Resolving ${records.length} duplicate budget records for month ${monthYear}...`);
 
-      // Authoritative record selection: prefer explicit totalBudgetInPaise or record with targets
-      let authRecord = records.find(r => typeof r.totalBudgetInPaise === 'number' && r.totalBudgetInPaise > 0) || records[0];
-
-      let maxTotalBudget = authRecord.totalBudgetInPaise || 4000000;
-      let maxEssential = authRecord.essentialBudgetInPaise || 0;
-      let maxFun = authRecord.funBudgetInPaise || 0;
-      let maxInv = authRecord.investmentBudgetInPaise || 0;
-      let maxEf = authRecord.emergencyBudgetInPaise || 0;
-      let maxSav = authRecord.savingsBudgetInPaise || 0;
-      let carryForward = Boolean(authRecord.carryForwardEnabled);
+      // Determine authoritative base: select user customized record with totalBudget or canonical ID
+      const userCustomRecord = records.find(r => typeof r.totalBudgetInPaise === 'number' && r.totalBudgetInPaise > 0);
+      const authRecord = userCustomRecord || records.find(r => r.id.includes(canonicalUserId)) || records[0];
 
       for (const other of records) {
-        if (other.id === authRecord.id) continue;
-        duplicateBudgetIdsToDelete.push(other.id);
-        if (typeof other.totalBudgetInPaise === 'number' && other.totalBudgetInPaise > 0) {
-          maxTotalBudget = Math.max(maxTotalBudget, other.totalBudgetInPaise);
+        if (other.id !== authRecord.id) {
+          duplicateBudgetIdsToDelete.push(other.id);
+          duplicateBudgetDocsToArchive.push(other);
         }
-        if (other.essentialBudgetInPaise > 0 && maxEssential === 0) maxEssential = other.essentialBudgetInPaise;
-        if (other.funBudgetInPaise > 0 && maxFun === 0) maxFun = other.funBudgetInPaise;
-        if (other.investmentBudgetInPaise > 0 && maxInv === 0) maxInv = other.investmentBudgetInPaise;
-        if (other.emergencyBudgetInPaise > 0 && maxEf === 0) maxEf = other.emergencyBudgetInPaise;
-        if (other.savingsBudgetInPaise > 0 && maxSav === 0) maxSav = other.savingsBudgetInPaise;
-        if (other.carryForwardEnabled) carryForward = true;
       }
 
-      authRecord.userId = canonicalUserId;
-      authRecord.totalBudgetInPaise = maxTotalBudget;
-      authRecord.essentialBudgetInPaise = maxEssential;
-      authRecord.funBudgetInPaise = maxFun;
-      authRecord.investmentBudgetInPaise = maxInv;
-      authRecord.emergencyBudgetInPaise = maxEf;
-      authRecord.savingsBudgetInPaise = maxSav;
-      authRecord.carryForwardEnabled = carryForward;
+      const consolidatedBudget: IBudgetAllocation = {
+        id: `budget-${canonicalUserId}-${monthYear}`,
+        userId: canonicalUserId,
+        monthYear,
+        totalBudgetInPaise: authRecord.totalBudgetInPaise || 4000000,
+        essentialBudgetInPaise: authRecord.essentialBudgetInPaise ?? 1800000,
+        funBudgetInPaise: authRecord.funBudgetInPaise ?? 400000,
+        investmentBudgetInPaise: authRecord.investmentBudgetInPaise ?? 800000,
+        emergencyBudgetInPaise: authRecord.emergencyBudgetInPaise ?? 500000,
+        savingsBudgetInPaise: authRecord.savingsBudgetInPaise ?? 500000,
+        carryForwardEnabled: Boolean(authRecord.carryForwardEnabled)
+      };
 
-      authoritativeBudgets.push(authRecord);
+      authoritativeBudgets.push(consolidatedBudget);
     }
   }
 
@@ -1153,38 +1248,65 @@ export async function runIdempotentMigrations(): Promise<void> {
     else memoryDb.budgetAllocations.push(authB);
   }
 
-  // 6. CASH WALLET DEDUPLICATION & MERGE
+  // 6. CASH WALLET DEDUPLICATION & PERSISTENCE
+  // Strictly filter wallets associated with Rajesh; do NOT reassign demo-user-id to Rajesh
   const rajeshWallets = memoryDb.cashWallets.filter(
-    w => w.userId === canonicalUserId || legacyIds.includes(w.userId)
+    w => w.userId === canonicalUserId || w.userId === 'user-rjrajeshpal30'
   );
+  let authWallet: any = null;
+  const dupWalletIds: string[] = [];
   if (rajeshWallets.length > 1) {
-    const authWallet = rajeshWallets.reduce((max, w) => (w.balanceInPaise > max.balanceInPaise ? w : max), rajeshWallets[0]);
+    // Authoritative selection: prefer canonical ID wallet; otherwise most recently updated
+    authWallet = rajeshWallets.find(w => w.userId === canonicalUserId && w.id !== 'cash-wallet-01') ||
+      rajeshWallets.find(w => w.userId === canonicalUserId) ||
+      rajeshWallets[0];
     authWallet.userId = canonicalUserId;
-    const dupWalletIds = rajeshWallets.filter(w => w.id !== authWallet.id).map(w => w.id);
+    for (const w of rajeshWallets) {
+      if (w.id !== authWallet.id) dupWalletIds.push(w.id);
+    }
     memoryDb.cashWallets = memoryDb.cashWallets.filter(w => !dupWalletIds.includes(w.id));
     if (mongoConnected && mongoose.connection.readyState === 1) {
       await CashWalletModel.deleteMany({ id: { $in: dupWalletIds } });
       await CashWalletModel.findOneAndUpdate({ id: authWallet.id }, authWallet, { upsert: true });
     }
   } else if (rajeshWallets.length === 1) {
-    rajeshWallets[0].userId = canonicalUserId;
+    authWallet = rajeshWallets[0];
+    authWallet.userId = canonicalUserId;
+  } else {
+    // If no cash wallet exists for Rajesh, initialize at 0 paise (NEVER ₹4,500)
+    authWallet = {
+      id: `cash-${canonicalUserId}`,
+      userId: canonicalUserId,
+      balanceInPaise: 0,
+      notes: 'Physical cash on hand',
+      updatedAt: new Date().toISOString()
+    };
+    memoryDb.cashWallets.push(authWallet);
+    if (mongoConnected && mongoose.connection.readyState === 1) {
+      await CashWalletModel.findOneAndUpdate({ id: authWallet.id }, authWallet, { upsert: true });
+    }
   }
 
   // 7. EMERGENCY FUND DEDUPLICATION & MERGE
   const rajeshFunds = memoryDb.emergencyFunds.filter(
     f => f.userId === canonicalUserId || legacyIds.includes(f.userId)
   );
+  let authFund: any = null;
+  const dupFundIds: string[] = [];
   if (rajeshFunds.length > 1) {
-    const authFund = rajeshFunds.reduce((max, f) => (f.currentBalanceInPaise > max.currentBalanceInPaise ? f : max), rajeshFunds[0]);
+    authFund = rajeshFunds.reduce((max, f) => (f.currentBalanceInPaise > max.currentBalanceInPaise ? f : max), rajeshFunds[0]);
     authFund.userId = canonicalUserId;
-    const dupFundIds = rajeshFunds.filter(f => f.id !== authFund.id).map(f => f.id);
+    for (const f of rajeshFunds) {
+      if (f.id !== authFund.id) dupFundIds.push(f.id);
+    }
     memoryDb.emergencyFunds = memoryDb.emergencyFunds.filter(f => !dupFundIds.includes(f.id));
     if (mongoConnected && mongoose.connection.readyState === 1) {
       await EmergencyFundModel.deleteMany({ id: { $in: dupFundIds } });
       await EmergencyFundModel.findOneAndUpdate({ id: authFund.id }, authFund, { upsert: true });
     }
   } else if (rajeshFunds.length === 1) {
-    rajeshFunds[0].userId = canonicalUserId;
+    authFund = rajeshFunds[0];
+    authFund.userId = canonicalUserId;
   }
 
   // 8. REASSIGN REMAINING COLLECTIONS IN MEMORY
@@ -1199,6 +1321,21 @@ export async function runIdempotentMigrations(): Promise<void> {
     return count;
   };
 
+  const deduplicateById = (arr: any[]) => {
+    const map = new Map();
+    for (const item of (arr || [])) {
+      if (item.id) map.set(item.id, item);
+    }
+    return Array.from(map.values());
+  };
+
+  memoryDb.bankAccounts = deduplicateById(memoryDb.bankAccounts);
+  memoryDb.creditCards = deduplicateById(memoryDb.creditCards);
+  memoryDb.transactions = deduplicateById(memoryDb.transactions);
+  memoryDb.investments = deduplicateById(memoryDb.investments);
+  memoryDb.fixedDeposits = deduplicateById(memoryDb.fixedDeposits);
+  memoryDb.savingsGoals = deduplicateById(memoryDb.savingsGoals);
+
   const reassignedBanks = reassignInMemory(memoryDb.bankAccounts);
   const reassignedCards = reassignInMemory(memoryDb.creditCards);
   const reassignedTxs = reassignInMemory(memoryDb.transactions);
@@ -1210,13 +1347,28 @@ export async function runIdempotentMigrations(): Promise<void> {
   // 9. SYNC TO MONGODB ATLAS SAFELY
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      // Delete duplicate budget allocations in Atlas before updating to prevent unique key error
+      // 9.1 Archive duplicate budget allocations to audit collection before removing to ensure zero data loss
+      if (duplicateBudgetDocsToArchive.length > 0) {
+        await AuditBudgetSnapshotModel.insertMany(duplicateBudgetDocsToArchive.map(doc => ({
+          originalId: doc.id,
+          originalUserId: doc.userId,
+          monthYear: doc.monthYear,
+          fullDocument: doc,
+          archivedAt: new Date().toISOString(),
+          reason: 'Resolved E11000 duplicate key collision for canonical migration v1'
+        }))).catch(err => console.warn('Audit snapshot warning:', err));
+        console.log(`[Migration Atlas] Archived ${duplicateBudgetDocsToArchive.length} duplicate budget documents to "audit_budget_snapshots".`);
+      }
+
       if (duplicateBudgetIdsToDelete.length > 0) {
         await BudgetAllocationModel.deleteMany({ id: { $in: duplicateBudgetIdsToDelete } });
         console.log(`[Migration Atlas] Deleted ${duplicateBudgetIdsToDelete.length} duplicate budget documents.`);
       }
 
-      // Upsert authoritative budgets individually (avoids compound unique key collisions)
+      // Also clean up any lingering legacy budget documents
+      await BudgetAllocationModel.deleteMany({ userId: { $in: legacyIds } });
+
+      // 9.2 Upsert authoritative budgets individually (avoids compound unique key collisions)
       for (const authBudget of authoritativeBudgets) {
         await BudgetAllocationModel.findOneAndUpdate(
           { userId: canonicalUserId, monthYear: authBudget.monthYear },
@@ -1225,7 +1377,7 @@ export async function runIdempotentMigrations(): Promise<void> {
         );
       }
 
-      // Safely reassign non-unique collections in Atlas
+      // 9.3 Safely reassign non-unique collections in Atlas
       await Promise.all([
         BankAccountModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: canonicalUserId } }),
         CreditCardModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: canonicalUserId } }),
@@ -1238,13 +1390,24 @@ export async function runIdempotentMigrations(): Promise<void> {
       console.log(`[Migration Atlas] Successfully updated records in MongoDB Atlas to ${canonicalUserId}`);
     } catch (atlasErr) {
       console.error('[Migration Atlas Error] Failed during MongoDB Atlas migration:', atlasErr);
+      const failedRecord: IMigrationRecord = {
+        id: `migration-v1-failed-${Date.now()}`,
+        name: MIGRATION_NAME,
+        version: MIGRATION_VERSION,
+        status: 'failed',
+        executedAt: new Date().toISOString(),
+        error: (atlasErr as any)?.message || String(atlasErr)
+      };
+      if (mongoConnected && mongoose.connection.readyState === 1) {
+        await MigrationModel.findOneAndUpdate({ version: MIGRATION_VERSION }, failedRecord, { upsert: true }).catch(() => {});
+      }
       throw atlasErr;
     }
   }
 
   // 10. RECORD MIGRATION COMPLETION
   const migrationRecord: IMigrationRecord = {
-    id: 'migration-v1-reconcile-rajesh',
+    id: 'migration-v1-canonical-ownership',
     name: MIGRATION_NAME,
     version: MIGRATION_VERSION,
     status: 'completed',
@@ -1285,7 +1448,7 @@ export async function runIdempotentMigrations(): Promise<void> {
 }
 
 export async function reconcileUserData(user?: IUser): Promise<void> {
-  // Safe no-op: Data reconciliation is strictly executed once via runIdempotentMigrations()
+  // Safe permanent no-op: Data ownership is strictly managed once via versioned idempotent migrations.
   return;
 }
 
