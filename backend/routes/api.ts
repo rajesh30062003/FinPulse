@@ -33,6 +33,8 @@ import {
   findEmailVerification,
   deleteEmailVerification,
   reconcileUserData,
+  getEffectiveUserId,
+  MigrationModel,
   UserModel,
   BankAccountModel,
   CashWalletModel,
@@ -174,9 +176,14 @@ router.get('/system/atlas-diagnostics', async (req: Request, res: Response) => {
     }
   }
 
+  const migration = await MigrationModel.findOne({ version: 1 }).lean().catch(() => null);
+  const canonicalRajesh = await findUserByEmail('rjrajeshpal30062003@gmail.com');
+
   res.json({
     status: 'ok',
     database: mongoStatus,
+    migration,
+    canonicalUser: canonicalRajesh ? { id: canonicalRajesh.id, name: canonicalRajesh.name, email: canonicalRajesh.email } : null,
     atlasCounts,
     memoryDbCounts: {
       users: db.users.length,
@@ -252,6 +259,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as { id: string; email: string };
+    decoded.id = getEffectiveUserId(decoded.id, decoded.email);
     req.user = decoded;
     next();
   } catch (err: any) {
@@ -501,6 +509,9 @@ router.post('/auth/login', async (req: Request, res: Response) => {
     user.lockUntil = null;
     await persistUser(user);
 
+    // Resolve canonical user ID for session issuance
+    user.id = getEffectiveUserId(user.id, user.email);
+
     // Issue Access Token (15 minutes) and Refresh Token (7 days)
     const accessToken = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '15m' });
     const refreshToken = jwt.sign(
@@ -583,6 +594,8 @@ router.post('/auth/refresh', async (req: Request, res: Response) => {
 
     // Refresh Token Rotation: Revoke previous token and issue fresh pair
     await revokeRefreshToken(tokenHash);
+
+    user.id = getEffectiveUserId(user.id, user.email);
 
     const newAccessToken = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '15m' });
     const newRefreshToken = jwt.sign(
@@ -2106,9 +2119,13 @@ router.post('/notifications/trigger-check', authenticate, async (req: AuthReques
 
 // ================= 9 SCENARIO TESTER & RESET ================= //
 
-router.post('/scenarios/reset', async (req: AuthRequest, res: Response) => {
+router.post('/scenarios/reset', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id || 'demo-user-id';
+    const email = req.user?.email || '';
+    if (email.toLowerCase().includes('rjrajeshpal') || userId === getEffectiveUserId(userId, email)) {
+      return res.status(403).json({ error: 'Resetting scenario data is disabled for primary production accounts to preserve actual financial records.' });
+    }
     await seedDemoUserAndScenarios(userId);
     res.json({ message: 'Database reset to comprehensive demo suite with all 9 scenarios initialized.' });
   } catch (err: any) {

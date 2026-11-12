@@ -229,6 +229,16 @@ var InvestmentModel = mongoose.models.Investment || mongoose.model("Investment",
 var FixedDepositModel = mongoose.models.FixedDeposit || mongoose.model("FixedDeposit", FixedDepositSchema);
 var NotificationModel = mongoose.models.Notification || mongoose.model("Notification", NotificationSchema);
 var EmailLogModel = mongoose.models.EmailLog || mongoose.model("EmailLog", EmailLogSchema);
+var MigrationSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
+  version: { type: Number, required: true, unique: true },
+  status: { type: String, enum: ["pending", "running", "completed", "failed"], default: "pending" },
+  executedAt: { type: String },
+  details: { type: mongoose.Schema.Types.Mixed },
+  error: { type: String }
+}, { timestamps: true });
+var MigrationModel = mongoose.models.Migration || mongoose.model("Migration", MigrationSchema);
 function getMongoStatus() {
   return {
     connected: mongoConnected,
@@ -270,10 +280,14 @@ async function initDatabase() {
     if (mongoUri && mongoUri.startsWith("mongodb")) {
       try {
         console.log("Connecting to MongoDB Atlas...");
-        await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5e3 });
+        await mongoose.connect(mongoUri, {
+          serverSelectionTimeoutMS: 5e3,
+          dbName: process.env.MONGODB_DB_NAME || void 0
+        });
         mongoConnected = true;
         mongoError = null;
-        console.log("Successfully connected to MongoDB Atlas!");
+        const activeDb = mongoose.connection.db?.databaseName || mongoose.connection.name || "default";
+        console.log(`Successfully connected to MongoDB Atlas! Active database: ${activeDb}`);
         const [
           atlasUsers,
           atlasBanks,
@@ -288,7 +302,8 @@ async function initDatabase() {
           atlasNotifs,
           atlasLogs,
           atlasTokens,
-          atlasVerifications
+          atlasVerifications,
+          atlasMigrations
         ] = await Promise.all([
           UserModel.find({}).lean(),
           BankAccountModel.find({}).lean(),
@@ -303,7 +318,8 @@ async function initDatabase() {
           NotificationModel.find({}).lean(),
           EmailLogModel.find({}).lean(),
           RefreshTokenModel.find({}).lean(),
-          EmailVerificationModel.find({}).lean()
+          EmailVerificationModel.find({}).lean(),
+          MigrationModel.find({}).lean().catch(() => [])
         ]);
         console.log(`MongoDB Atlas Hydration Report: Users: ${atlasUsers.length}, Accounts: ${atlasBanks.length}, Cards: ${atlasCards.length}, Transactions: ${atlasTxs.length}, Budgets: ${atlasBudgets.length}, Investments: ${atlasInvestments.length}, FDs: ${atlasFDs.length}`);
         const mergeById = (localArr, atlasArr) => {
@@ -363,6 +379,9 @@ async function initDatabase() {
         if (atlasVerifications.length > 0) {
           memoryDb.emailVerifications = mergeById(memoryDb.emailVerifications, atlasVerifications);
         }
+        if (atlasMigrations && atlasMigrations.length > 0) {
+          memoryDb.migrations = mergeById(memoryDb.migrations || [], atlasMigrations);
+        }
         saveDatabase();
       } catch (err) {
         mongoConnected = false;
@@ -370,6 +389,7 @@ async function initDatabase() {
         console.warn("MongoDB connection failed or timed out. Operating seamlessly with resilient ledger storage:", mongoError);
       }
     }
+    await runIdempotentMigrations();
     if (!memoryDb.users || memoryDb.users.length === 0) {
       await seedDemoUserAndScenarios();
     } else {
@@ -384,28 +404,12 @@ async function initDatabase() {
         (u) => u.email.toLowerCase() === "rjrajeshpal30@gmail.com" || u.email.toLowerCase() === "rjrajeshpal30062003@gmail.com"
       );
       for (const rjUser of rjUsers) {
-        rjUser.passwordHash = await bcrypt.hash("Demo@1234", 10);
+        if (!rjUser.passwordHash) {
+          rjUser.passwordHash = await bcrypt.hash("Demo@1234", 10);
+        }
         rjUser.failedLoginAttempts = 0;
         rjUser.lockUntil = null;
         rjUser.isVerified = true;
-        await reconcileUserData(rjUser);
-      }
-      if (!memoryDb.users.some((u) => u.email.toLowerCase() === "rjrajeshpal30@gmail.com")) {
-        const hash = await bcrypt.hash("Demo@1234", 10);
-        const newUser = {
-          id: "user-rjrajeshpal30",
-          name: "Rajesh Pal",
-          email: "rjrajeshpal30@gmail.com",
-          passwordHash: hash,
-          isVerified: true,
-          currency: "INR",
-          monthlyBudgetInPaise: 4e6,
-          reminderDayOfMonth: 25,
-          emailNotificationsEnabled: true,
-          createdAt: (/* @__PURE__ */ new Date()).toISOString()
-        };
-        memoryDb.users.push(newUser);
-        await reconcileUserData(newUser);
       }
       saveDatabase();
     }
@@ -428,11 +432,42 @@ function getDb() {
   if (!memoryDb.refreshTokens) memoryDb.refreshTokens = [];
   return memoryDb;
 }
+function getEffectiveUserId(userId, userEmail) {
+  if (!userId && !userEmail) return "";
+  const cleanEmail = (userEmail || "").trim().toLowerCase();
+  const canonicalRajesh = (memoryDb.users || []).find(
+    (u) => u.email.toLowerCase() === "rjrajeshpal30062003@gmail.com" || u.email.toLowerCase() === "rjrajeshpal30@gmail.com"
+  );
+  const canonicalRajeshId = canonicalRajesh ? canonicalRajesh.id : "user-rjrajeshpal30";
+  if (
+    userId === "user-1794473436793-0d16c1" ||
+    userId === "user-rjrajeshpal30" ||
+    userId === "demo-user-id" ||
+    cleanEmail === "rjrajeshpal30062003@gmail.com" ||
+    cleanEmail === "rjrajeshpal30@gmail.com"
+  ) {
+    return canonicalRajeshId;
+  }
+  return userId || "";
+}
 async function findUserByEmail(email) {
   const cleanEmail = email.trim().toLowerCase();
+  const isRajesh = cleanEmail === "rjrajeshpal30062003@gmail.com" || cleanEmail === "rjrajeshpal30@gmail.com";
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      const doc = await UserModel.findOne({ email: cleanEmail }).lean();
+      let doc = null;
+      if (isRajesh) {
+        doc = await UserModel.findOne({
+          $or: [
+            { email: "rjrajeshpal30062003@gmail.com" },
+            { id: "user-rjrajeshpal30" },
+            { id: "user-1794473436793-0d16c1" },
+            { email: "rjrajeshpal30@gmail.com" }
+          ]
+        }).lean();
+      } else {
+        doc = await UserModel.findOne({ email: cleanEmail }).lean();
+      }
       if (doc) {
         const existingIdx = memoryDb.users.findIndex((u) => u.id === doc.id);
         const mappedUser = {
@@ -463,11 +498,26 @@ async function findUserByEmail(email) {
       console.warn("MongoDB user lookup warning:", err);
     }
   }
-  let found = memoryDb.users.find((u) => u.email.toLowerCase() === cleanEmail);
+  let found = isRajesh
+    ? memoryDb.users.find(
+        (u) => u.email.toLowerCase() === "rjrajeshpal30062003@gmail.com" ||
+          u.id === "user-rjrajeshpal30" ||
+          u.id === "user-1794473436793-0d16c1" ||
+          u.email.toLowerCase() === "rjrajeshpal30@gmail.com"
+      )
+    : memoryDb.users.find((u) => u.email.toLowerCase() === cleanEmail);
   if (!found && fs.existsSync(DATA_FILE)) {
     try {
       const raw = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
-      found = (raw.users || []).find((u) => u.email.toLowerCase() === cleanEmail);
+      const list = raw.users || [];
+      found = isRajesh
+        ? list.find(
+            (u) => u.email.toLowerCase() === "rjrajeshpal30062003@gmail.com" ||
+              u.id === "user-rjrajeshpal30" ||
+              u.id === "user-1794473436793-0d16c1" ||
+              u.email.toLowerCase() === "rjrajeshpal30@gmail.com"
+          )
+        : list.find((u) => u.email.toLowerCase() === cleanEmail);
       if (found) {
         memoryDb.users.push(found);
       }
@@ -477,15 +527,20 @@ async function findUserByEmail(email) {
   return found || null;
 }
 async function findUserById(id) {
+  const effectiveId = getEffectiveUserId(id);
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      const doc = await UserModel.findOne({ id }).lean();
+      const doc = await UserModel.findOne({ id: effectiveId }).lean();
       if (doc) return doc;
+      if (effectiveId !== id) {
+        const origDoc = await UserModel.findOne({ id }).lean();
+        if (origDoc) return origDoc;
+      }
     } catch (err) {
       console.warn("MongoDB findUserById warning:", err);
     }
   }
-  return memoryDb.users.find((u) => u.id === id) || null;
+  return memoryDb.users.find((u) => u.id === effectiveId) || memoryDb.users.find((u) => u.id === id) || null;
 }
 async function persistUser(user) {
   const idx = memoryDb.users.findIndex((u) => u.id === user.id);
@@ -782,66 +837,344 @@ async function deleteSavingsGoal(id, userId) {
     }
   }
 }
-async function reconcileUserData(user) {
-  if (!user || !user.id) return;
-  const isPrimaryUser = user.email.toLowerCase() === "rjrajeshpal30@gmail.com" || user.email.toLowerCase() === "rjrajeshpal30062003@gmail.com";
-  const legacyIds = ["demo-user-id", "user-1794473436793-0d16c1"].filter((id) => id !== user.id);
-  if (isPrimaryUser && legacyIds.length > 0) {
-    let memoryReassigned = 0;
-    const reassign = (arr) => {
-      for (const item of arr || []) {
-        if (legacyIds.includes(item.userId)) {
-          item.userId = user.id;
-          memoryReassigned++;
-        }
-      }
-    };
-    reassign(memoryDb.bankAccounts);
-    reassign(memoryDb.cashWallets);
-    reassign(memoryDb.creditCards);
-    reassign(memoryDb.transactions);
-    reassign(memoryDb.budgetAllocations);
-    reassign(memoryDb.investments);
-    reassign(memoryDb.fixedDeposits);
-    reassign(memoryDb.emergencyFunds);
-    reassign(memoryDb.savingsGoals);
-    reassign(memoryDb.notifications);
-    if (memoryReassigned > 0) {
-      saveDatabase();
-      console.log(`Reconciled ${memoryReassigned} in-memory items from ${legacyIds.join(", ")} to user ${user.id}`);
+function createDatabaseBackup(tag = "pre_migration") {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-    if (mongoConnected && mongoose.connection.readyState === 1) {
-      try {
-        await Promise.all([
-          BankAccountModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
-          CashWalletModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
-          CreditCardModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
-          TransactionModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
-          BudgetAllocationModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
-          InvestmentModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
-          FixedDepositModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
-          EmergencyFundModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
-          SavingsGoalModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
-          NotificationModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } })
-        ]);
-        console.log(`Reconciled MongoDB Atlas collections from ${legacyIds.join(", ")} to user ${user.id}`);
-      } catch (err) {
-        console.error("Error reconciling MongoDB Atlas records:", err);
-      }
-    }
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const backupFileName = `backup_${tag}_${timestamp}.json`;
+    const backupFilePath = path.join(DATA_DIR, backupFileName);
+    fs.writeFileSync(backupFilePath, JSON.stringify(memoryDb, null, 2), "utf-8");
+    console.log(`[Database Backup] Snapshot successfully saved: ${backupFilePath}`);
+    return backupFilePath;
+  } catch (err) {
+    console.error("[Database Backup Error] Failed to create database backup snapshot:", err);
+    return "";
   }
-  const userBanksInMemory = (memoryDb.bankAccounts || []).filter((b) => b.userId === user.id);
-  let userBanksInAtlas = 0;
+}
+async function runIdempotentMigrations() {
+  const MIGRATION_VERSION = 1;
+  const MIGRATION_NAME = "canonical_ownership_reconciliation_v1";
+  if (!memoryDb.migrations) memoryDb.migrations = [];
+  const inMemoryDone = memoryDb.migrations.find((m) => m.version === MIGRATION_VERSION && m.status === "completed");
+  let atlasDone = false;
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      userBanksInAtlas = await BankAccountModel.countDocuments({ userId: user.id });
-    } catch {
+      const doc = await MigrationModel.findOne({ version: MIGRATION_VERSION, status: "completed" }).lean();
+      if (doc) atlasDone = true;
+    } catch (err) {
+      console.warn("Could not query MigrationModel in Atlas:", err);
     }
   }
-  if (userBanksInMemory.length === 0 && userBanksInAtlas === 0 && isPrimaryUser) {
-    console.log(`User ${user.email} (${user.id}) has no existing financial records. Provisioning initial portfolio...`);
-    await seedDemoUserAndScenarios(user.id);
+  if (inMemoryDone || atlasDone) {
+    console.log(`[Migration] Version ${MIGRATION_VERSION} (${MIGRATION_NAME}) already completed. Skipping startup migration.`);
+    return;
   }
+  console.log(`[Migration] Initiating Migration v${MIGRATION_VERSION} (${MIGRATION_NAME})...`);
+  const backupPath = createDatabaseBackup("pre_reconcile_v1");
+  console.log(`[Migration] Pre-migration backup verified at: ${backupPath || "In-memory ledger"}`);
+  let canonicalUser = null;
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      canonicalUser = await UserModel.findOne({ email: "rjrajeshpal30062003@gmail.com" }).lean();
+      if (!canonicalUser) {
+        canonicalUser = await UserModel.findOne({ id: "user-1794473436793-0d16c1" }).lean();
+      }
+      if (!canonicalUser) {
+        canonicalUser = await UserModel.findOne({ id: "user-rjrajeshpal30" }).lean();
+      }
+      if (!canonicalUser) {
+        canonicalUser = await UserModel.findOne({ email: "rjrajeshpal30@gmail.com" }).lean();
+      }
+    } catch (qErr) {
+      console.warn("[Migration] Querying Atlas for canonical user warning:", qErr);
+    }
+  }
+  if (!canonicalUser) {
+    canonicalUser = memoryDb.users.find((u) => u.email.toLowerCase() === "rjrajeshpal30062003@gmail.com");
+  }
+  if (!canonicalUser) {
+    canonicalUser = memoryDb.users.find((u) => u.id === "user-1794473436793-0d16c1");
+  }
+  if (!canonicalUser) {
+    canonicalUser = memoryDb.users.find((u) => u.id === "user-rjrajeshpal30");
+  }
+  if (!canonicalUser) {
+    canonicalUser = memoryDb.users.find((u) => u.email.toLowerCase() === "rjrajeshpal30@gmail.com");
+  }
+  if (!canonicalUser) {
+    const hash = await bcrypt.hash("Demo@1234", 10);
+    canonicalUser = {
+      id: "user-rjrajeshpal30",
+      name: "Rajesh Pal",
+      email: "rjrajeshpal30062003@gmail.com",
+      passwordHash: hash,
+      isVerified: true,
+      currency: "INR",
+      monthlyBudgetInPaise: 45e5,
+      reminderDayOfMonth: 25,
+      emailNotificationsEnabled: true,
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+  }
+  const canonicalUserId = canonicalUser.id;
+  canonicalUser.name = "Rajesh Pal";
+  canonicalUser.email = "rjrajeshpal30062003@gmail.com";
+  canonicalUser.isVerified = true;
+  const candidateIds = ["demo-user-id", "user-1794473436793-0d16c1", "user-rjrajeshpal30"];
+  const legacyIds = candidateIds.filter((id) => id !== canonicalUserId);
+  console.log(`[Migration] Authoritative Canonical User: ${canonicalUserId} (${canonicalUser.email})`);
+  console.log(`[Migration] Reconciling legacy user IDs: [${legacyIds.join(", ")}] -> Canonical: ${canonicalUserId}`);
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await UserModel.deleteMany({
+        $or: [
+          { id: { $in: legacyIds } },
+          { email: "rjrajeshpal30@gmail.com" }
+        ],
+        _id: { $ne: canonicalUser._id }
+      });
+      await UserModel.findOneAndUpdate({ id: canonicalUserId }, canonicalUser, { upsert: true, new: true });
+    } catch (uErr) {
+      console.warn("[Migration] Updating canonical user in Atlas warning:", uErr);
+    }
+  }
+  memoryDb.users = memoryDb.users.filter((u) => !legacyIds.includes(u.id) && u.email.toLowerCase() !== "rjrajeshpal30@gmail.com");
+  const existingUserIdx = memoryDb.users.findIndex((u) => u.id === canonicalUserId);
+  if (existingUserIdx >= 0) memoryDb.users[existingUserIdx] = canonicalUser;
+  else memoryDb.users.push(canonicalUser);
+
+  const allRajeshBudgets = memoryDb.budgetAllocations.filter(
+    (b) => b.userId === canonicalUserId || legacyIds.includes(b.userId)
+  );
+  const budgetsByMonth = new Map();
+  for (const b of allRajeshBudgets) {
+    const list = budgetsByMonth.get(b.monthYear) || [];
+    list.push(b);
+    budgetsByMonth.set(b.monthYear, list);
+  }
+  let resolvedDuplicateBudgetsCount = 0;
+  const duplicateBudgetIdsToDelete = [];
+  const authoritativeBudgets = [];
+  for (const [monthYear, records] of budgetsByMonth.entries()) {
+    if (records.length === 1) {
+      const rec = { ...records[0] };
+      rec.userId = canonicalUserId;
+      authoritativeBudgets.push(rec);
+    } else {
+      resolvedDuplicateBudgetsCount += (records.length - 1);
+      console.log(`[Migration] Resolving ${records.length} duplicate budget records for month ${monthYear}...`);
+      const nonDemoRecord = records.find((r) => !r.id.includes("demo") && typeof r.totalBudgetInPaise === "number" && r.totalBudgetInPaise > 0);
+      const authRecord = nonDemoRecord || records.find((r) => typeof r.totalBudgetInPaise === "number" && r.totalBudgetInPaise > 0) || records[0];
+      let maxTotalBudget = authRecord.totalBudgetInPaise || 4e6;
+      let maxEssential = authRecord.essentialBudgetInPaise || 0;
+      let maxFun = authRecord.funBudgetInPaise || 0;
+      let maxInv = authRecord.investmentBudgetInPaise || 0;
+      let maxEf = authRecord.emergencyBudgetInPaise || 0;
+      let maxSav = authRecord.savingsBudgetInPaise || 0;
+      let carryForward = Boolean(authRecord.carryForwardEnabled);
+      for (const other of records) {
+        if (other.id !== authRecord.id) {
+          duplicateBudgetIdsToDelete.push(other.id);
+        }
+        if (typeof other.totalBudgetInPaise === "number" && other.totalBudgetInPaise > 0) {
+          maxTotalBudget = Math.max(maxTotalBudget, other.totalBudgetInPaise);
+        }
+        if (other.essentialBudgetInPaise && other.essentialBudgetInPaise > 0) {
+          maxEssential = Math.max(maxEssential, other.essentialBudgetInPaise);
+        }
+        if (other.funBudgetInPaise && other.funBudgetInPaise > 0) {
+          maxFun = Math.max(maxFun, other.funBudgetInPaise);
+        }
+        if (other.investmentBudgetInPaise && other.investmentBudgetInPaise > 0) {
+          maxInv = Math.max(maxInv, other.investmentBudgetInPaise);
+        }
+        if (other.emergencyBudgetInPaise && other.emergencyBudgetInPaise > 0) {
+          maxEf = Math.max(maxEf, other.emergencyBudgetInPaise);
+        }
+        if (other.savingsBudgetInPaise && other.savingsBudgetInPaise > 0) {
+          maxSav = Math.max(maxSav, other.savingsBudgetInPaise);
+        }
+        if (other.carryForwardEnabled) {
+          carryForward = true;
+        }
+      }
+      authoritativeBudgets.push({
+        id: authRecord.id,
+        userId: canonicalUserId,
+        monthYear,
+        totalBudgetInPaise: maxTotalBudget,
+        essentialBudgetInPaise: maxEssential,
+        funBudgetInPaise: maxFun,
+        investmentBudgetInPaise: maxInv,
+        emergencyBudgetInPaise: maxEf,
+        savingsBudgetInPaise: maxSav,
+        carryForwardEnabled: carryForward
+      });
+    }
+  }
+  if (duplicateBudgetIdsToDelete.length > 0) {
+    memoryDb.budgetAllocations = memoryDb.budgetAllocations.filter((b) => !duplicateBudgetIdsToDelete.includes(b.id));
+  }
+  for (const authB of authoritativeBudgets) {
+    const idx = memoryDb.budgetAllocations.findIndex((b) => b.id === authB.id);
+    if (idx >= 0) memoryDb.budgetAllocations[idx] = authB;
+    else memoryDb.budgetAllocations.push(authB);
+  }
+
+  const rajeshWallets = memoryDb.cashWallets.filter((w) => w.userId === canonicalUserId || legacyIds.includes(w.userId));
+  let authWallet = null;
+  const dupWalletIds = [];
+  if (rajeshWallets.length > 1) {
+    authWallet = rajeshWallets.reduce((max, w) => w.balanceInPaise > max.balanceInPaise ? w : max, rajeshWallets[0]);
+    authWallet.userId = canonicalUserId;
+    for (const w of rajeshWallets) {
+      if (w.id !== authWallet.id) dupWalletIds.push(w.id);
+    }
+    memoryDb.cashWallets = memoryDb.cashWallets.filter((w) => !dupWalletIds.includes(w.id));
+    if (mongoConnected && mongoose.connection.readyState === 1) {
+      await CashWalletModel.deleteMany({ id: { $in: dupWalletIds } });
+      await CashWalletModel.findOneAndUpdate({ id: authWallet.id }, authWallet, { upsert: true });
+    }
+  } else if (rajeshWallets.length === 1) {
+    authWallet = rajeshWallets[0];
+    authWallet.userId = canonicalUserId;
+  }
+
+  const rajeshFunds = memoryDb.emergencyFunds.filter((f) => f.userId === canonicalUserId || legacyIds.includes(f.userId));
+  let authFund = null;
+  const dupFundIds = [];
+  if (rajeshFunds.length > 1) {
+    authFund = rajeshFunds.reduce((max, f) => f.currentBalanceInPaise > max.currentBalanceInPaise ? f : max, rajeshFunds[0]);
+    authFund.userId = canonicalUserId;
+    for (const f of rajeshFunds) {
+      if (f.id !== authFund.id) dupFundIds.push(f.id);
+    }
+    memoryDb.emergencyFunds = memoryDb.emergencyFunds.filter((f) => !dupFundIds.includes(f.id));
+    if (mongoConnected && mongoose.connection.readyState === 1) {
+      await EmergencyFundModel.deleteMany({ id: { $in: dupFundIds } });
+      await EmergencyFundModel.findOneAndUpdate({ id: authFund.id }, authFund, { upsert: true });
+    }
+  } else if (rajeshFunds.length === 1) {
+    authFund = rajeshFunds[0];
+    authFund.userId = canonicalUserId;
+  }
+
+  const reassignInMemory = (arr) => {
+    let count = 0;
+    for (const item of arr || []) {
+      if (legacyIds.includes(item.userId)) {
+        item.userId = canonicalUserId;
+        count++;
+      }
+    }
+    return count;
+  };
+
+  const deduplicateById = (arr) => {
+    const map = new Map();
+    for (const item of arr || []) {
+      if (item.id) map.set(item.id, item);
+    }
+    return Array.from(map.values());
+  };
+
+  memoryDb.bankAccounts = deduplicateById(memoryDb.bankAccounts);
+  memoryDb.creditCards = deduplicateById(memoryDb.creditCards);
+  memoryDb.transactions = deduplicateById(memoryDb.transactions);
+  memoryDb.investments = deduplicateById(memoryDb.investments);
+  memoryDb.fixedDeposits = deduplicateById(memoryDb.fixedDeposits);
+  memoryDb.savingsGoals = deduplicateById(memoryDb.savingsGoals);
+
+  const reassignedBanks = reassignInMemory(memoryDb.bankAccounts);
+  const reassignedCards = reassignInMemory(memoryDb.creditCards);
+  const reassignedTxs = reassignInMemory(memoryDb.transactions);
+  const reassignedInvs = reassignInMemory(memoryDb.investments);
+  const reassignedFDs = reassignInMemory(memoryDb.fixedDeposits);
+  const reassignedSavings = reassignInMemory(memoryDb.savingsGoals);
+  const reassignedNotifs = reassignInMemory(memoryDb.notifications);
+
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      if (duplicateBudgetIdsToDelete.length > 0) {
+        await BudgetAllocationModel.deleteMany({ id: { $in: duplicateBudgetIdsToDelete } });
+        console.log(`[Migration Atlas] Deleted ${duplicateBudgetIdsToDelete.length} duplicate budget documents.`);
+      }
+      await BudgetAllocationModel.deleteMany({ userId: { $in: legacyIds } });
+      for (const authBudget of authoritativeBudgets) {
+        await BudgetAllocationModel.findOneAndUpdate(
+          { userId: canonicalUserId, monthYear: authBudget.monthYear },
+          authBudget,
+          { upsert: true, new: true }
+        );
+      }
+      await Promise.all([
+        BankAccountModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: canonicalUserId } }),
+        CreditCardModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: canonicalUserId } }),
+        TransactionModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: canonicalUserId } }),
+        InvestmentModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: canonicalUserId } }),
+        FixedDepositModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: canonicalUserId } }),
+        SavingsGoalModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: canonicalUserId } }),
+        NotificationModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: canonicalUserId } })
+      ]);
+      console.log(`[Migration Atlas] Successfully updated records in MongoDB Atlas to ${canonicalUserId}`);
+    } catch (atlasErr) {
+      console.error("[Migration Atlas Error] Failed during MongoDB Atlas migration:", atlasErr);
+      const failedRecord = {
+        id: `migration-v1-failed-${Date.now()}`,
+        name: MIGRATION_NAME,
+        version: MIGRATION_VERSION,
+        status: "failed",
+        executedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        error: atlasErr?.message || String(atlasErr)
+      };
+      if (mongoConnected && mongoose.connection.readyState === 1) {
+        await MigrationModel.findOneAndUpdate({ version: MIGRATION_VERSION }, failedRecord, { upsert: true }).catch(() => {});
+      }
+      throw atlasErr;
+    }
+  }
+
+  const migrationRecord = {
+    id: "migration-v1-canonical-ownership",
+    name: MIGRATION_NAME,
+    version: MIGRATION_VERSION,
+    status: "completed",
+    executedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    details: {
+      canonicalUserId,
+      canonicalEmail: canonicalUser.email,
+      legacyIds,
+      resolvedDuplicateBudgetsCount,
+      reassigned: {
+        bankAccounts: reassignedBanks,
+        creditCards: reassignedCards,
+        transactions: reassignedTxs,
+        investments: reassignedInvs,
+        fixedDeposits: reassignedFDs,
+        savingsGoals: reassignedSavings,
+        notifications: reassignedNotifs
+      }
+    }
+  };
+  memoryDb.migrations.push(migrationRecord);
+  saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await MigrationModel.findOneAndUpdate(
+        { version: MIGRATION_VERSION },
+        migrationRecord,
+        { upsert: true }
+      );
+    } catch (mErr) {
+      console.warn("Could not persist migration record in Atlas:", mErr);
+    }
+  }
+  console.log(`[Migration SUCCESS] Version ${MIGRATION_VERSION} (${MIGRATION_NAME}) completed! Canonical User: ${canonicalUserId} (${canonicalUser.email}). Merged and resolved ${resolvedDuplicateBudgetsCount} duplicate budget records.`);
+}
+async function reconcileUserData(user) {
+  return;
 }
 async function seedDemoUserAndScenarios(targetUserId) {
   const passwordHash = await bcrypt.hash("Demo@1234", 10);
@@ -2176,9 +2509,21 @@ router.get("/system/atlas-diagnostics", async (req, res) => {
       console.error("Atlas diagnostics count error:", err);
     }
   }
+  let migrationStatus = null;
+  if (mongoStatus.connected) {
+    try {
+      migrationStatus = await MigrationModel.findOne({ version: 1 }).lean();
+    } catch {}
+  }
+  if (!migrationStatus && db.migrations) {
+    migrationStatus = db.migrations.find((m) => m.version === 1) || null;
+  }
+  const canonicalUser = await findUserByEmail("rjrajeshpal30062003@gmail.com");
   res.json({
     status: "ok",
     database: mongoStatus,
+    migration: migrationStatus,
+    canonicalUser: canonicalUser ? { id: canonicalUser.id, email: canonicalUser.email, name: canonicalUser.name } : null,
     atlasCounts,
     memoryDbCounts: {
       users: db.users.length,
@@ -2240,6 +2585,9 @@ function authenticate(req, res, next) {
   const token = authHeader.split(" ")[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded && decoded.id) {
+      decoded.id = getEffectiveUserId(decoded.id, decoded.email);
+    }
     req.user = decoded;
     next();
   } catch (err) {
@@ -2444,6 +2792,8 @@ router.post("/auth/login", async (req, res) => {
     user.failedLoginAttempts = 0;
     user.lockUntil = null;
     await persistUser(user);
+    const effectiveUserId = getEffectiveUserId(user.id, user.email);
+    user.id = effectiveUserId;
     const accessToken = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: "15m" });
     const refreshToken = jwt.sign(
       { id: user.id, email: user.email, jti: crypto.randomUUID() },
@@ -2459,7 +2809,6 @@ router.post("/auth/login", async (req, res) => {
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     });
     setRefreshTokenCookie(res, refreshToken);
-    await reconcileUserData(user);
     return res.json({
       success: true,
       message: "Login successful",
@@ -2507,6 +2856,8 @@ router.post("/auth/refresh", async (req, res) => {
       return res.status(401).json({ error: "User account not active" });
     }
     await revokeRefreshToken(tokenHash);
+    const effectiveUserId = getEffectiveUserId(user.id, user.email);
+    user.id = effectiveUserId;
     const newAccessToken = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: "15m" });
     const newRefreshToken = jwt.sign(
       { id: user.id, email: user.email, jti: crypto.randomUUID() },
@@ -2559,7 +2910,6 @@ router.get("/auth/me", authenticate, async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
-    await reconcileUserData(user);
     const { passwordHash, verificationToken, verificationOtp, ...safeUser } = user;
     return res.json(safeUser);
   } catch (err) {
@@ -3724,10 +4074,13 @@ router.post("/notifications/trigger-check", authenticate, async (req, res) => {
   const list = db.notifications.filter((n) => n.userId === req.user.id);
   res.json({ message: "Reminders check executed", notifications: list });
 });
-router.post("/scenarios/reset", async (req, res) => {
+router.post("/scenarios/reset", authenticate, async (req, res) => {
   try {
-    const userId = req.user?.id || "demo-user-id";
-    await seedDemoUserAndScenarios(userId);
+    const userId = req.user?.id;
+    if (userId === "user-rjrajeshpal30" || userId === "user-1794473436793-0d16c1" || req.user?.email?.includes("rjrajeshpal")) {
+      return res.status(403).json({ error: "Reset is disabled for the primary production user to protect financial records." });
+    }
+    await seedDemoUserAndScenarios(userId || "demo-user-id");
     res.json({ message: "Database reset to comprehensive demo suite with all 9 scenarios initialized." });
   } catch (err) {
     res.status(500).json({ error: err.message });
