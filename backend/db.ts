@@ -427,7 +427,16 @@ export async function findUserByEmail(email: string): Promise<IUser | null> {
     }
   }
   // 2. Check local memory store
-  const found = memoryDb.users.find(u => u.email.toLowerCase() === cleanEmail);
+  let found = memoryDb.users.find(u => u.email.toLowerCase() === cleanEmail);
+  if (!found && fs.existsSync(DATA_FILE)) {
+    try {
+      const raw = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+      found = (raw.users || []).find((u: any) => u.email.toLowerCase() === cleanEmail);
+      if (found) {
+        memoryDb.users.push(found);
+      }
+    } catch {}
+  }
   return found || null;
 }
 

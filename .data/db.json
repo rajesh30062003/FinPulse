@@ -18,14 +18,53 @@
       "id": "user-1794323316803",
       "name": "Aarav Patel",
       "email": "aarav@test.local",
-      "passwordHash": "$2b$10$62.dQdLMe4bbrmT7yWcnre7VmqYJZuvszMkRZ.J7fLL17YB6frcKa",
+      "passwordHash": "$2b$10$3CK20O.Cd2EBv6BpVQ0.duz2kbQi40imeOwqpt49MAK6/4auTEplG",
       "isVerified": true,
       "currency": "INR",
       "monthlyBudgetInPaise": 4000000,
       "reminderDayOfMonth": 25,
       "emailNotificationsEnabled": true,
       "createdAt": "Tue Nov 10 2026 15:08:36 GMT+0000 (Coordinated Universal Time)",
+      "failedLoginAttempts": 0,
+      "lockUntil": null
+    },
+    {
+      "id": "user-1794473018005-1c1b67",
+      "name": "Fallback Tester",
+      "email": "fallback_test_1794473017726@finpulse.local",
+      "passwordHash": "$2b$10$Kk3Sd8kpAl0z3N9LVrWpAutrT1HobF1yUHQav9TarcLEJ4HTA9DmG",
+      "isVerified": true,
+      "currency": "INR",
+      "monthlyBudgetInPaise": 4000000,
+      "reminderDayOfMonth": 25,
+      "emailNotificationsEnabled": true,
+      "createdAt": "Thu Nov 12 2026 08:43:38 GMT+0000 (Coordinated Universal Time)"
+    },
+    {
+      "id": "user-1794473075908-1f42f8",
+      "name": "Fallback Tester",
+      "email": "fallback_test_1794473075621@finpulse.local",
+      "passwordHash": "$2b$10$oV3bhIZmkl8AMKaSuaqeoO1fST2kReZMLC1jXHc6ZLLEiAztCo.xq",
+      "isVerified": true,
+      "currency": "INR",
+      "monthlyBudgetInPaise": 4000000,
+      "reminderDayOfMonth": 25,
+      "emailNotificationsEnabled": true,
+      "createdAt": "Thu Nov 12 2026 08:44:35 GMT+0000 (Coordinated Universal Time)",
       "failedLoginAttempts": 1
+    },
+    {
+      "id": "legacy-1794473077958",
+      "name": "Legacy User",
+      "email": "legacy_unverified_1794473077820@finpulse.local",
+      "passwordHash": "$2b$10$amWUeC1mHe5U/AVgI21hdOkcWGuiG3/Sy6tbdIESvb/OCnYJbxLg6",
+      "isVerified": true,
+      "accountStatus": "active",
+      "failedLoginAttempts": 0,
+      "lockUntil": null,
+      "currency": "INR",
+      "monthlyBudgetInPaise": 3000000,
+      "createdAt": "2026-11-12T08:44:37.958Z"
     }
   ],
   "bankAccounts": [
@@ -69,6 +108,32 @@
       "isActive": true,
       "notes": "Secondary emergency & bill pay account",
       "createdAt": "2026-11-11T10:08:08.138Z"
+    },
+    {
+      "id": "bank-1794473018154",
+      "userId": "user-1794473018005-1c1b67",
+      "bankName": "Primary Bank",
+      "accountHolderName": "Fallback Tester",
+      "accountType": "Savings",
+      "accountNickname": "Primary Savings",
+      "accountNumberMasked": "•••• 1234",
+      "balanceInPaise": 0,
+      "openingBalanceInPaise": 0,
+      "isActive": true,
+      "createdAt": "2026-11-12T08:43:38.154Z"
+    },
+    {
+      "id": "bank-1794473076054",
+      "userId": "user-1794473075908-1f42f8",
+      "bankName": "Primary Bank",
+      "accountHolderName": "Fallback Tester",
+      "accountType": "Savings",
+      "accountNickname": "Primary Savings",
+      "accountNumberMasked": "•••• 1234",
+      "balanceInPaise": 0,
+      "openingBalanceInPaise": 0,
+      "isActive": true,
+      "createdAt": "2026-11-12T08:44:36.054Z"
     }
   ],
   "cashWallets": [
@@ -84,6 +149,20 @@
       "balanceInPaise": 450000,
       "notes": "Physical cash on hand",
       "updatedAt": "2026-11-11T10:08:08.138Z"
+    },
+    {
+      "id": "cash-1794473018297",
+      "userId": "user-1794473018005-1c1b67",
+      "balanceInPaise": 0,
+      "notes": "Primary Cash Wallet",
+      "updatedAt": "2026-11-12T08:43:38.297Z"
+    },
+    {
+      "id": "cash-1794473076193",
+      "userId": "user-1794473075908-1f42f8",
+      "balanceInPaise": 0,
+      "notes": "Primary Cash Wallet",
+      "updatedAt": "2026-11-12T08:44:36.193Z"
     }
   ],
   "creditCards": [
@@ -252,6 +331,28 @@
       "emergencyBudgetInPaise": 500000,
       "savingsBudgetInPaise": 500000,
       "carryForwardEnabled": false
+    },
+    {
+      "id": "budget-user-1794473018005-1c1b67",
+      "userId": "user-1794473018005-1c1b67",
+      "monthYear": "2026-11",
+      "essentialBudgetInPaise": 2000000,
+      "funBudgetInPaise": 500000,
+      "investmentBudgetInPaise": 500000,
+      "emergencyBudgetInPaise": 500000,
+      "savingsBudgetInPaise": 500000,
+      "carryForwardEnabled": false
+    },
+    {
+      "id": "budget-user-1794473075908-1f42f8",
+      "userId": "user-1794473075908-1f42f8",
+      "monthYear": "2026-11",
+      "essentialBudgetInPaise": 2000000,
+      "funBudgetInPaise": 500000,
+      "investmentBudgetInPaise": 500000,
+      "emergencyBudgetInPaise": 500000,
+      "savingsBudgetInPaise": 500000,
+      "carryForwardEnabled": false
     }
   ],
   "investments": [
@@ -315,6 +416,20 @@
       "targetAmountInPaise": 10000000,
       "currentBalanceInPaise": 3300000,
       "updatedAt": "2026-11-11T10:08:08.138Z"
+    },
+    {
+      "id": "ef-1794473018582",
+      "userId": "user-1794473018005-1c1b67",
+      "targetAmountInPaise": 10000000,
+      "currentBalanceInPaise": 0,
+      "updatedAt": "2026-11-12T08:43:38.582Z"
+    },
+    {
+      "id": "ef-1794473076470",
+      "userId": "user-1794473075908-1f42f8",
+      "targetAmountInPaise": 10000000,
+      "currentBalanceInPaise": 0,
+      "updatedAt": "2026-11-12T08:44:36.470Z"
     }
   ],
   "savingsGoals": [
@@ -400,6 +515,62 @@
       "expiresAt": "2026-11-18T10:41:58.395Z",
       "revoked": true,
       "createdAt": "2026-11-11T10:41:58.395Z"
+    },
+    {
+      "id": "token-1794473018727-h2psa",
+      "userId": "user-1794473018005-1c1b67",
+      "tokenHash": "ab20e2607b2985487a5f7dbe166bd6ffae5dccbbea40a484ca15fb9726c94ed8",
+      "expiresAt": "2026-11-19T08:43:38.727Z",
+      "revoked": true,
+      "createdAt": "2026-11-12T08:43:38.727Z"
+    },
+    {
+      "id": "token-1794473019407-reedj",
+      "userId": "user-1794473018005-1c1b67",
+      "tokenHash": "f17f86927b2956101a01b4f571171cc35f6ab62f417d781858fc7c6fb05986e6",
+      "expiresAt": "2026-11-19T08:43:39.407Z",
+      "revoked": false,
+      "createdAt": "2026-11-12T08:43:39.407Z"
+    },
+    {
+      "id": "token-1794473020640-o4z20",
+      "userId": "user-1794473018005-1c1b67",
+      "tokenHash": "5dc788fd33e79ed27303d180948fe61df352a29506d82f9f3b673737c2fb174d",
+      "expiresAt": "2026-11-19T08:43:40.640Z",
+      "revoked": false,
+      "createdAt": "2026-11-12T08:43:40.640Z"
+    },
+    {
+      "id": "token-1794473076610-jwicg",
+      "userId": "user-1794473075908-1f42f8",
+      "tokenHash": "031f12f22ddcd4120cd869d61272982b5b0cf53ee3c6e1b7abd5f7f94f3369e2",
+      "expiresAt": "2026-11-19T08:44:36.610Z",
+      "revoked": true,
+      "createdAt": "2026-11-12T08:44:36.610Z"
+    },
+    {
+      "id": "token-1794473077288-zp883",
+      "userId": "user-1794473075908-1f42f8",
+      "tokenHash": "1fb1660bf6095dd4e533e2a7c55d387e84049f533879ce2e9db44ed6e00ccc4b",
+      "expiresAt": "2026-11-19T08:44:37.288Z",
+      "revoked": false,
+      "createdAt": "2026-11-12T08:44:37.288Z"
+    },
+    {
+      "id": "token-1794473078335-ypy5z",
+      "userId": "legacy-1794473077958",
+      "tokenHash": "8140bd108b57822d8b6cdd8daa36dc71b100e4ab5ca34f1b72c4bce9872fa118",
+      "expiresAt": "2026-11-19T08:44:38.335Z",
+      "revoked": false,
+      "createdAt": "2026-11-12T08:44:38.335Z"
+    },
+    {
+      "id": "token-1794473078895-lpw5t",
+      "userId": "user-1794473075908-1f42f8",
+      "tokenHash": "55334d4c5a10e9c7f96fb564c7446fe28d11edf56362d260f22a9b14e147813e",
+      "expiresAt": "2026-11-19T08:44:38.895Z",
+      "revoked": false,
+      "createdAt": "2026-11-12T08:44:38.895Z"
     }
   ],
   "emailVerifications": []

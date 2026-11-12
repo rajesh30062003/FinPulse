@@ -10,7 +10,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, pass: string) => Promise<void>;
-  register: (name: string, email: string, pass: string, confirmPassword?: string) => Promise<{ success: boolean; message: string; email: string; expiresInSeconds: number }>;
+  register: (name: string, email: string, pass: string, confirmPassword?: string) => Promise<{ success: boolean; message: string; accessToken?: string; refreshToken?: string; user?: any }>;
   verifyEmail: (email: string, otp: string) => Promise<void>;
   resendOtp: (email: string) => Promise<{ success: boolean; message: string; expiresInSeconds: number }>;
   logout: () => Promise<void>;
@@ -76,6 +76,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       password: pass,
       confirmPassword: confirmPassword || pass
     });
+    if (res && res.user) {
+      setUser(res.user);
+      setSessionState('authenticated');
+    }
     return res;
   };
 

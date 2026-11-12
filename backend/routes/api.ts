@@ -144,7 +144,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
 
 // ================= AUTHENTICATION CONTROLLER ================= //
 
-// 1. REGISTRATION - Validate fields, prevent duplicate, store hashed OTP (5m expiry), send email
+// 1. REGISTRATION - Direct active account creation with bcrypt password hashing and immediate session issuance
 router.post('/auth/register', async (req: Request, res: Response) => {
   try {
     const { name, email, password, confirmPassword } = req.body;
@@ -170,9 +170,9 @@ router.post('/auth/register', async (req: Request, res: Response) => {
     const cleanEmail = email.trim().toLowerCase();
     const cleanName = name.trim();
 
-    // Check if user is already registered and verified
+    // Prevent duplicate accounts
     const existingUser = await findUserByEmail(cleanEmail);
-    if (existingUser && existingUser.isVerified) {
+    if (existingUser) {
       return res.status(409).json({
         success: false,
         error: 'An account with this email address already exists. Please log in.',
@@ -180,129 +180,35 @@ router.post('/auth/register', async (req: Request, res: Response) => {
       });
     }
 
-    // Check resend cooldown on existing pending verification
-    const existingVerif = await findEmailVerification(cleanEmail);
-    if (existingVerif && Date.now() - existingVerif.lastSentAt < 60000) {
-      const waitSec = Math.ceil((60000 - (Date.now() - existingVerif.lastSentAt)) / 1000);
-      return res.status(429).json({ error: `Please wait ${waitSec} seconds before requesting another code.` });
-    }
-
-    // Generate cryptographically secure 6-digit OTP & hash both OTP and password
-    const otp = crypto.randomInt(100000, 1000000).toString();
-    const otpHash = hashToken(otp);
+    // Hash password with bcrypt
     const passwordHash = await bcrypt.hash(password, 10);
+    const userId = `user-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
 
-    // Save pending verification with 5-minute expiration
-    const verificationRecord: IEmailVerification = {
-      id: `verif-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
-      email: cleanEmail,
+    // Create directly activated user record
+    const newUser: IUser = {
+      id: userId,
       name: cleanName,
+      email: cleanEmail,
       passwordHash,
-      otpHash,
-      expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
-      attempts: 0,
-      verified: false,
-      lastSentAt: Date.now(),
+      isVerified: true, // Auto-activated (email OTP verification disabled)
+      accountStatus: 'active',
+      failedLoginAttempts: 0,
+      lockUntil: null,
+      currency: 'INR',
+      monthlyBudgetInPaise: 4000000,
+      reminderDayOfMonth: 25,
+      emailNotificationsEnabled: true,
       createdAt: new Date().toISOString()
     };
-    await persistEmailVerification(verificationRecord);
+    await persistUser(newUser);
 
-    // Dispatch real email via Brevo SMTP relay
+    // Initialize starter accounts for the new user
     try {
-      await EmailService.sendVerificationEmail({
-        email: cleanEmail,
-        name: cleanName,
-        otp
-      });
-    } catch (smtpErr: any) {
-      // SMTP delivery failed: delete verification record so user can retry safely
-      await deleteEmailVerification(cleanEmail);
-      console.log(`[Registration SMTP Failed] Could not dispatch OTP to ${maskEmail(cleanEmail)}: ${smtpErr?.message}`);
-      return res.status(503).json({
-        success: false,
-        error: smtpErr?.message || "We couldn't send your verification email via Brevo SMTP. Please check your Brevo SMTP configuration.",
-        code: 'SMTP_DELIVERY_FAILED',
-        provider: 'Brevo SMTP',
-        smtpCode: smtpErr?.code
-      });
-    }
-
-    // Pure secure JSON response WITHOUT leaking the OTP
-    return res.status(200).json({
-      success: true,
-      message: `Verification code sent to ${maskEmail(cleanEmail)}`,
-      email: cleanEmail,
-      expiresInSeconds: 300
-    });
-  } catch (err: any) {
-    console.error('Registration error:', err);
-    return res.status(500).json({ error: err.message || 'Registration failed' });
-  }
-});
-
-// 2. EMAIL VERIFICATION - Verify hashed OTP, enforce max 5 attempts, activate account
-router.post('/auth/verify-email', async (req: Request, res: Response) => {
-  try {
-    const { email, otp } = req.body;
-    if (!email || !otp) {
-      return res.status(400).json({ error: 'Email and 6-digit verification code are required' });
-    }
-
-    const cleanEmail = email.trim().toLowerCase();
-    const verif = await findEmailVerification(cleanEmail);
-
-    if (!verif) {
-      return res.status(400).json({ error: 'No pending verification found. Please register first.' });
-    }
-
-    // Check expiration (5 minutes)
-    if (Date.now() > verif.expiresAt) {
-      return res.status(400).json({ error: 'Verification code has expired. Please request a new code.' });
-    }
-
-    // Check attempts limit (max 5)
-    if (verif.attempts >= 5) {
-      return res.status(400).json({ error: 'Too many failed verification attempts. Please request a new code.' });
-    }
-
-    // Validate OTP hash
-    const enteredOtpHash = hashToken(otp.trim());
-    if (enteredOtpHash !== verif.otpHash) {
-      verif.attempts += 1;
-      await persistEmailVerification(verif);
-      const remaining = 5 - verif.attempts;
-      return res.status(400).json({
-        error: `Invalid verification code. ${remaining > 0 ? remaining + ' attempt(s) remaining.' : 'Code locked. Please request a new one.'}`
-      });
-    }
-
-    // OTP is valid! Activate or create user account
-    let user = await findUserByEmail(cleanEmail);
-    const userId = user ? user.id : `user-${Date.now()}`;
-
-    if (!user) {
-      user = {
-        id: userId,
-        name: verif.name,
-        email: cleanEmail,
-        passwordHash: verif.passwordHash,
-        isVerified: true,
-        accountStatus: 'active',
-        failedLoginAttempts: 0,
-        currency: 'INR',
-        monthlyBudgetInPaise: 4000000,
-        reminderDayOfMonth: 25,
-        emailNotificationsEnabled: true,
-        createdAt: new Date().toISOString()
-      };
-      await persistUser(user);
-
-      // Seed starter accounts for the new verified user
       const bankAccount: IBankAccount = {
         id: `bank-${Date.now()}`,
         userId,
         bankName: 'Primary Bank',
-        accountHolderName: verif.name,
+        accountHolderName: cleanName,
         accountType: 'Savings',
         accountNickname: 'Primary Savings',
         accountNumberMasked: '•••• 1234',
@@ -317,6 +223,7 @@ router.post('/auth/verify-email', async (req: Request, res: Response) => {
         id: `cash-${Date.now()}`,
         userId,
         balanceInPaise: 0,
+        notes: 'Primary Cash Wallet',
         updatedAt: new Date().toISOString()
       };
       await persistCashWallet(cashWallet);
@@ -344,21 +251,14 @@ router.post('/auth/verify-email', async (req: Request, res: Response) => {
         updatedAt: new Date().toISOString()
       };
       await persistEmergencyFund(emergencyFund);
-    } else {
-      user.isVerified = true;
-      user.passwordHash = verif.passwordHash;
-      user.accountStatus = 'active';
-      user.failedLoginAttempts = 0;
-      await persistUser(user);
+    } catch (seedErr) {
+      console.log('Non-critical ledger seeding note:', seedErr);
     }
 
-    // Clean up used verification record
-    await deleteEmailVerification(cleanEmail);
-
-    // Issue tokens
-    const accessToken = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '15m' });
+    // Issue Access Token (15m) and Refresh Token (7d)
+    const accessToken = jwt.sign({ id: newUser.id, email: newUser.email }, JWT_SECRET, { expiresIn: '15m' });
     const refreshToken = jwt.sign(
-      { id: user.id, email: user.email, jti: crypto.randomUUID() },
+      { id: newUser.id, email: newUser.email, jti: crypto.randomUUID() },
       JWT_REFRESH_SECRET,
       { expiresIn: '7d' }
     );
@@ -366,7 +266,7 @@ router.post('/auth/verify-email', async (req: Request, res: Response) => {
     // Store hashed refresh token in database
     await persistRefreshToken({
       id: `token-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      userId: user.id,
+      userId: newUser.id,
       tokenHash: hashToken(refreshToken),
       expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
       revoked: false,
@@ -375,81 +275,53 @@ router.post('/auth/verify-email', async (req: Request, res: Response) => {
 
     setRefreshTokenCookie(res, refreshToken);
 
-    return res.status(200).json({
+    return res.status(201).json({
       success: true,
-      message: 'Account verified and activated successfully!',
+      message: 'Account created successfully',
       accessToken,
       refreshToken,
       user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
         isVerified: true,
-        currency: user.currency,
-        monthlyBudgetInPaise: user.monthlyBudgetInPaise
+        currency: newUser.currency,
+        monthlyBudgetInPaise: newUser.monthlyBudgetInPaise
       }
     });
   } catch (err: any) {
-    console.error('Email verification error:', err);
-    return res.status(500).json({ error: err.message || 'Verification failed' });
+    console.error('Registration error:', err);
+    return res.status(500).json({ error: err.message || 'Registration failed' });
   }
 });
 
-// 3. RESEND OTP - 60s cooldown, resets attempt counter, sends new code
-router.post('/auth/resend-otp', async (req: Request, res: Response) => {
+// 2. EMAIL VERIFICATION - Deprecated non-blocking route (verification disabled)
+router.post('/auth/verify-email', async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: 'Email address is required' });
+    if (email) {
+      const user = await findUserByEmail(email.trim().toLowerCase());
+      if (user && !user.isVerified) {
+        user.isVerified = true;
+        await persistUser(user);
+      }
     }
-
-    const cleanEmail = email.trim().toLowerCase();
-    const verif = await findEmailVerification(cleanEmail);
-
-    if (!verif) {
-      return res.status(400).json({ error: 'No pending registration found for this email. Please register.' });
-    }
-
-    // 60-second cooldown
-    const elapsed = Date.now() - verif.lastSentAt;
-    if (elapsed < 60000) {
-      const waitSec = Math.ceil((60000 - elapsed) / 1000);
-      return res.status(429).json({ error: `Please wait ${waitSec} seconds before requesting a new code.` });
-    }
-
-    // Generate cryptographically secure new OTP
-    const newOtp = crypto.randomInt(100000, 1000000).toString();
-
-    // Dispatch via real Gmail SMTP
-    try {
-      await EmailService.sendVerificationEmail({
-        email: cleanEmail,
-        name: verif.name,
-        otp: newOtp
-      });
-    } catch (smtpErr: any) {
-      console.error(`[Resend OTP SMTP Failed] Could not dispatch OTP to ${maskEmail(cleanEmail)}:`, smtpErr?.message);
-      return res.status(503).json({
-        error: smtpErr?.message || "We couldn't send your verification email via Brevo SMTP. Please check your Brevo SMTP configuration.",
-        code: smtpErr?.code
-      });
-    }
-
-    // Update pending record only after SMTP success
-    verif.otpHash = hashToken(newOtp);
-    verif.expiresAt = Date.now() + 5 * 60 * 1000;
-    verif.attempts = 0;
-    verif.lastSentAt = Date.now();
-    await persistEmailVerification(verif);
-
     return res.json({
       success: true,
-      message: `Verification code sent to ${maskEmail(cleanEmail)}`,
-      expiresInSeconds: 300
+      message: 'Email verification is disabled. All accounts are active directly.'
     });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message || 'Failed to resend verification code' });
+  } catch {
+    return res.json({ success: true, message: 'Account is active.' });
   }
+});
+
+// 3. RESEND OTP - Deprecated non-blocking route (verification disabled)
+router.post('/auth/resend-otp', async (req: Request, res: Response) => {
+  return res.json({
+    success: true,
+    message: 'Email verification is disabled. You can log in directly.',
+    expiresInSeconds: 0
+  });
 });
 
 // 4. LOGIN - Credentials check, lockout check, verified check, returns access & refresh tokens
@@ -499,14 +371,9 @@ router.post('/auth/login', async (req: Request, res: Response) => {
       });
     }
 
-    // 4. Password is valid: now enforce email verification
+    // 4. Auto-activate any legacy unverified accounts once the password matches
     if (!user.isVerified) {
-      return res.status(403).json({
-        error: 'Email address is not verified. Please verify your email before logging in.',
-        code: 'EMAIL_NOT_VERIFIED',
-        unverified: true,
-        email: user.email
-      });
+      user.isVerified = true;
     }
 
     // Reset failed login counter on success

@@ -226,15 +226,20 @@ export const api = {
   },
 
   async register(payload: { name: string; email: string; password: string; confirmPassword?: string }) {
-    return apiRequest<{
+    const res = await apiRequest<{
       success: boolean;
       message: string;
-      email: string;
-      expiresInSeconds: number;
+      accessToken?: string;
+      refreshToken?: string;
+      user?: any;
     }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(payload)
     });
+    if (res.accessToken) {
+      setAccessToken(res.accessToken);
+    }
+    return res;
   },
 
   async verifyEmail(payload: { email: string; otp: string }) {

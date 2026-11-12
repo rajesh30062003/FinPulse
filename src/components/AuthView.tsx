@@ -20,9 +20,9 @@ import { useAuth } from '../context/AuthContext';
 import { getApiBase, setCustomApiUrl } from '../services/api';
 
 export const AuthView: React.FC = () => {
-  const { login, register, verifyEmail, resendOtp, forgotPassword, resetPassword } = useAuth();
+  const { login, register, forgotPassword, resetPassword } = useAuth();
 
-  const [tab, setTab] = useState<'login' | 'register' | 'verify' | 'forgot' | 'reset'>('login');
+  const [tab, setTab] = useState<'login' | 'register' | 'forgot' | 'reset'>('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,18 +36,6 @@ export const AuthView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // OTP Timer & Resend Cooldown
-  const [otpExpirySeconds, setOtpExpirySeconds] = useState(300); // 5 minutes
-  const [resendCooldownSeconds, setResendCooldownSeconds] = useState(60); // 60 seconds
-
-  const maskEmail = (raw: string) => {
-    if (!raw || !raw.includes('@')) return raw;
-    const [userPart, domainPart] = raw.split('@');
-    if (userPart.length <= 2) return `${userPart[0]}*@${domainPart}`;
-    const masked = userPart[0] + '*'.repeat(Math.min(userPart.length - 2, 6)) + userPart.slice(-1);
-    return `${masked}@${domainPart}`;
-  };
-
   // Backend connection drawer
   const [showServerConfig, setShowServerConfig] = useState(false);
   const [backendUrlInput, setBackendUrlInput] = useState('');
@@ -57,30 +45,6 @@ export const AuthView: React.FC = () => {
   useEffect(() => {
     setBackendUrlInput(localStorage.getItem('finpulse_api_url') || (import.meta.env.VITE_API_URL as string) || '');
   }, []);
-
-  // Countdown timer for OTP expiration
-  useEffect(() => {
-    if (tab !== 'verify') return;
-    const interval = setInterval(() => {
-      setOtpExpirySeconds(prev => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [tab]);
-
-  // Cooldown timer for Resend OTP
-  useEffect(() => {
-    if (tab !== 'verify') return;
-    const interval = setInterval(() => {
-      setResendCooldownSeconds(prev => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [tab]);
-
-  const formatTimer = (totalSeconds: number) => {
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = totalSeconds % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
 
   const testAndSaveBackend = async () => {
     setIsTestingBackend(true);
@@ -124,17 +88,12 @@ export const AuthView: React.FC = () => {
       setLoading(true);
       await login(email, password);
     } catch (err: any) {
-      if (err.status === 403 && (err.data?.unverified || err.data?.code === 'EMAIL_NOT_VERIFIED')) {
-        setTab('verify');
-        setError('Your email is not verified yet. Please enter the 6-digit verification code sent to your inbox.');
-      } else if (err.status === 403 && err.data?.code === 'ACCOUNT_LOCKED') {
+      if (err.status === 403 && err.data?.code === 'ACCOUNT_LOCKED') {
         setError(err.message || 'Account temporarily locked due to multiple failed login attempts.');
       } else if (err.status === 403 && err.data?.code === 'ACCOUNT_SUSPENDED') {
         setError(err.message || 'Account suspended. Please contact support.');
       } else if (err.status === 401) {
         setError('Invalid email or password. Please verify your credentials.');
-      } else if (err.status === 503) {
-        setError(err.message || 'Email delivery service temporarily unavailable. Please try again.');
       } else {
         setError(err.message || 'Invalid email or password');
       }
@@ -161,60 +120,13 @@ export const AuthView: React.FC = () => {
     try {
       setLoading(true);
       const res = await register(name, email, password, confirmPassword);
-      setSuccess(res.message || 'Account registration initiated! Verification code dispatched to your email.');
-      setOtpExpirySeconds(res.expiresInSeconds || 300);
-      setResendCooldownSeconds(60);
-      setOtp('');
-      setTab('verify');
+      setSuccess(res.message || 'Account created successfully! Loading your financial vault...');
     } catch (err: any) {
-      if (err.status === 503) {
-        setError(`Email delivery failed (HTTP 503): ${err.message || 'Brevo SMTP connection or authentication failed'}`);
-      } else if (err.status === 400 && err.data?.code === 'EMAIL_EXISTS') {
+      if (err.status === 409 || (err.status === 400 && err.data?.code === 'EMAIL_EXISTS')) {
         setError('An account with this email address already exists. Please sign in.');
-      } else if (err.status === 429) {
-        setError(err.message || 'Please wait before requesting another code.');
       } else {
         setError(err.message || 'Registration failed');
       }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSuccess(null);
-
-    if (otp.trim().length !== 6) {
-      setError('Please enter the complete 6-digit verification code.');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      await verifyEmail(email, otp.trim());
-      setSuccess('Account activated and verified! Redirecting to your financial vault...');
-    } catch (err: any) {
-      setError(err.message || 'Verification failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResendOtp = async () => {
-    if (resendCooldownSeconds > 0) return;
-    setError(null);
-    setSuccess(null);
-    try {
-      setLoading(true);
-      const res = await resendOtp(email);
-      setSuccess(res.message || 'A fresh verification code has been dispatched.');
-      setOtpExpirySeconds(res.expiresInSeconds || 300);
-      setResendCooldownSeconds(60);
-      setOtp('');
-    } catch (err: any) {
-      setError(err.message || 'Failed to resend code');
     } finally {
       setLoading(false);
     }
@@ -335,10 +247,10 @@ export const AuthView: React.FC = () => {
             <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-xs space-y-1.5">
               <div className="flex items-center gap-2 text-white font-semibold text-xs">
                 <Mail className="w-4 h-4 text-blue-400" />
-                <span>Brevo SMTP OTP (Port 2525)</span>
+                <span>Instant Account Activation</span>
               </div>
               <p className="text-[11px] text-slate-400 leading-normal">
-                Strict 5-minute hashed OTP verification dispatched via Brevo SMTP on port 2525 with STARTTLS to safely bypass Render Free port blocks.
+                Direct zero-friction account creation with bcrypt password encryption. Your financial vault is active and ready immediately.
               </p>
             </div>
 
@@ -665,7 +577,7 @@ export const AuthView: React.FC = () => {
                   </div>
 
                   <p className="text-[11px] text-slate-400 leading-normal pt-1">
-                    An automated 6-digit verification code will be sent to your email. Dashboard access is gated until verification is complete.
+                    Instant account activation with bcrypt encryption. Your financial data is securely isolated from your first sign in.
                   </p>
 
                   <button
@@ -676,94 +588,15 @@ export const AuthView: React.FC = () => {
                     {loading ? (
                       <>
                         <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Sending Verification Code...</span>
+                        <span>Creating Account...</span>
                       </>
                     ) : (
                       <>
-                        <span>Register &amp; Dispatch Verification Code</span>
+                        <span>Create Financial Account</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
                   </button>
-                </form>
-              )}
-
-              {/* ---------------- 3. VERIFY EMAIL FORM ---------------- */}
-              {tab === 'verify' && (
-                <form onSubmit={handleVerify} className="space-y-4">
-                  <div className="text-center space-y-1">
-                    <div className="w-12 h-12 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center mx-auto text-blue-400 mb-2">
-                      <Mail className="w-6 h-6" />
-                    </div>
-                    <h3 className="text-sm font-bold text-white">Enter 6-Digit Verification Code</h3>
-                    <p className="text-xs text-slate-400">
-                      Code dispatched to <strong className="text-white">{maskEmail(email)}</strong> via Brevo SMTP
-                    </p>
-                  </div>
-
-                  {/* Code Input */}
-                  <div>
-                    <input
-                      type="text"
-                      required
-                      maxLength={6}
-                      value={otp}
-                      onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-                      placeholder="••••••"
-                      className="w-full py-3 text-center text-2xl font-mono tracking-[0.5em] rounded-xl bg-slate-950 border border-slate-800 text-white font-black focus:outline-hidden focus:border-blue-500"
-                    />
-                  </div>
-
-                  {/* Timer & Expiry */}
-                  <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Expires in: </span>
-                      <span className="font-mono font-bold text-white">{formatTimer(otpExpirySeconds)}</span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleResendOtp}
-                      disabled={resendCooldownSeconds > 0 || loading}
-                      className="text-blue-400 hover:underline disabled:text-slate-600 disabled:no-underline font-medium"
-                    >
-                      {resendCooldownSeconds > 0
-                        ? `Resend in ${resendCooldownSeconds}s`
-                        : 'Resend Code'}
-                    </button>
-                  </div>
-
-                  {/* Submit verification */}
-                  <div className="space-y-2 pt-2">
-                    <button
-                      type="submit"
-                      disabled={loading || otp.length !== 6}
-                      className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
-                    >
-                      {loading ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          <span>Verifying Token...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Check className="w-4 h-4" />
-                          <span>Verify &amp; Activate Vault Access</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  <div className="text-center pt-1">
-                    <button
-                      type="button"
-                      onClick={() => { setTab('login'); setError(null); }}
-                      className="text-xs text-slate-400 hover:text-white hover:underline"
-                    >
-                      ← Back to Sign In
-                    </button>
-                  </div>
                 </form>
               )}
 
@@ -921,7 +754,7 @@ export const AuthView: React.FC = () => {
 
       {/* Footer */}
       <footer className="relative z-10 w-full max-w-7xl mx-auto px-6 py-6 border-t border-slate-900 text-center text-xs text-slate-500">
-        <p>FinPulse Multi-Tenant Financial Ledger · Secured with Brevo SMTP (Port 2525) &amp; MongoDB Atlas Storage</p>
+        <p>FinPulse Multi-Tenant Financial Ledger · Secured with Cryptographic Authentication &amp; MongoDB Atlas Storage</p>
       </footer>
     </div>
   );

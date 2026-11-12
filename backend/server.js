@@ -369,7 +369,17 @@ async function findUserByEmail(email) {
       console.warn("MongoDB user lookup warning:", err);
     }
   }
-  const found = memoryDb.users.find((u) => u.email.toLowerCase() === cleanEmail);
+  let found = memoryDb.users.find((u) => u.email.toLowerCase() === cleanEmail);
+  if (!found && fs.existsSync(DATA_FILE)) {
+    try {
+      const raw = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+      found = (raw.users || []).find((u) => u.email.toLowerCase() === cleanEmail);
+      if (found) {
+        memoryDb.users.push(found);
+      }
+    } catch {
+    }
+  }
   return found || null;
 }
 async function findUserById(id) {
@@ -523,50 +533,6 @@ async function revokeAllUserRefreshTokens(userId) {
       await RefreshTokenModel.updateMany({ userId }, { $set: { revoked: true } });
     } catch (err) {
       console.error("Error revoking user refresh tokens in MongoDB Atlas:", err);
-    }
-  }
-}
-async function persistEmailVerification(verif) {
-  if (!memoryDb.emailVerifications) memoryDb.emailVerifications = [];
-  const idx = memoryDb.emailVerifications.findIndex((v) => v.email === verif.email);
-  if (idx >= 0) {
-    memoryDb.emailVerifications[idx] = verif;
-  } else {
-    memoryDb.emailVerifications.push(verif);
-  }
-  saveDatabase();
-  if (mongoConnected && mongoose.connection.readyState === 1) {
-    try {
-      await EmailVerificationModel.findOneAndUpdate({ email: verif.email }, verif, { upsert: true });
-    } catch (err) {
-      console.error("Error saving email verification to MongoDB Atlas:", err);
-    }
-  }
-}
-async function findEmailVerification(email) {
-  const cleanEmail = email.toLowerCase().trim();
-  if (mongoConnected && mongoose.connection.readyState === 1) {
-    try {
-      const doc = await EmailVerificationModel.findOne({ email: cleanEmail }).lean();
-      if (doc) return doc;
-    } catch (err) {
-      console.warn("MongoDB findEmailVerification warning:", err);
-    }
-  }
-  if (!memoryDb.emailVerifications) memoryDb.emailVerifications = [];
-  const found = memoryDb.emailVerifications.find((v) => v.email === cleanEmail);
-  return found || null;
-}
-async function deleteEmailVerification(email) {
-  const cleanEmail = email.toLowerCase().trim();
-  if (!memoryDb.emailVerifications) memoryDb.emailVerifications = [];
-  memoryDb.emailVerifications = memoryDb.emailVerifications.filter((v) => v.email !== cleanEmail);
-  saveDatabase();
-  if (mongoConnected && mongoose.connection.readyState === 1) {
-    try {
-      await EmailVerificationModel.deleteMany({ email: cleanEmail });
-    } catch (err) {
-      console.error("Error deleting email verification from MongoDB Atlas:", err);
     }
   }
 }
@@ -1885,112 +1851,38 @@ router.post("/auth/register", async (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
     const cleanName = name.trim();
     const existingUser = await findUserByEmail(cleanEmail);
-    if (existingUser && existingUser.isVerified) {
+    if (existingUser) {
       return res.status(409).json({
         success: false,
         error: "An account with this email address already exists. Please log in.",
         code: "EMAIL_ALREADY_EXISTS"
       });
     }
-    const existingVerif = await findEmailVerification(cleanEmail);
-    if (existingVerif && Date.now() - existingVerif.lastSentAt < 6e4) {
-      const waitSec = Math.ceil((6e4 - (Date.now() - existingVerif.lastSentAt)) / 1e3);
-      return res.status(429).json({ error: `Please wait ${waitSec} seconds before requesting another code.` });
-    }
-    const otp = crypto.randomInt(1e5, 1e6).toString();
-    const otpHash = hashToken(otp);
     const passwordHash = await bcrypt2.hash(password, 10);
-    const verificationRecord = {
-      id: `verif-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
-      email: cleanEmail,
+    const userId = `user-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
+    const newUser = {
+      id: userId,
       name: cleanName,
+      email: cleanEmail,
       passwordHash,
-      otpHash,
-      expiresAt: Date.now() + 5 * 60 * 1e3,
-      // 5 minutes
-      attempts: 0,
-      verified: false,
-      lastSentAt: Date.now(),
+      isVerified: true,
+      // Auto-activated (email OTP verification disabled)
+      accountStatus: "active",
+      failedLoginAttempts: 0,
+      lockUntil: null,
+      currency: "INR",
+      monthlyBudgetInPaise: 4e6,
+      reminderDayOfMonth: 25,
+      emailNotificationsEnabled: true,
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     };
-    await persistEmailVerification(verificationRecord);
+    await persistUser(newUser);
     try {
-      await EmailService.sendVerificationEmail({
-        email: cleanEmail,
-        name: cleanName,
-        otp
-      });
-    } catch (smtpErr) {
-      await deleteEmailVerification(cleanEmail);
-      console.log(`[Registration SMTP Failed] Could not dispatch OTP to ${maskEmail(cleanEmail)}: ${smtpErr?.message}`);
-      return res.status(503).json({
-        success: false,
-        error: smtpErr?.message || "We couldn't send your verification email via Brevo SMTP. Please check your Brevo SMTP configuration.",
-        code: "SMTP_DELIVERY_FAILED",
-        provider: "Brevo SMTP",
-        smtpCode: smtpErr?.code
-      });
-    }
-    return res.status(200).json({
-      success: true,
-      message: `Verification code sent to ${maskEmail(cleanEmail)}`,
-      email: cleanEmail,
-      expiresInSeconds: 300
-    });
-  } catch (err) {
-    console.error("Registration error:", err);
-    return res.status(500).json({ error: err.message || "Registration failed" });
-  }
-});
-router.post("/auth/verify-email", async (req, res) => {
-  try {
-    const { email, otp } = req.body;
-    if (!email || !otp) {
-      return res.status(400).json({ error: "Email and 6-digit verification code are required" });
-    }
-    const cleanEmail = email.trim().toLowerCase();
-    const verif = await findEmailVerification(cleanEmail);
-    if (!verif) {
-      return res.status(400).json({ error: "No pending verification found. Please register first." });
-    }
-    if (Date.now() > verif.expiresAt) {
-      return res.status(400).json({ error: "Verification code has expired. Please request a new code." });
-    }
-    if (verif.attempts >= 5) {
-      return res.status(400).json({ error: "Too many failed verification attempts. Please request a new code." });
-    }
-    const enteredOtpHash = hashToken(otp.trim());
-    if (enteredOtpHash !== verif.otpHash) {
-      verif.attempts += 1;
-      await persistEmailVerification(verif);
-      const remaining = 5 - verif.attempts;
-      return res.status(400).json({
-        error: `Invalid verification code. ${remaining > 0 ? remaining + " attempt(s) remaining." : "Code locked. Please request a new one."}`
-      });
-    }
-    let user = await findUserByEmail(cleanEmail);
-    const userId = user ? user.id : `user-${Date.now()}`;
-    if (!user) {
-      user = {
-        id: userId,
-        name: verif.name,
-        email: cleanEmail,
-        passwordHash: verif.passwordHash,
-        isVerified: true,
-        accountStatus: "active",
-        failedLoginAttempts: 0,
-        currency: "INR",
-        monthlyBudgetInPaise: 4e6,
-        reminderDayOfMonth: 25,
-        emailNotificationsEnabled: true,
-        createdAt: (/* @__PURE__ */ new Date()).toISOString()
-      };
-      await persistUser(user);
       const bankAccount = {
         id: `bank-${Date.now()}`,
         userId,
         bankName: "Primary Bank",
-        accountHolderName: verif.name,
+        accountHolderName: cleanName,
         accountType: "Savings",
         accountNickname: "Primary Savings",
         accountNumberMasked: "\u2022\u2022\u2022\u2022 1234",
@@ -2004,6 +1896,7 @@ router.post("/auth/verify-email", async (req, res) => {
         id: `cash-${Date.now()}`,
         userId,
         balanceInPaise: 0,
+        notes: "Primary Cash Wallet",
         updatedAt: (/* @__PURE__ */ new Date()).toISOString()
       };
       await persistCashWallet(cashWallet);
@@ -2029,91 +1922,67 @@ router.post("/auth/verify-email", async (req, res) => {
         updatedAt: (/* @__PURE__ */ new Date()).toISOString()
       };
       await persistEmergencyFund(emergencyFund);
-    } else {
-      user.isVerified = true;
-      user.passwordHash = verif.passwordHash;
-      user.accountStatus = "active";
-      user.failedLoginAttempts = 0;
-      await persistUser(user);
+    } catch (seedErr) {
+      console.log("Non-critical ledger seeding note:", seedErr);
     }
-    await deleteEmailVerification(cleanEmail);
-    const accessToken = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: "15m" });
+    const accessToken = jwt.sign({ id: newUser.id, email: newUser.email }, JWT_SECRET, { expiresIn: "15m" });
     const refreshToken = jwt.sign(
-      { id: user.id, email: user.email, jti: crypto.randomUUID() },
+      { id: newUser.id, email: newUser.email, jti: crypto.randomUUID() },
       JWT_REFRESH_SECRET,
       { expiresIn: "7d" }
     );
     await persistRefreshToken({
       id: `token-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      userId: user.id,
+      userId: newUser.id,
       tokenHash: hashToken(refreshToken),
       expiresAt: new Date(Date.now() + 7 * 864e5).toISOString(),
       revoked: false,
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     });
     setRefreshTokenCookie(res, refreshToken);
-    return res.status(200).json({
+    return res.status(201).json({
       success: true,
-      message: "Account verified and activated successfully!",
+      message: "Account created successfully",
       accessToken,
       refreshToken,
       user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
         isVerified: true,
-        currency: user.currency,
-        monthlyBudgetInPaise: user.monthlyBudgetInPaise
+        currency: newUser.currency,
+        monthlyBudgetInPaise: newUser.monthlyBudgetInPaise
       }
     });
   } catch (err) {
-    console.error("Email verification error:", err);
-    return res.status(500).json({ error: err.message || "Verification failed" });
+    console.error("Registration error:", err);
+    return res.status(500).json({ error: err.message || "Registration failed" });
+  }
+});
+router.post("/auth/verify-email", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (email) {
+      const user = await findUserByEmail(email.trim().toLowerCase());
+      if (user && !user.isVerified) {
+        user.isVerified = true;
+        await persistUser(user);
+      }
+    }
+    return res.json({
+      success: true,
+      message: "Email verification is disabled. All accounts are active directly."
+    });
+  } catch {
+    return res.json({ success: true, message: "Account is active." });
   }
 });
 router.post("/auth/resend-otp", async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: "Email address is required" });
-    }
-    const cleanEmail = email.trim().toLowerCase();
-    const verif = await findEmailVerification(cleanEmail);
-    if (!verif) {
-      return res.status(400).json({ error: "No pending registration found for this email. Please register." });
-    }
-    const elapsed = Date.now() - verif.lastSentAt;
-    if (elapsed < 6e4) {
-      const waitSec = Math.ceil((6e4 - elapsed) / 1e3);
-      return res.status(429).json({ error: `Please wait ${waitSec} seconds before requesting a new code.` });
-    }
-    const newOtp = crypto.randomInt(1e5, 1e6).toString();
-    try {
-      await EmailService.sendVerificationEmail({
-        email: cleanEmail,
-        name: verif.name,
-        otp: newOtp
-      });
-    } catch (smtpErr) {
-      console.error(`[Resend OTP SMTP Failed] Could not dispatch OTP to ${maskEmail(cleanEmail)}:`, smtpErr?.message);
-      return res.status(503).json({
-        error: smtpErr?.message || "We couldn't send your verification email via Brevo SMTP. Please check your Brevo SMTP configuration.",
-        code: smtpErr?.code
-      });
-    }
-    verif.otpHash = hashToken(newOtp);
-    verif.expiresAt = Date.now() + 5 * 60 * 1e3;
-    verif.attempts = 0;
-    verif.lastSentAt = Date.now();
-    await persistEmailVerification(verif);
-    return res.json({
-      success: true,
-      message: `Verification code sent to ${maskEmail(cleanEmail)}`,
-      expiresInSeconds: 300
-    });
-  } catch (err) {
-    return res.status(500).json({ error: err.message || "Failed to resend verification code" });
-  }
+  return res.json({
+    success: true,
+    message: "Email verification is disabled. You can log in directly.",
+    expiresInSeconds: 0
+  });
 });
 router.post("/auth/login", async (req, res) => {
   try {
@@ -2153,12 +2022,7 @@ router.post("/auth/login", async (req, res) => {
       });
     }
     if (!user.isVerified) {
-      return res.status(403).json({
-        error: "Email address is not verified. Please verify your email before logging in.",
-        code: "EMAIL_NOT_VERIFIED",
-        unverified: true,
-        email: user.email
-      });
+      user.isVerified = true;
     }
     user.failedLoginAttempts = 0;
     user.lockUntil = null;
