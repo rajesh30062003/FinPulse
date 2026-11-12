@@ -92,7 +92,7 @@
     {
       "id": "cash-wallet-01",
       "userId": "demo-user-id",
-      "balanceInPaise": 450000,
+      "balanceInPaise": 0,
       "notes": "Physical cash on hand",
       "updatedAt": "2026-11-11T10:08:08.138Z"
     }

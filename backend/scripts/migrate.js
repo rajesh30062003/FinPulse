@@ -18,10 +18,16 @@
 
 import fs from 'fs';
 import path from 'path';
-import mongoose from 'mongoose';
-import dotenv from 'dotenv';
 
-dotenv.config();
+let mongoose = null;
+let dotenv = null;
+try {
+  const m = await import('mongoose');
+  mongoose = m.default || m;
+  const d = await import('dotenv');
+  dotenv = d.default || d;
+  if (dotenv?.config) dotenv.config();
+} catch {}
 
 const MIGRATION_VERSION = 1;
 const MIGRATION_NAME = 'canonical_ownership_reconciliation_v1';
@@ -29,59 +35,6 @@ const CANONICAL_EMAIL = 'rjrajeshpal30062003@gmail.com';
 const LEGACY_EMAILS = ['rjrajeshpal30@gmail.com'];
 const TARGET_CANONICAL_ID = 'user-1794473436793-0d16c1';
 const VERIFIED_LEGACY_IDS = ['demo-user-id', 'user-rjrajeshpal30'];
-
-// Schemas & Models
-const MigrationSchema = new mongoose.Schema({
-  id: { type: String, required: true, unique: true },
-  name: { type: String, required: true },
-  version: { type: Number, required: true, unique: true },
-  status: { type: String, enum: ['pending', 'running', 'completed', 'failed'], default: 'pending' },
-  executedAt: { type: String },
-  databaseName: { type: String },
-  details: { type: mongoose.Schema.Types.Mixed },
-  error: { type: String }
-}, { timestamps: true });
-
-const UserSchema = new mongoose.Schema({
-  id: { type: String, required: true, unique: true },
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-  passwordHash: { type: String, required: true },
-  isVerified: { type: Boolean, default: false }
-}, { strict: false, timestamps: true });
-
-const BudgetAllocationSchema = new mongoose.Schema({
-  id: { type: String, required: true, unique: true },
-  userId: { type: String, required: true, index: true },
-  monthYear: { type: String, required: true }
-}, { strict: false });
-BudgetAllocationSchema.index({ userId: 1, monthYear: 1 }, { unique: true });
-
-const AuditBudgetSnapshotSchema = new mongoose.Schema({
-  originalId: { type: String, required: true },
-  originalUserId: { type: String, required: true },
-  monthYear: { type: String, required: true },
-  fullDocument: { type: mongoose.Schema.Types.Mixed, required: true },
-  archivedAt: { type: String, default: () => new Date().toISOString() },
-  reason: { type: String, default: 'pre_deduplication_audit_archive' }
-}, { timestamps: true });
-
-const createModel = (name, schema) => mongoose.models[name] || mongoose.model(name, schema);
-const createGenericModel = (name) => mongoose.models[name] || mongoose.model(name, new mongoose.Schema({}, { strict: false }));
-
-const MigrationModel = createModel('Migration', MigrationSchema);
-const UserModel = createModel('User', UserSchema);
-const BudgetAllocationModel = createModel('BudgetAllocation', BudgetAllocationSchema);
-const AuditBudgetSnapshotModel = createModel('AuditBudgetSnapshot', AuditBudgetSnapshotSchema);
-const BankAccountModel = createGenericModel('BankAccount');
-const CashWalletModel = createGenericModel('CashWallet');
-const CreditCardModel = createGenericModel('CreditCard');
-const TransactionModel = createGenericModel('Transaction');
-const InvestmentModel = createGenericModel('Investment');
-const FixedDepositModel = createGenericModel('FixedDeposit');
-const EmergencyFundModel = createGenericModel('EmergencyFund');
-const SavingsGoalModel = createGenericModel('SavingsGoal');
-const NotificationModel = createGenericModel('Notification');
 
 async function run() {
   const isDryRun = process.argv.includes('--dry-run');
@@ -91,6 +44,13 @@ async function run() {
   console.log('='.repeat(75));
 
   const mongoUri = process.env.MONGODB_URI;
+
+  if (!mongoose) {
+    console.error('\n[FATAL ERROR] Mongoose package is not installed in the local environment.');
+    console.error('This script is strictly intended to run in an environment with MongoDB Atlas access (e.g. Render Shell or CI/CD).');
+    console.error('Local JSON ledger (.data/db.json) execution is deliberately prohibited.');
+    process.exit(1);
+  }
 
   if (!mongoUri || !mongoUri.startsWith('mongodb')) {
     console.error('\n[FATAL ERROR] MONGODB_URI environment variable is missing or invalid.');
@@ -103,6 +63,59 @@ async function run() {
     console.error('3. Execute: node backend/scripts/migrate.js (to apply live)\n');
     process.exit(1);
   }
+
+  // Schemas & Models
+  const MigrationSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    name: { type: String, required: true },
+    version: { type: Number, required: true, unique: true },
+    status: { type: String, enum: ['pending', 'running', 'completed', 'failed'], default: 'pending' },
+    executedAt: { type: String },
+    databaseName: { type: String },
+    details: { type: mongoose.Schema.Types.Mixed },
+    error: { type: String }
+  }, { timestamps: true });
+
+  const UserSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    passwordHash: { type: String, required: true },
+    isVerified: { type: Boolean, default: false }
+  }, { strict: false, timestamps: true });
+
+  const BudgetAllocationSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    userId: { type: String, required: true, index: true },
+    monthYear: { type: String, required: true }
+  }, { strict: false });
+  BudgetAllocationSchema.index({ userId: 1, monthYear: 1 }, { unique: true });
+
+  const AuditBudgetSnapshotSchema = new mongoose.Schema({
+    originalId: { type: String, required: true },
+    originalUserId: { type: String, required: true },
+    monthYear: { type: String, required: true },
+    fullDocument: { type: mongoose.Schema.Types.Mixed, required: true },
+    archivedAt: { type: String, default: () => new Date().toISOString() },
+    reason: { type: String, default: 'pre_deduplication_audit_archive' }
+  }, { timestamps: true });
+
+  const createModel = (name, schema) => mongoose.models[name] || mongoose.model(name, schema);
+  const createGenericModel = (name) => mongoose.models[name] || mongoose.model(name, new mongoose.Schema({}, { strict: false }));
+
+  const MigrationModel = createModel('Migration', MigrationSchema);
+  const UserModel = createModel('User', UserSchema);
+  const BudgetAllocationModel = createModel('BudgetAllocation', BudgetAllocationSchema);
+  const AuditBudgetSnapshotModel = createModel('AuditBudgetSnapshot', AuditBudgetSnapshotSchema);
+  const BankAccountModel = createGenericModel('BankAccount');
+  const CashWalletModel = createGenericModel('CashWallet');
+  const CreditCardModel = createGenericModel('CreditCard');
+  const TransactionModel = createGenericModel('Transaction');
+  const InvestmentModel = createGenericModel('Investment');
+  const FixedDepositModel = createGenericModel('FixedDeposit');
+  const EmergencyFundModel = createGenericModel('EmergencyFund');
+  const SavingsGoalModel = createGenericModel('SavingsGoal');
+  const NotificationModel = createGenericModel('Notification');
 
   // Connect to MongoDB Atlas
   console.log('\nConnecting to MongoDB Atlas production cluster...');

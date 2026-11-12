@@ -25,7 +25,7 @@ export const CreditCardBillsView: React.FC = () => {
 
         <button
           onClick={() => {
-            const cardWithDebt = creditCards.find(c => c.outstandingBalanceInPaise > 0) || creditCards[0];
+            const cardWithDebt = creditCards.find(c => c.outstandingBalanceInPaise > 0) || creditCards.find(c => c.isActive !== false && c.status !== 'Closed') || creditCards[0];
             if (cardWithDebt) setSelectedCardForBill(cardWithDebt);
             setIsPayBillOpen(true);
           }}
@@ -53,7 +53,14 @@ export const CreditCardBillsView: React.FC = () => {
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <span className="text-xs text-slate-500 font-medium">{card.bankName}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-slate-500 font-medium">{card.bankName}</span>
+                    {(card.isActive === false || card.status === 'Closed') && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                        Closed
+                      </span>
+                    )}
+                  </div>
                   <h3 className="text-base font-bold text-slate-900 dark:text-white">{card.cardName}</h3>
                   <span className="text-xs font-mono text-slate-400">•••• •••• •••• {card.lastFourDigits}</span>
                 </div>

@@ -6,14 +6,16 @@ import { api, formatINR } from '../services/api';
 export const EmergencyFundView: React.FC = () => {
   const { emergencyFund, accounts, refreshAll, transactions } = useFinancial();
 
+  const activeAccounts = accounts.filter(a => a.isActive !== false && a.status !== 'Closed');
+
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [isEditTargetOpen, setIsEditTargetOpen] = useState(false);
 
   const [targetRupees, setTargetRupees] = useState('');
-  const [depositBankId, setDepositBankId] = useState(accounts[0]?.id || '');
+  const [depositBankId, setDepositBankId] = useState(activeAccounts[0]?.id || '');
   const [depositAmountRupees, setDepositAmountRupees] = useState('');
-  const [withdrawBankId, setWithdrawBankId] = useState(accounts[0]?.id || '');
+  const [withdrawBankId, setWithdrawBankId] = useState(activeAccounts[0]?.id || '');
   const [withdrawAmountRupees, setWithdrawAmountRupees] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
@@ -273,7 +275,7 @@ export const EmergencyFundView: React.FC = () => {
                   onChange={e => setDepositBankId(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
                 >
-                  {accounts.map(a => <option key={a.id} value={a.id}>{a.bankName} ({formatINR(a.balanceInPaise)})</option>)}
+                  {activeAccounts.map(a => <option key={a.id} value={a.id}>{a.bankName} ({formatINR(a.balanceInPaise)})</option>)}
                 </select>
               </div>
               <div>
@@ -331,7 +333,7 @@ export const EmergencyFundView: React.FC = () => {
                   onChange={e => setWithdrawBankId(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
                 >
-                  {accounts.map(a => <option key={a.id} value={a.id}>{a.bankName}</option>)}
+                  {activeAccounts.map(a => <option key={a.id} value={a.id}>{a.bankName}</option>)}
                 </select>
               </div>
               <div>

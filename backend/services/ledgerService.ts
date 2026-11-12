@@ -1,4 +1,4 @@
-import { getDb, saveDatabase } from '../db.js';
+import { getDb, saveDatabase, isOwner } from '../db.js';
 import { ITransaction, IBankAccount, ICreditCard, ICashWallet } from '../types.js';
 
 export class LedgerService {
@@ -15,14 +15,14 @@ export class LedgerService {
           const bank = db.bankAccounts.find(b => b.id === destinationAccountId);
           if (bank) bank.balanceInPaise -= amountInPaise;
         } else if (paymentMethod === 'Cash') {
-          const cash = db.cashWallets.find(w => w.userId === tx.userId);
+          const cash = db.cashWallets.find(w => isOwner(w.userId, tx.userId));
           if (cash) cash.balanceInPaise -= amountInPaise;
         }
         break;
 
       case 'expense':
         if (paymentMethod === 'Cash') {
-          const cash = db.cashWallets.find(w => w.userId === tx.userId);
+          const cash = db.cashWallets.find(w => isOwner(w.userId, tx.userId));
           if (cash) cash.balanceInPaise += amountInPaise;
         } else if (sourceAccountId) {
           const bank = db.bankAccounts.find(b => b.id === sourceAccountId);
@@ -70,12 +70,12 @@ export class LedgerService {
           const bank = db.bankAccounts.find(b => b.id === sourceAccountId);
           if (bank) bank.balanceInPaise += amountInPaise;
         }
-        const cashWithdrawal = db.cashWallets.find(w => w.userId === tx.userId);
+        const cashWithdrawal = db.cashWallets.find(w => isOwner(w.userId, tx.userId));
         if (cashWithdrawal) cashWithdrawal.balanceInPaise -= amountInPaise;
         break;
 
       case 'cash_deposit':
-        const cashDeposit = db.cashWallets.find(w => w.userId === tx.userId);
+        const cashDeposit = db.cashWallets.find(w => isOwner(w.userId, tx.userId));
         if (cashDeposit) cashDeposit.balanceInPaise += amountInPaise;
         if (destinationAccountId) {
           const bank = db.bankAccounts.find(b => b.id === destinationAccountId);
@@ -88,10 +88,10 @@ export class LedgerService {
           const bank = db.bankAccounts.find(b => b.id === sourceAccountId);
           if (bank) bank.balanceInPaise += amountInPaise;
         } else if (paymentMethod === 'Cash') {
-          const cash = db.cashWallets.find(w => w.userId === tx.userId);
+          const cash = db.cashWallets.find(w => isOwner(w.userId, tx.userId));
           if (cash) cash.balanceInPaise += amountInPaise;
         }
-        const ef = db.emergencyFunds.find(e => e.userId === tx.userId);
+        const ef = db.emergencyFunds.find(e => isOwner(e.userId, tx.userId));
         if (ef) ef.currentBalanceInPaise = Math.max(0, ef.currentBalanceInPaise - amountInPaise);
         break;
 
@@ -100,7 +100,7 @@ export class LedgerService {
           const bank = db.bankAccounts.find(b => b.id === destinationAccountId);
           if (bank) bank.balanceInPaise -= amountInPaise;
         }
-        const efWithdraw = db.emergencyFunds.find(e => e.userId === tx.userId);
+        const efWithdraw = db.emergencyFunds.find(e => isOwner(e.userId, tx.userId));
         if (efWithdraw) efWithdraw.currentBalanceInPaise += amountInPaise;
         break;
 
@@ -109,7 +109,7 @@ export class LedgerService {
           const bank = db.bankAccounts.find(b => b.id === sourceAccountId);
           if (bank) bank.balanceInPaise += amountInPaise;
         } else if (paymentMethod === 'Cash') {
-          const cash = db.cashWallets.find(w => w.userId === tx.userId);
+          const cash = db.cashWallets.find(w => isOwner(w.userId, tx.userId));
           if (cash) cash.balanceInPaise += amountInPaise;
         }
         break;
@@ -137,7 +137,7 @@ export class LedgerService {
           if (!bank) throw new Error('Receiving bank account not found');
           bank.balanceInPaise += amountInPaise;
         } else if (paymentMethod === 'Cash') {
-          let cash = db.cashWallets.find(w => w.userId === tx.userId);
+          let cash = db.cashWallets.find(w => isOwner(w.userId, tx.userId));
           if (!cash) {
             cash = { id: `cash-${Date.now()}`, userId: tx.userId, balanceInPaise: 0, updatedAt: new Date().toISOString() };
             db.cashWallets.push(cash);
@@ -148,7 +148,7 @@ export class LedgerService {
 
       case 'expense':
         if (paymentMethod === 'Cash') {
-          const cash = db.cashWallets.find(w => w.userId === tx.userId);
+          const cash = db.cashWallets.find(w => isOwner(w.userId, tx.userId));
           if (!cash || cash.balanceInPaise < amountInPaise) {
             // Allow transaction but warn or handle low balance
           }
@@ -206,7 +206,7 @@ export class LedgerService {
         if (!sourceAccountId) throw new Error('Source bank account required for cash withdrawal');
         const withdrawBank = db.bankAccounts.find(b => b.id === sourceAccountId);
         if (!withdrawBank) throw new Error('Source bank account not found');
-        let cashW = db.cashWallets.find(w => w.userId === tx.userId);
+        let cashW = db.cashWallets.find(w => isOwner(w.userId, tx.userId));
         if (!cashW) {
           cashW = { id: `cash-${Date.now()}`, userId: tx.userId, balanceInPaise: 0, updatedAt: new Date().toISOString() };
           db.cashWallets.push(cashW);
@@ -219,7 +219,7 @@ export class LedgerService {
         if (!destinationAccountId) throw new Error('Destination bank account required for cash deposit');
         const depositBank = db.bankAccounts.find(b => b.id === destinationAccountId);
         if (!depositBank) throw new Error('Destination bank account not found');
-        const cashD = db.cashWallets.find(w => w.userId === tx.userId);
+        const cashD = db.cashWallets.find(w => isOwner(w.userId, tx.userId));
         if (cashD) cashD.balanceInPaise -= amountInPaise;
         depositBank.balanceInPaise += amountInPaise;
         break;
@@ -229,10 +229,10 @@ export class LedgerService {
           const bank = db.bankAccounts.find(b => b.id === sourceAccountId);
           if (bank) bank.balanceInPaise -= amountInPaise;
         } else if (paymentMethod === 'Cash') {
-          const cash = db.cashWallets.find(w => w.userId === tx.userId);
+          const cash = db.cashWallets.find(w => isOwner(w.userId, tx.userId));
           if (cash) cash.balanceInPaise -= amountInPaise;
         }
-        let ef = db.emergencyFunds.find(e => e.userId === tx.userId);
+        let ef = db.emergencyFunds.find(e => isOwner(e.userId, tx.userId));
         if (!ef) {
           ef = { id: `ef-${Date.now()}`, userId: tx.userId, targetAmountInPaise: 10000000, currentBalanceInPaise: 0, updatedAt: new Date().toISOString() };
           db.emergencyFunds.push(ef);
@@ -242,7 +242,7 @@ export class LedgerService {
         break;
 
       case 'emergency_withdrawal':
-        let efW = db.emergencyFunds.find(e => e.userId === tx.userId);
+        let efW = db.emergencyFunds.find(e => isOwner(e.userId, tx.userId));
         if (efW) {
           efW.currentBalanceInPaise = Math.max(0, efW.currentBalanceInPaise - amountInPaise);
           efW.updatedAt = new Date().toISOString();
@@ -258,7 +258,7 @@ export class LedgerService {
           const bank = db.bankAccounts.find(b => b.id === sourceAccountId);
           if (bank) bank.balanceInPaise -= amountInPaise;
         } else if (paymentMethod === 'Cash') {
-          const cash = db.cashWallets.find(w => w.userId === tx.userId);
+          const cash = db.cashWallets.find(w => isOwner(w.userId, tx.userId));
           if (cash) cash.balanceInPaise -= amountInPaise;
         }
         break;

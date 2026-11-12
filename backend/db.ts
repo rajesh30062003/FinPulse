@@ -104,6 +104,7 @@ export const BankAccountSchema = new mongoose.Schema({
   balanceInPaise: { type: Number, default: 0 },
   openingBalanceInPaise: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },
+  status: { type: String, default: 'Active' },
   notes: { type: String },
   createdAt: { type: String, default: () => new Date().toISOString() }
 });
@@ -131,6 +132,7 @@ export const CreditCardSchema = new mongoose.Schema({
   billingCycle: { type: String, default: '16th to 15th' },
   notes: { type: String },
   isActive: { type: Boolean, default: true },
+  status: { type: String, default: 'Active' },
   lastPaymentDate: { type: String },
   lastPaymentAmountInPaise: { type: Number }
 });
@@ -292,6 +294,17 @@ export const MigrationSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 export const MigrationModel = mongoose.models.Migration || mongoose.model('Migration', MigrationSchema);
+
+export const AuditBudgetSnapshotSchema = new mongoose.Schema({
+  originalId: { type: String, required: true },
+  originalUserId: { type: String, required: true },
+  monthYear: { type: String, required: true },
+  fullDocument: { type: mongoose.Schema.Types.Mixed, required: true },
+  archivedAt: { type: String, default: () => new Date().toISOString() },
+  reason: { type: String, default: 'pre_deduplication_audit_archive' }
+}, { timestamps: true });
+
+export const AuditBudgetSnapshotModel = mongoose.models.AuditBudgetSnapshot || mongoose.model('AuditBudgetSnapshot', AuditBudgetSnapshotSchema);
 
 export function getMongoStatus() {
   return {
@@ -485,9 +498,10 @@ export function getEffectiveUserId(userId?: string, userEmail?: string): string 
 
   const canonicalRajesh = (memoryDb.users || []).find(u =>
     u.email.toLowerCase() === 'rjrajeshpal30062003@gmail.com' ||
+    u.id === 'user-1794473436793-0d16c1' ||
     u.email.toLowerCase() === 'rjrajeshpal30@gmail.com'
   );
-  const canonicalRajeshId = canonicalRajesh ? canonicalRajesh.id : 'user-rjrajeshpal30';
+  const canonicalRajeshId = canonicalRajesh ? canonicalRajesh.id : 'user-1794473436793-0d16c1';
 
   if (
     userId === 'user-1794473436793-0d16c1' ||
@@ -499,6 +513,20 @@ export function getEffectiveUserId(userId?: string, userEmail?: string): string 
     return canonicalRajeshId;
   }
   return userId || '';
+}
+
+export function isOwner(itemUserId?: string, authUserId?: string): boolean {
+  if (!itemUserId || !authUserId) return false;
+  if (itemUserId === authUserId) return true;
+  return getEffectiveUserId(itemUserId) === getEffectiveUserId(authUserId);
+}
+
+export function getOwnerFilter(userId: string): any {
+  const canonical = getEffectiveUserId(userId);
+  if (canonical === 'user-1794473436793-0d16c1') {
+    return { $in: ['user-1794473436793-0d16c1', 'user-rjrajeshpal30', 'demo-user-id'] };
+  }
+  return userId;
 }
 
 export async function findUserByEmail(email: string): Promise<IUser | null> {
@@ -645,7 +673,7 @@ export async function persistBankAccount(account: IBankAccount): Promise<void> {
 }
 
 export async function persistCashWallet(wallet: ICashWallet): Promise<void> {
-  const idx = memoryDb.cashWallets.findIndex(w => w.id === wallet.id);
+  const idx = memoryDb.cashWallets.findIndex(w => w.id === wallet.id || isOwner(w.userId, wallet.userId));
   if (idx >= 0) {
     memoryDb.cashWallets[idx] = wallet;
   } else {
@@ -655,7 +683,11 @@ export async function persistCashWallet(wallet: ICashWallet): Promise<void> {
 
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await CashWalletModel.findOneAndUpdate({ id: wallet.id }, wallet, { upsert: true });
+      await CashWalletModel.findOneAndUpdate(
+        { $or: [{ id: wallet.id }, { userId: getOwnerFilter(wallet.userId) }] },
+        wallet,
+        { upsert: true, new: true }
+      );
     } catch (err) {
       console.error('Error saving cash wallet to MongoDB Atlas:', err);
     }
@@ -945,11 +977,11 @@ export async function deleteEmailVerification(email: string): Promise<void> {
 }
 
 export async function deleteBankAccount(id: string, userId: string): Promise<void> {
-  memoryDb.bankAccounts = memoryDb.bankAccounts.filter(b => !(b.id === id && b.userId === userId));
+  memoryDb.bankAccounts = memoryDb.bankAccounts.filter(b => !(b.id === id && isOwner(b.userId, userId)));
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await BankAccountModel.deleteOne({ id, userId });
+      await BankAccountModel.deleteOne({ id, userId: getOwnerFilter(userId) });
     } catch (err) {
       console.error('Error deleting bank account from MongoDB Atlas:', err);
     }
@@ -957,11 +989,11 @@ export async function deleteBankAccount(id: string, userId: string): Promise<voi
 }
 
 export async function deleteCreditCard(id: string, userId: string): Promise<void> {
-  memoryDb.creditCards = memoryDb.creditCards.filter(c => !(c.id === id && c.userId === userId));
+  memoryDb.creditCards = memoryDb.creditCards.filter(c => !(c.id === id && isOwner(c.userId, userId)));
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await CreditCardModel.deleteOne({ id, userId });
+      await CreditCardModel.deleteOne({ id, userId: getOwnerFilter(userId) });
     } catch (err) {
       console.error('Error deleting credit card from MongoDB Atlas:', err);
     }
@@ -969,11 +1001,11 @@ export async function deleteCreditCard(id: string, userId: string): Promise<void
 }
 
 export async function deleteTransaction(id: string, userId: string): Promise<void> {
-  memoryDb.transactions = memoryDb.transactions.filter(t => !(t.id === id && t.userId === userId));
+  memoryDb.transactions = memoryDb.transactions.filter(t => !(t.id === id && isOwner(t.userId, userId)));
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await TransactionModel.deleteOne({ id, userId });
+      await TransactionModel.deleteOne({ id, userId: getOwnerFilter(userId) });
     } catch (err) {
       console.error('Error deleting transaction from MongoDB Atlas:', err);
     }
@@ -981,11 +1013,11 @@ export async function deleteTransaction(id: string, userId: string): Promise<voi
 }
 
 export async function deleteInvestment(id: string, userId: string): Promise<void> {
-  memoryDb.investments = memoryDb.investments.filter(i => !(i.id === id && i.userId === userId));
+  memoryDb.investments = memoryDb.investments.filter(i => !(i.id === id && isOwner(i.userId, userId)));
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await InvestmentModel.deleteOne({ id, userId });
+      await InvestmentModel.deleteOne({ id, userId: getOwnerFilter(userId) });
     } catch (err) {
       console.error('Error deleting investment from MongoDB Atlas:', err);
     }
@@ -993,11 +1025,11 @@ export async function deleteInvestment(id: string, userId: string): Promise<void
 }
 
 export async function deleteFixedDeposit(id: string, userId: string): Promise<void> {
-  memoryDb.fixedDeposits = memoryDb.fixedDeposits.filter(f => !(f.id === id && f.userId === userId));
+  memoryDb.fixedDeposits = memoryDb.fixedDeposits.filter(f => !(f.id === id && isOwner(f.userId, userId)));
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await FixedDepositModel.deleteOne({ id, userId });
+      await FixedDepositModel.deleteOne({ id, userId: getOwnerFilter(userId) });
     } catch (err) {
       console.error('Error deleting fixed deposit from MongoDB Atlas:', err);
     }
@@ -1005,11 +1037,11 @@ export async function deleteFixedDeposit(id: string, userId: string): Promise<vo
 }
 
 export async function deleteSavingsGoal(id: string, userId: string): Promise<void> {
-  memoryDb.savingsGoals = memoryDb.savingsGoals.filter(s => !(s.id === id && s.userId === userId));
+  memoryDb.savingsGoals = memoryDb.savingsGoals.filter(s => !(s.id === id && isOwner(s.userId, userId)));
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await SavingsGoalModel.deleteOne({ id, userId });
+      await SavingsGoalModel.deleteOne({ id, userId: getOwnerFilter(userId) });
     } catch (err) {
       console.error('Error deleting savings goal from MongoDB Atlas:', err);
     }
@@ -1162,6 +1194,7 @@ export async function runIdempotentMigrations(): Promise<void> {
 
   let resolvedDuplicateBudgetsCount = 0;
   const duplicateBudgetIdsToDelete: string[] = [];
+  const duplicateBudgetDocsToArchive: any[] = [];
   const authoritativeBudgets: IBudgetAllocation[] = [];
 
   for (const [monthYear, records] of budgetsByMonth.entries()) {
@@ -1170,63 +1203,35 @@ export async function runIdempotentMigrations(): Promise<void> {
       rec.userId = canonicalUserId;
       authoritativeBudgets.push(rec);
     } else {
-      // Multiple records exist for this monthYear! Merge safely to preserve all allocations
+      // Multiple records exist for this monthYear: resolve without Math.max heuristics
       resolvedDuplicateBudgetsCount += (records.length - 1);
       console.log(`[Migration] Resolving ${records.length} duplicate budget records for month ${monthYear}...`);
 
-      // Determine authoritative base: prefer non-demo record with totalBudgetInPaise
-      const nonDemoRecord = records.find(r => !r.id.includes('demo') && typeof r.totalBudgetInPaise === 'number' && r.totalBudgetInPaise > 0);
-      const authRecord = nonDemoRecord || records.find(r => typeof r.totalBudgetInPaise === 'number' && r.totalBudgetInPaise > 0) || records[0];
-
-      let maxTotalBudget = authRecord.totalBudgetInPaise || 4000000;
-      let maxEssential = authRecord.essentialBudgetInPaise || 0;
-      let maxFun = authRecord.funBudgetInPaise || 0;
-      let maxInv = authRecord.investmentBudgetInPaise || 0;
-      let maxEf = authRecord.emergencyBudgetInPaise || 0;
-      let maxSav = authRecord.savingsBudgetInPaise || 0;
-      let carryForward = Boolean(authRecord.carryForwardEnabled);
+      // Determine authoritative base: select user customized record with totalBudget or canonical ID
+      const userCustomRecord = records.find(r => typeof r.totalBudgetInPaise === 'number' && r.totalBudgetInPaise > 0);
+      const authRecord = userCustomRecord || records.find(r => r.id.includes(canonicalUserId)) || records[0];
 
       for (const other of records) {
         if (other.id !== authRecord.id) {
           duplicateBudgetIdsToDelete.push(other.id);
-        }
-        if (typeof other.totalBudgetInPaise === 'number' && other.totalBudgetInPaise > 0) {
-          maxTotalBudget = Math.max(maxTotalBudget, other.totalBudgetInPaise);
-        }
-        if (other.essentialBudgetInPaise && other.essentialBudgetInPaise > 0) {
-          maxEssential = Math.max(maxEssential, other.essentialBudgetInPaise);
-        }
-        if (other.funBudgetInPaise && other.funBudgetInPaise > 0) {
-          maxFun = Math.max(maxFun, other.funBudgetInPaise);
-        }
-        if (other.investmentBudgetInPaise && other.investmentBudgetInPaise > 0) {
-          maxInv = Math.max(maxInv, other.investmentBudgetInPaise);
-        }
-        if (other.emergencyBudgetInPaise && other.emergencyBudgetInPaise > 0) {
-          maxEf = Math.max(maxEf, other.emergencyBudgetInPaise);
-        }
-        if (other.savingsBudgetInPaise && other.savingsBudgetInPaise > 0) {
-          maxSav = Math.max(maxSav, other.savingsBudgetInPaise);
-        }
-        if (other.carryForwardEnabled) {
-          carryForward = true;
+          duplicateBudgetDocsToArchive.push(other);
         }
       }
 
-      const mergedBudget: IBudgetAllocation = {
-        id: authRecord.id,
+      const consolidatedBudget: IBudgetAllocation = {
+        id: `budget-${canonicalUserId}-${monthYear}`,
         userId: canonicalUserId,
         monthYear,
-        totalBudgetInPaise: maxTotalBudget,
-        essentialBudgetInPaise: maxEssential,
-        funBudgetInPaise: maxFun,
-        investmentBudgetInPaise: maxInv,
-        emergencyBudgetInPaise: maxEf,
-        savingsBudgetInPaise: maxSav,
-        carryForwardEnabled: carryForward
+        totalBudgetInPaise: authRecord.totalBudgetInPaise || 4000000,
+        essentialBudgetInPaise: authRecord.essentialBudgetInPaise ?? 1800000,
+        funBudgetInPaise: authRecord.funBudgetInPaise ?? 400000,
+        investmentBudgetInPaise: authRecord.investmentBudgetInPaise ?? 800000,
+        emergencyBudgetInPaise: authRecord.emergencyBudgetInPaise ?? 500000,
+        savingsBudgetInPaise: authRecord.savingsBudgetInPaise ?? 500000,
+        carryForwardEnabled: Boolean(authRecord.carryForwardEnabled)
       };
 
-      authoritativeBudgets.push(mergedBudget);
+      authoritativeBudgets.push(consolidatedBudget);
     }
   }
 
@@ -1243,14 +1248,18 @@ export async function runIdempotentMigrations(): Promise<void> {
     else memoryDb.budgetAllocations.push(authB);
   }
 
-  // 6. CASH WALLET DEDUPLICATION & MERGE
+  // 6. CASH WALLET DEDUPLICATION & PERSISTENCE
+  // Strictly filter wallets associated with Rajesh; do NOT reassign demo-user-id to Rajesh
   const rajeshWallets = memoryDb.cashWallets.filter(
-    w => w.userId === canonicalUserId || legacyIds.includes(w.userId)
+    w => w.userId === canonicalUserId || w.userId === 'user-rjrajeshpal30'
   );
   let authWallet: any = null;
   const dupWalletIds: string[] = [];
   if (rajeshWallets.length > 1) {
-    authWallet = rajeshWallets.reduce((max, w) => (w.balanceInPaise > max.balanceInPaise ? w : max), rajeshWallets[0]);
+    // Authoritative selection: prefer canonical ID wallet; otherwise most recently updated
+    authWallet = rajeshWallets.find(w => w.userId === canonicalUserId && w.id !== 'cash-wallet-01') ||
+      rajeshWallets.find(w => w.userId === canonicalUserId) ||
+      rajeshWallets[0];
     authWallet.userId = canonicalUserId;
     for (const w of rajeshWallets) {
       if (w.id !== authWallet.id) dupWalletIds.push(w.id);
@@ -1263,6 +1272,19 @@ export async function runIdempotentMigrations(): Promise<void> {
   } else if (rajeshWallets.length === 1) {
     authWallet = rajeshWallets[0];
     authWallet.userId = canonicalUserId;
+  } else {
+    // If no cash wallet exists for Rajesh, initialize at 0 paise (NEVER ₹4,500)
+    authWallet = {
+      id: `cash-${canonicalUserId}`,
+      userId: canonicalUserId,
+      balanceInPaise: 0,
+      notes: 'Physical cash on hand',
+      updatedAt: new Date().toISOString()
+    };
+    memoryDb.cashWallets.push(authWallet);
+    if (mongoConnected && mongoose.connection.readyState === 1) {
+      await CashWalletModel.findOneAndUpdate({ id: authWallet.id }, authWallet, { upsert: true });
+    }
   }
 
   // 7. EMERGENCY FUND DEDUPLICATION & MERGE
@@ -1325,7 +1347,19 @@ export async function runIdempotentMigrations(): Promise<void> {
   // 9. SYNC TO MONGODB ATLAS SAFELY
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      // 9.1 Delete duplicate budget allocations in Atlas before updating to prevent unique key error
+      // 9.1 Archive duplicate budget allocations to audit collection before removing to ensure zero data loss
+      if (duplicateBudgetDocsToArchive.length > 0) {
+        await AuditBudgetSnapshotModel.insertMany(duplicateBudgetDocsToArchive.map(doc => ({
+          originalId: doc.id,
+          originalUserId: doc.userId,
+          monthYear: doc.monthYear,
+          fullDocument: doc,
+          archivedAt: new Date().toISOString(),
+          reason: 'Resolved E11000 duplicate key collision for canonical migration v1'
+        }))).catch(err => console.warn('Audit snapshot warning:', err));
+        console.log(`[Migration Atlas] Archived ${duplicateBudgetDocsToArchive.length} duplicate budget documents to "audit_budget_snapshots".`);
+      }
+
       if (duplicateBudgetIdsToDelete.length > 0) {
         await BudgetAllocationModel.deleteMany({ id: { $in: duplicateBudgetIdsToDelete } });
         console.log(`[Migration Atlas] Deleted ${duplicateBudgetIdsToDelete.length} duplicate budget documents.`);

@@ -66,6 +66,7 @@ var BankAccountSchema = new mongoose.Schema({
   balanceInPaise: { type: Number, default: 0 },
   openingBalanceInPaise: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },
+  status: { type: String, default: "Active" },
   notes: { type: String },
   createdAt: { type: String, default: () => (/* @__PURE__ */ new Date()).toISOString() }
 });
@@ -91,6 +92,7 @@ var CreditCardSchema = new mongoose.Schema({
   billingCycle: { type: String, default: "16th to 15th" },
   notes: { type: String },
   isActive: { type: Boolean, default: true },
+  status: { type: String, default: "Active" },
   lastPaymentDate: { type: String },
   lastPaymentAmountInPaise: { type: Number }
 });
@@ -239,6 +241,15 @@ var MigrationSchema = new mongoose.Schema({
   error: { type: String }
 }, { timestamps: true });
 var MigrationModel = mongoose.models.Migration || mongoose.model("Migration", MigrationSchema);
+var AuditBudgetSnapshotSchema = new mongoose.Schema({
+  originalId: { type: String, required: true },
+  originalUserId: { type: String, required: true },
+  monthYear: { type: String, required: true },
+  fullDocument: { type: mongoose.Schema.Types.Mixed, required: true },
+  archivedAt: { type: String, default: () => new Date().toISOString() },
+  reason: { type: String, default: "pre_deduplication_audit_archive" }
+}, { timestamps: true });
+var AuditBudgetSnapshotModel = mongoose.models.AuditBudgetSnapshot || mongoose.model("AuditBudgetSnapshot", AuditBudgetSnapshotSchema);
 function getMongoStatus() {
   return {
     connected: mongoConnected,
@@ -436,9 +447,11 @@ function getEffectiveUserId(userId, userEmail) {
   if (!userId && !userEmail) return "";
   const cleanEmail = (userEmail || "").trim().toLowerCase();
   const canonicalRajesh = (memoryDb.users || []).find(
-    (u) => u.email.toLowerCase() === "rjrajeshpal30062003@gmail.com" || u.email.toLowerCase() === "rjrajeshpal30@gmail.com"
+    (u) => u.email.toLowerCase() === "rjrajeshpal30062003@gmail.com" ||
+      u.id === "user-1794473436793-0d16c1" ||
+      u.email.toLowerCase() === "rjrajeshpal30@gmail.com"
   );
-  const canonicalRajeshId = canonicalRajesh ? canonicalRajesh.id : "user-rjrajeshpal30";
+  const canonicalRajeshId = canonicalRajesh ? canonicalRajesh.id : "user-1794473436793-0d16c1";
   if (
     userId === "user-1794473436793-0d16c1" ||
     userId === "user-rjrajeshpal30" ||
@@ -449,6 +462,18 @@ function getEffectiveUserId(userId, userEmail) {
     return canonicalRajeshId;
   }
   return userId || "";
+}
+function isOwner(itemUserId, authUserId) {
+  if (!itemUserId || !authUserId) return false;
+  if (itemUserId === authUserId) return true;
+  return getEffectiveUserId(itemUserId) === getEffectiveUserId(authUserId);
+}
+function getOwnerFilter(userId) {
+  const canonical = getEffectiveUserId(userId);
+  if (canonical === "user-1794473436793-0d16c1") {
+    return { $in: ["user-1794473436793-0d16c1", "user-rjrajeshpal30", "demo-user-id"] };
+  }
+  return userId;
 }
 async function findUserByEmail(email) {
   const cleanEmail = email.trim().toLowerCase();
@@ -579,7 +604,7 @@ async function persistBankAccount(account) {
   }
 }
 async function persistCashWallet(wallet) {
-  const idx = memoryDb.cashWallets.findIndex((w) => w.id === wallet.id);
+  const idx = memoryDb.cashWallets.findIndex((w) => w.id === wallet.id || isOwner(w.userId, wallet.userId));
   if (idx >= 0) {
     memoryDb.cashWallets[idx] = wallet;
   } else {
@@ -588,7 +613,11 @@ async function persistCashWallet(wallet) {
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await CashWalletModel.findOneAndUpdate({ id: wallet.id }, wallet, { upsert: true });
+      await CashWalletModel.findOneAndUpdate(
+        { $or: [{ id: wallet.id }, { userId: getOwnerFilter(wallet.userId) }] },
+        wallet,
+        { upsert: true, new: true }
+      );
     } catch (err) {
       console.error("Error saving cash wallet to MongoDB Atlas:", err);
     }
@@ -772,66 +801,66 @@ async function revokeAllUserRefreshTokens(userId) {
   }
 }
 async function deleteBankAccount(id, userId) {
-  memoryDb.bankAccounts = memoryDb.bankAccounts.filter((b) => !(b.id === id && b.userId === userId));
+  memoryDb.bankAccounts = memoryDb.bankAccounts.filter((b) => !(b.id === id && isOwner(b.userId, userId)));
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await BankAccountModel.deleteOne({ id, userId });
+      await BankAccountModel.deleteOne({ id, userId: getOwnerFilter(userId) });
     } catch (err) {
       console.error("Error deleting bank account from MongoDB Atlas:", err);
     }
   }
 }
 async function deleteCreditCard(id, userId) {
-  memoryDb.creditCards = memoryDb.creditCards.filter((c) => !(c.id === id && c.userId === userId));
+  memoryDb.creditCards = memoryDb.creditCards.filter((c) => !(c.id === id && isOwner(c.userId, userId)));
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await CreditCardModel.deleteOne({ id, userId });
+      await CreditCardModel.deleteOne({ id, userId: getOwnerFilter(userId) });
     } catch (err) {
       console.error("Error deleting credit card from MongoDB Atlas:", err);
     }
   }
 }
 async function deleteTransaction(id, userId) {
-  memoryDb.transactions = memoryDb.transactions.filter((t) => !(t.id === id && t.userId === userId));
+  memoryDb.transactions = memoryDb.transactions.filter((t) => !(t.id === id && isOwner(t.userId, userId)));
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await TransactionModel.deleteOne({ id, userId });
+      await TransactionModel.deleteOne({ id, userId: getOwnerFilter(userId) });
     } catch (err) {
       console.error("Error deleting transaction from MongoDB Atlas:", err);
     }
   }
 }
 async function deleteInvestment(id, userId) {
-  memoryDb.investments = memoryDb.investments.filter((i) => !(i.id === id && i.userId === userId));
+  memoryDb.investments = memoryDb.investments.filter((i) => !(i.id === id && isOwner(i.userId, userId)));
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await InvestmentModel.deleteOne({ id, userId });
+      await InvestmentModel.deleteOne({ id, userId: getOwnerFilter(userId) });
     } catch (err) {
       console.error("Error deleting investment from MongoDB Atlas:", err);
     }
   }
 }
 async function deleteFixedDeposit(id, userId) {
-  memoryDb.fixedDeposits = memoryDb.fixedDeposits.filter((f) => !(f.id === id && f.userId === userId));
+  memoryDb.fixedDeposits = memoryDb.fixedDeposits.filter((f) => !(f.id === id && isOwner(f.userId, userId)));
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await FixedDepositModel.deleteOne({ id, userId });
+      await FixedDepositModel.deleteOne({ id, userId: getOwnerFilter(userId) });
     } catch (err) {
       console.error("Error deleting fixed deposit from MongoDB Atlas:", err);
     }
   }
 }
 async function deleteSavingsGoal(id, userId) {
-  memoryDb.savingsGoals = memoryDb.savingsGoals.filter((s) => !(s.id === id && s.userId === userId));
+  memoryDb.savingsGoals = memoryDb.savingsGoals.filter((s) => !(s.id === id && isOwner(s.userId, userId)));
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await SavingsGoalModel.deleteOne({ id, userId });
+      await SavingsGoalModel.deleteOne({ id, userId: getOwnerFilter(userId) });
     } catch (err) {
       console.error("Error deleting savings goal from MongoDB Atlas:", err);
     }
@@ -956,6 +985,7 @@ async function runIdempotentMigrations() {
   }
   let resolvedDuplicateBudgetsCount = 0;
   const duplicateBudgetIdsToDelete = [];
+  const duplicateBudgetDocsToArchive = [];
   const authoritativeBudgets = [];
   for (const [monthYear, records] of budgetsByMonth.entries()) {
     if (records.length === 1) {
@@ -965,52 +995,25 @@ async function runIdempotentMigrations() {
     } else {
       resolvedDuplicateBudgetsCount += (records.length - 1);
       console.log(`[Migration] Resolving ${records.length} duplicate budget records for month ${monthYear}...`);
-      const nonDemoRecord = records.find((r) => !r.id.includes("demo") && typeof r.totalBudgetInPaise === "number" && r.totalBudgetInPaise > 0);
-      const authRecord = nonDemoRecord || records.find((r) => typeof r.totalBudgetInPaise === "number" && r.totalBudgetInPaise > 0) || records[0];
-      let maxTotalBudget = authRecord.totalBudgetInPaise || 4e6;
-      let maxEssential = authRecord.essentialBudgetInPaise || 0;
-      let maxFun = authRecord.funBudgetInPaise || 0;
-      let maxInv = authRecord.investmentBudgetInPaise || 0;
-      let maxEf = authRecord.emergencyBudgetInPaise || 0;
-      let maxSav = authRecord.savingsBudgetInPaise || 0;
-      let carryForward = Boolean(authRecord.carryForwardEnabled);
+      const userCustomRecord = records.find((r) => typeof r.totalBudgetInPaise === "number" && r.totalBudgetInPaise > 0);
+      const authRecord = userCustomRecord || records.find((r) => r.id.includes(canonicalUserId)) || records[0];
       for (const other of records) {
         if (other.id !== authRecord.id) {
           duplicateBudgetIdsToDelete.push(other.id);
-        }
-        if (typeof other.totalBudgetInPaise === "number" && other.totalBudgetInPaise > 0) {
-          maxTotalBudget = Math.max(maxTotalBudget, other.totalBudgetInPaise);
-        }
-        if (other.essentialBudgetInPaise && other.essentialBudgetInPaise > 0) {
-          maxEssential = Math.max(maxEssential, other.essentialBudgetInPaise);
-        }
-        if (other.funBudgetInPaise && other.funBudgetInPaise > 0) {
-          maxFun = Math.max(maxFun, other.funBudgetInPaise);
-        }
-        if (other.investmentBudgetInPaise && other.investmentBudgetInPaise > 0) {
-          maxInv = Math.max(maxInv, other.investmentBudgetInPaise);
-        }
-        if (other.emergencyBudgetInPaise && other.emergencyBudgetInPaise > 0) {
-          maxEf = Math.max(maxEf, other.emergencyBudgetInPaise);
-        }
-        if (other.savingsBudgetInPaise && other.savingsBudgetInPaise > 0) {
-          maxSav = Math.max(maxSav, other.savingsBudgetInPaise);
-        }
-        if (other.carryForwardEnabled) {
-          carryForward = true;
+          duplicateBudgetDocsToArchive.push(other);
         }
       }
       authoritativeBudgets.push({
-        id: authRecord.id,
+        id: `budget-${canonicalUserId}-${monthYear}`,
         userId: canonicalUserId,
         monthYear,
-        totalBudgetInPaise: maxTotalBudget,
-        essentialBudgetInPaise: maxEssential,
-        funBudgetInPaise: maxFun,
-        investmentBudgetInPaise: maxInv,
-        emergencyBudgetInPaise: maxEf,
-        savingsBudgetInPaise: maxSav,
-        carryForwardEnabled: carryForward
+        totalBudgetInPaise: authRecord.totalBudgetInPaise || 4e6,
+        essentialBudgetInPaise: authRecord.essentialBudgetInPaise ?? 18e5,
+        funBudgetInPaise: authRecord.funBudgetInPaise ?? 4e5,
+        investmentBudgetInPaise: authRecord.investmentBudgetInPaise ?? 8e5,
+        emergencyBudgetInPaise: authRecord.emergencyBudgetInPaise ?? 5e5,
+        savingsBudgetInPaise: authRecord.savingsBudgetInPaise ?? 5e5,
+        carryForwardEnabled: Boolean(authRecord.carryForwardEnabled)
       });
     }
   }
@@ -1023,11 +1026,14 @@ async function runIdempotentMigrations() {
     else memoryDb.budgetAllocations.push(authB);
   }
 
-  const rajeshWallets = memoryDb.cashWallets.filter((w) => w.userId === canonicalUserId || legacyIds.includes(w.userId));
+  // Strictly filter wallets associated with Rajesh; do NOT reassign demo-user-id to Rajesh
+  const rajeshWallets = memoryDb.cashWallets.filter((w) => w.userId === canonicalUserId || w.userId === "user-rjrajeshpal30");
   let authWallet = null;
   const dupWalletIds = [];
   if (rajeshWallets.length > 1) {
-    authWallet = rajeshWallets.reduce((max, w) => w.balanceInPaise > max.balanceInPaise ? w : max, rajeshWallets[0]);
+    authWallet = rajeshWallets.find((w) => w.userId === canonicalUserId && w.id !== "cash-wallet-01") ||
+      rajeshWallets.find((w) => w.userId === canonicalUserId) ||
+      rajeshWallets[0];
     authWallet.userId = canonicalUserId;
     for (const w of rajeshWallets) {
       if (w.id !== authWallet.id) dupWalletIds.push(w.id);
@@ -1040,6 +1046,19 @@ async function runIdempotentMigrations() {
   } else if (rajeshWallets.length === 1) {
     authWallet = rajeshWallets[0];
     authWallet.userId = canonicalUserId;
+  } else {
+    // If no cash wallet exists for Rajesh, initialize at 0 paise (NEVER ₹4,500)
+    authWallet = {
+      id: `cash-${canonicalUserId}`,
+      userId: canonicalUserId,
+      balanceInPaise: 0,
+      notes: "Physical cash on hand",
+      updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    memoryDb.cashWallets.push(authWallet);
+    if (mongoConnected && mongoose.connection.readyState === 1) {
+      await CashWalletModel.findOneAndUpdate({ id: authWallet.id }, authWallet, { upsert: true });
+    }
   }
 
   const rajeshFunds = memoryDb.emergencyFunds.filter((f) => f.userId === canonicalUserId || legacyIds.includes(f.userId));
@@ -1097,6 +1116,17 @@ async function runIdempotentMigrations() {
 
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
+      if (duplicateBudgetDocsToArchive.length > 0) {
+        await AuditBudgetSnapshotModel.insertMany(duplicateBudgetDocsToArchive.map(doc => ({
+          originalId: doc.id,
+          originalUserId: doc.userId,
+          monthYear: doc.monthYear,
+          fullDocument: doc,
+          archivedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          reason: "Resolved E11000 duplicate key collision for canonical migration v1"
+        }))).catch(err => console.warn("Audit snapshot warning:", err));
+        console.log(`[Migration Atlas] Archived ${duplicateBudgetDocsToArchive.length} duplicate budget documents to "audit_budget_snapshots".`);
+      }
       if (duplicateBudgetIdsToDelete.length > 0) {
         await BudgetAllocationModel.deleteMany({ id: { $in: duplicateBudgetIdsToDelete } });
         console.log(`[Migration Atlas] Deleted ${duplicateBudgetIdsToDelete.length} duplicate budget documents.`);
@@ -1576,13 +1606,13 @@ var LedgerService = class {
           const bank = db.bankAccounts.find((b) => b.id === destinationAccountId);
           if (bank) bank.balanceInPaise -= amountInPaise;
         } else if (paymentMethod === "Cash") {
-          const cash = db.cashWallets.find((w) => w.userId === tx.userId);
+          const cash = db.cashWallets.find((w) => isOwner(w.userId, tx.userId));
           if (cash) cash.balanceInPaise -= amountInPaise;
         }
         break;
       case "expense":
         if (paymentMethod === "Cash") {
-          const cash = db.cashWallets.find((w) => w.userId === tx.userId);
+          const cash = db.cashWallets.find((w) => isOwner(w.userId, tx.userId));
           if (cash) cash.balanceInPaise += amountInPaise;
         } else if (sourceAccountId) {
           const bank = db.bankAccounts.find((b) => b.id === sourceAccountId);
@@ -1626,11 +1656,11 @@ var LedgerService = class {
           const bank = db.bankAccounts.find((b) => b.id === sourceAccountId);
           if (bank) bank.balanceInPaise += amountInPaise;
         }
-        const cashWithdrawal = db.cashWallets.find((w) => w.userId === tx.userId);
+        const cashWithdrawal = db.cashWallets.find((w) => isOwner(w.userId, tx.userId));
         if (cashWithdrawal) cashWithdrawal.balanceInPaise -= amountInPaise;
         break;
       case "cash_deposit":
-        const cashDeposit = db.cashWallets.find((w) => w.userId === tx.userId);
+        const cashDeposit = db.cashWallets.find((w) => isOwner(w.userId, tx.userId));
         if (cashDeposit) cashDeposit.balanceInPaise += amountInPaise;
         if (destinationAccountId) {
           const bank = db.bankAccounts.find((b) => b.id === destinationAccountId);
@@ -1642,10 +1672,10 @@ var LedgerService = class {
           const bank = db.bankAccounts.find((b) => b.id === sourceAccountId);
           if (bank) bank.balanceInPaise += amountInPaise;
         } else if (paymentMethod === "Cash") {
-          const cash = db.cashWallets.find((w) => w.userId === tx.userId);
+          const cash = db.cashWallets.find((w) => isOwner(w.userId, tx.userId));
           if (cash) cash.balanceInPaise += amountInPaise;
         }
-        const ef = db.emergencyFunds.find((e) => e.userId === tx.userId);
+        const ef = db.emergencyFunds.find((e) => isOwner(e.userId, tx.userId));
         if (ef) ef.currentBalanceInPaise = Math.max(0, ef.currentBalanceInPaise - amountInPaise);
         break;
       case "emergency_withdrawal":
@@ -1653,7 +1683,7 @@ var LedgerService = class {
           const bank = db.bankAccounts.find((b) => b.id === destinationAccountId);
           if (bank) bank.balanceInPaise -= amountInPaise;
         }
-        const efWithdraw = db.emergencyFunds.find((e) => e.userId === tx.userId);
+        const efWithdraw = db.emergencyFunds.find((e) => isOwner(e.userId, tx.userId));
         if (efWithdraw) efWithdraw.currentBalanceInPaise += amountInPaise;
         break;
       case "investment_deposit":
@@ -1661,7 +1691,7 @@ var LedgerService = class {
           const bank = db.bankAccounts.find((b) => b.id === sourceAccountId);
           if (bank) bank.balanceInPaise += amountInPaise;
         } else if (paymentMethod === "Cash") {
-          const cash = db.cashWallets.find((w) => w.userId === tx.userId);
+          const cash = db.cashWallets.find((w) => isOwner(w.userId, tx.userId));
           if (cash) cash.balanceInPaise += amountInPaise;
         }
         break;
@@ -1686,7 +1716,7 @@ var LedgerService = class {
           if (!bank) throw new Error("Receiving bank account not found");
           bank.balanceInPaise += amountInPaise;
         } else if (paymentMethod === "Cash") {
-          let cash = db.cashWallets.find((w) => w.userId === tx.userId);
+          let cash = db.cashWallets.find((w) => isOwner(w.userId, tx.userId));
           if (!cash) {
             cash = { id: `cash-${Date.now()}`, userId: tx.userId, balanceInPaise: 0, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
             db.cashWallets.push(cash);
@@ -1696,7 +1726,7 @@ var LedgerService = class {
         break;
       case "expense":
         if (paymentMethod === "Cash") {
-          const cash = db.cashWallets.find((w) => w.userId === tx.userId);
+          const cash = db.cashWallets.find((w) => isOwner(w.userId, tx.userId));
           if (!cash || cash.balanceInPaise < amountInPaise) {
           }
           if (cash) cash.balanceInPaise -= amountInPaise;
@@ -1743,7 +1773,7 @@ var LedgerService = class {
         if (!sourceAccountId) throw new Error("Source bank account required for cash withdrawal");
         const withdrawBank = db.bankAccounts.find((b) => b.id === sourceAccountId);
         if (!withdrawBank) throw new Error("Source bank account not found");
-        let cashW = db.cashWallets.find((w) => w.userId === tx.userId);
+        let cashW = db.cashWallets.find((w) => isOwner(w.userId, tx.userId));
         if (!cashW) {
           cashW = { id: `cash-${Date.now()}`, userId: tx.userId, balanceInPaise: 0, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
           db.cashWallets.push(cashW);
@@ -1755,7 +1785,7 @@ var LedgerService = class {
         if (!destinationAccountId) throw new Error("Destination bank account required for cash deposit");
         const depositBank = db.bankAccounts.find((b) => b.id === destinationAccountId);
         if (!depositBank) throw new Error("Destination bank account not found");
-        const cashD = db.cashWallets.find((w) => w.userId === tx.userId);
+        const cashD = db.cashWallets.find((w) => isOwner(w.userId, tx.userId));
         if (cashD) cashD.balanceInPaise -= amountInPaise;
         depositBank.balanceInPaise += amountInPaise;
         break;
@@ -1764,10 +1794,10 @@ var LedgerService = class {
           const bank = db.bankAccounts.find((b) => b.id === sourceAccountId);
           if (bank) bank.balanceInPaise -= amountInPaise;
         } else if (paymentMethod === "Cash") {
-          const cash = db.cashWallets.find((w) => w.userId === tx.userId);
+          const cash = db.cashWallets.find((w) => isOwner(w.userId, tx.userId));
           if (cash) cash.balanceInPaise -= amountInPaise;
         }
-        let ef = db.emergencyFunds.find((e) => e.userId === tx.userId);
+        let ef = db.emergencyFunds.find((e) => isOwner(e.userId, tx.userId));
         if (!ef) {
           ef = { id: `ef-${Date.now()}`, userId: tx.userId, targetAmountInPaise: 1e7, currentBalanceInPaise: 0, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
           db.emergencyFunds.push(ef);
@@ -1776,7 +1806,7 @@ var LedgerService = class {
         ef.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
         break;
       case "emergency_withdrawal":
-        let efW = db.emergencyFunds.find((e) => e.userId === tx.userId);
+        let efW = db.emergencyFunds.find((e) => isOwner(e.userId, tx.userId));
         if (efW) {
           efW.currentBalanceInPaise = Math.max(0, efW.currentBalanceInPaise - amountInPaise);
           efW.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -1791,7 +1821,7 @@ var LedgerService = class {
           const bank = db.bankAccounts.find((b) => b.id === sourceAccountId);
           if (bank) bank.balanceInPaise -= amountInPaise;
         } else if (paymentMethod === "Cash") {
-          const cash = db.cashWallets.find((w) => w.userId === tx.userId);
+          const cash = db.cashWallets.find((w) => isOwner(w.userId, tx.userId));
           if (cash) cash.balanceInPaise -= amountInPaise;
         }
         break;
@@ -3015,41 +3045,44 @@ router.get("/dashboard/summary", authenticate, (req, res) => {
   const userId = req.user.id;
   const now = /* @__PURE__ */ new Date();
   const currentMonthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const userBanks = db.bankAccounts.filter((b) => b.userId === userId && b.isActive);
+  const userBanks = db.bankAccounts.filter((b) => isOwner(b.userId, userId) && b.isActive !== false && b.status !== "Closed");
   const totalBankPaise = userBanks.reduce((sum, b) => sum + b.balanceInPaise, 0);
-  const cashWallet = db.cashWallets.find((w) => w.userId === userId);
+  const cashWallet = db.cashWallets.find((w) => isOwner(w.userId, userId));
   const totalCashPaise = cashWallet ? cashWallet.balanceInPaise : 0;
   const totalAvailableMoneyPaise = totalBankPaise + totalCashPaise;
-  const userCards = db.creditCards.filter((c) => c.userId === userId && c.isActive);
-  const totalCCOutstandingPaise = userCards.reduce((sum, c) => sum + c.outstandingBalanceInPaise, 0);
-  const userTxs = db.transactions.filter((t) => t.userId === userId);
+  const userCardsWithDebt = db.creditCards.filter((c) => isOwner(c.userId, userId) && c.outstandingBalanceInPaise > 0);
+  const totalCCOutstandingPaise = userCardsWithDebt.reduce((sum, c) => sum + c.outstandingBalanceInPaise, 0);
+  const activeCards = db.creditCards.filter((c) => isOwner(c.userId, userId) && c.isActive !== false && c.status !== "Closed");
+  const totalAvailableCreditPaise = activeCards.reduce((sum, c) => sum + Math.max(0, c.availableCreditInPaise), 0);
+  const totalCreditLimitPaise = activeCards.reduce((sum, c) => sum + c.creditLimitInPaise, 0);
+  const userTxs = db.transactions.filter((t) => isOwner(t.userId, userId));
   const monthTxs = userTxs.filter((t) => t.date.startsWith(currentMonthYear));
   const totalMonthlyIncomePaise = monthTxs.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amountInPaise, 0);
   const totalMonthlyExpensesPaise = monthTxs.filter((t) => t.type === "expense" || t.type === "credit_card_expense").reduce((sum, t) => sum + t.amountInPaise, 0);
-  const userInvestments = db.investments.filter((i) => i.userId === userId);
+  const userInvestments = db.investments.filter((i) => isOwner(i.userId, userId));
   const totalInvestedPaise = userInvestments.reduce((sum, i) => sum + i.investedAmountInPaise, 0);
   const totalCurrentInvestmentsPaise = userInvestments.reduce((sum, i) => sum + i.currentValueInPaise, 0);
-  const ef = db.emergencyFunds.find((e) => e.userId === userId);
+  const ef = db.emergencyFunds.find((e) => isOwner(e.userId, userId));
   const emergencyFundBalancePaise = ef ? ef.currentBalanceInPaise : 0;
   const emergencyFundTargetPaise = ef ? ef.targetAmountInPaise : 1e7;
-  const userSavings = db.savingsGoals.filter((s) => s.userId === userId);
+  const userSavings = db.savingsGoals.filter((s) => isOwner(s.userId, userId));
   const totalSavingsPaise = userSavings.reduce((sum, s) => sum + s.savedAmountInPaise, 0);
-  const user = db.users.find((u) => u.id === userId);
-  const currentAllocation = db.budgetAllocations.find((b) => b.userId === userId && b.monthYear === currentMonthYear);
+  const user = db.users.find((u) => isOwner(u.id, userId));
+  const currentAllocation = db.budgetAllocations.find((b) => isOwner(b.userId, userId) && b.monthYear === currentMonthYear);
   const monthlyBudgetPaise = currentAllocation?.totalBudgetInPaise || user?.monthlyBudgetInPaise || 4e6;
   const remainingBudgetPaise = Math.max(0, monthlyBudgetPaise - totalMonthlyExpensesPaise);
   const budgetUtilizationPercent = monthlyBudgetPaise > 0 ? Math.round(totalMonthlyExpensesPaise / monthlyBudgetPaise * 100) : 0;
   const totalPlannedAllocationPaise = currentAllocation ? currentAllocation.essentialBudgetInPaise + currentAllocation.funBudgetInPaise + currentAllocation.investmentBudgetInPaise + currentAllocation.emergencyBudgetInPaise + currentAllocation.savingsBudgetInPaise : 32e5;
   const unallocatedBudgetPaise = monthlyBudgetPaise - totalPlannedAllocationPaise;
   const unallocatedCushionPaise = totalMonthlyIncomePaise - totalPlannedAllocationPaise;
-  const upcomingBills = userCards.filter((c) => c.outstandingBalanceInPaise > 0).map((c) => ({
+  const upcomingBills = userCardsWithDebt.map((c) => ({
     cardId: c.id,
     cardName: c.cardName,
     lastFourDigits: c.lastFourDigits,
     outstandingPaise: c.outstandingBalanceInPaise,
     dueDay: c.dueDay
   }));
-  const userFDs = db.fixedDeposits.filter((f) => f.userId === userId && f.status === "Active");
+  const userFDs = db.fixedDeposits.filter((f) => isOwner(f.userId, userId) && f.status === "Active");
   const upcomingFDs = userFDs.map((f) => {
     const diffDays = Math.ceil((new Date(f.maturityDate).getTime() - Date.now()) / (1e3 * 60 * 60 * 24));
     return {
@@ -3070,6 +3103,10 @@ router.get("/dashboard/summary", authenticate, (req, res) => {
     totalBankPaise,
     totalCashPaise,
     totalCCOutstandingPaise,
+    totalAvailableCreditPaise,
+    totalCreditLimitPaise,
+    activeBankCount: userBanks.length,
+    activeCardCount: activeCards.length,
     totalMonthlyIncomePaise,
     totalMonthlyExpensesPaise,
     totalInvestedPaise,
@@ -3095,7 +3132,7 @@ router.get("/dashboard/summary", authenticate, (req, res) => {
 });
 router.get("/accounts", authenticate, (req, res) => {
   const db = getDb();
-  const accounts = db.bankAccounts.filter((b) => b.userId === req.user.id);
+  const accounts = db.bankAccounts.filter((b) => isOwner(b.userId, req.user.id));
   res.json(accounts);
 });
 router.post("/accounts", authenticate, async (req, res) => {
@@ -3126,47 +3163,136 @@ router.post("/accounts", authenticate, async (req, res) => {
 });
 router.put("/accounts/:id", authenticate, async (req, res) => {
   const db = getDb();
-  const account = db.bankAccounts.find((b) => b.id === req.params.id && b.userId === req.user.id);
+  const account = db.bankAccounts.find((b) => b.id === req.params.id && isOwner(b.userId, req.user.id));
   if (!account) return res.status(404).json({ error: "Account not found" });
-  const { bankName, accountHolderName, accountType, accountNickname, notes, isActive } = req.body;
+  const { bankName, accountHolderName, accountType, accountNickname, notes, isActive, status } = req.body;
   if (bankName) account.bankName = bankName;
   if (accountHolderName) account.accountHolderName = accountHolderName;
   if (accountType) account.accountType = accountType;
   if (accountNickname) account.accountNickname = accountNickname;
   if (notes !== void 0) account.notes = notes;
   if (isActive !== void 0) account.isActive = isActive;
+  if (status !== void 0) account.status = status;
+  else if (isActive === false) account.status = "Closed";
+  else if (isActive === true) account.status = "Active";
   saveDatabase();
   await persistBankAccount(account);
   res.json(account);
 });
 router.delete("/accounts/:id", authenticate, async (req, res) => {
   const db = getDb();
-  const account = db.bankAccounts.find((b) => b.id === req.params.id && b.userId === req.user.id);
+  const account = db.bankAccounts.find((b) => b.id === req.params.id && isOwner(b.userId, req.user.id));
   if (!account) return res.status(404).json({ error: "Account not found" });
-  await deleteBankAccount(req.params.id, req.user.id);
-  res.json({ message: "Account removed successfully" });
+  account.isActive = false;
+  account.status = "Closed";
+  saveDatabase();
+  await persistBankAccount(account);
+  res.json({ message: "Account closed successfully without removing transaction history", account });
 });
-router.get("/cash", authenticate, (req, res) => {
+router.post("/accounts/:id/close", authenticate, async (req, res) => {
   const db = getDb();
-  let wallet = db.cashWallets.find((w) => w.userId === req.user.id);
+  const account = db.bankAccounts.find((b) => b.id === req.params.id && isOwner(b.userId, req.user.id));
+  if (!account) return res.status(404).json({ error: "Account not found" });
+  account.isActive = false;
+  account.status = "Closed";
+  saveDatabase();
+  await persistBankAccount(account);
+  res.json({ message: "Account closed successfully", account });
+});
+router.post("/accounts/:id/reopen", authenticate, async (req, res) => {
+  const db = getDb();
+  const account = db.bankAccounts.find((b) => b.id === req.params.id && isOwner(b.userId, req.user.id));
+  if (!account) return res.status(404).json({ error: "Account not found" });
+  account.isActive = true;
+  account.status = "Active";
+  saveDatabase();
+  await persistBankAccount(account);
+  res.json({ message: "Account reopened successfully", account });
+});
+router.post("/accounts/reset-financial-setup", authenticate, async (req, res) => {
+  try {
+    const { confirmation } = req.body;
+    if (confirmation !== "RESET") {
+      return res.status(400).json({ error: 'Please enter "RESET" to confirm closing all bank accounts and credit cards.' });
+    }
+    const db = getDb();
+    const userId = req.user.id;
+    const userBanks = db.bankAccounts.filter((b) => isOwner(b.userId, userId) && b.isActive);
+    for (const bank of userBanks) {
+      bank.isActive = false;
+      bank.status = "Closed";
+    }
+    const userCards = db.creditCards.filter((c) => isOwner(c.userId, userId) && c.isActive);
+    for (const card of userCards) {
+      card.isActive = false;
+      card.status = "Closed";
+    }
+    saveDatabase();
+    const status = getMongoStatus();
+    if (status.connected) {
+      const ownerFilter = getOwnerFilter(userId);
+      await BankAccountModel.updateMany(
+        { userId: ownerFilter, isActive: true },
+        { $set: { isActive: false, status: "Closed" } }
+      );
+      await CreditCardModel.updateMany(
+        { userId: ownerFilter, isActive: true },
+        { $set: { isActive: false, status: "Closed" } }
+      );
+    }
+    res.json({
+      success: true,
+      message: `Reset complete: Closed ${userBanks.length} bank account(s) and ${userCards.length} credit card(s). Historical transactions and all other records have been preserved.`,
+      closedBankCount: userBanks.length,
+      closedCardCount: userCards.length
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message || "Reset financial setup failed" });
+  }
+});
+router.post("/settings/reset-bank-card-setup", authenticate, async (req, res) => {
+  return router.handle({ ...req, url: "/accounts/reset-financial-setup" }, res, () => {});
+});
+router.get("/cash", authenticate, async (req, res) => {
+  const db = getDb();
+  let wallet = db.cashWallets.find((w) => isOwner(w.userId, req.user.id));
+  const status = getMongoStatus();
+  if (status.connected) {
+    try {
+      const atlasWallet = await CashWalletModel.findOne({ userId: getOwnerFilter(req.user.id) }).lean();
+      if (atlasWallet) {
+        const { _id, __v, ...cleanWallet } = atlasWallet;
+        wallet = cleanWallet;
+        const idx = db.cashWallets.findIndex((w) => isOwner(w.userId, req.user.id));
+        if (idx >= 0) db.cashWallets[idx] = cleanWallet;
+        else db.cashWallets.push(cleanWallet);
+        saveDatabase();
+      }
+    } catch (err) {
+      console.warn("Atlas cash wallet query error:", err);
+    }
+  }
   if (!wallet) {
-    wallet = { id: `cash-${Date.now()}`, userId: req.user.id, balanceInPaise: 0, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+    wallet = { id: `cash-${Date.now()}`, userId: req.user.id, balanceInPaise: 0, notes: "Physical cash on hand", updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
     db.cashWallets.push(wallet);
     saveDatabase();
-    persistCashWallet(wallet).catch(() => {
-    });
+    await persistCashWallet(wallet);
   }
   res.json(wallet);
 });
 router.post("/cash/adjust", authenticate, async (req, res) => {
   const db = getDb();
   const { newBalanceInPaise, reason } = req.body;
-  let wallet = db.cashWallets.find((w) => w.userId === req.user.id);
+  const parsedAmt = Number(newBalanceInPaise);
+  if (isNaN(parsedAmt) || parsedAmt < 0) {
+    return res.status(400).json({ error: "Valid non-negative balance in paise is required" });
+  }
+  let wallet = db.cashWallets.find((w) => isOwner(w.userId, req.user.id));
   if (!wallet) {
-    wallet = { id: `cash-${Date.now()}`, userId: req.user.id, balanceInPaise: 0, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+    wallet = { id: `cash-${Date.now()}`, userId: req.user.id, balanceInPaise: 0, notes: "Physical cash on hand", updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
     db.cashWallets.push(wallet);
   }
-  wallet.balanceInPaise = newBalanceInPaise;
+  wallet.balanceInPaise = Math.round(parsedAmt);
   wallet.notes = reason || "Manual balance adjustment";
   wallet.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
   saveDatabase();
@@ -3175,7 +3301,7 @@ router.post("/cash/adjust", authenticate, async (req, res) => {
 });
 router.get("/credit-cards", authenticate, (req, res) => {
   const db = getDb();
-  const cards = db.creditCards.filter((c) => c.userId === req.user.id);
+  const cards = db.creditCards.filter((c) => isOwner(c.userId, req.user.id));
   res.json(cards);
 });
 router.post("/credit-cards", authenticate, async (req, res) => {
@@ -3198,19 +3324,60 @@ router.post("/credit-cards", authenticate, async (req, res) => {
     dueDay: dueDay || 5,
     billingCycle: billingCycle || "Monthly",
     notes,
-    isActive: true
+    isActive: true,
+    status: "Active"
   };
   db.creditCards.push(newCard);
   saveDatabase();
   await persistCreditCard(newCard);
   res.status(201).json(newCard);
 });
+router.put("/credit-cards/:id", authenticate, async (req, res) => {
+  const db = getDb();
+  const card = db.creditCards.find((c) => c.id === req.params.id && isOwner(c.userId, req.user.id));
+  if (!card) return res.status(404).json({ error: "Credit card not found" });
+  const { cardName, bankName, cardNickname, notes, isActive, status } = req.body;
+  if (cardName) card.cardName = cardName;
+  if (bankName) card.bankName = bankName;
+  if (cardNickname) card.cardNickname = cardNickname;
+  if (notes !== void 0) card.notes = notes;
+  if (isActive !== void 0) card.isActive = isActive;
+  if (status !== void 0) card.status = status;
+  else if (isActive === false) card.status = "Closed";
+  else if (isActive === true) card.status = "Active";
+  saveDatabase();
+  await persistCreditCard(card);
+  res.json(card);
+});
 router.delete("/credit-cards/:id", authenticate, async (req, res) => {
   const db = getDb();
-  const card = db.creditCards.find((c) => c.id === req.params.id && c.userId === req.user.id);
+  const card = db.creditCards.find((c) => c.id === req.params.id && isOwner(c.userId, req.user.id));
   if (!card) return res.status(404).json({ error: "Credit card not found" });
-  await deleteCreditCard(req.params.id, req.user.id);
-  res.json({ message: "Credit card removed successfully" });
+  card.isActive = false;
+  card.status = "Closed";
+  saveDatabase();
+  await persistCreditCard(card);
+  res.json({ message: "Credit card closed successfully without removing transaction or bill history", card });
+});
+router.post("/credit-cards/:id/close", authenticate, async (req, res) => {
+  const db = getDb();
+  const card = db.creditCards.find((c) => c.id === req.params.id && isOwner(c.userId, req.user.id));
+  if (!card) return res.status(404).json({ error: "Credit card not found" });
+  card.isActive = false;
+  card.status = "Closed";
+  saveDatabase();
+  await persistCreditCard(card);
+  res.json({ message: "Credit card closed successfully", card });
+});
+router.post("/credit-cards/:id/reopen", authenticate, async (req, res) => {
+  const db = getDb();
+  const card = db.creditCards.find((c) => c.id === req.params.id && isOwner(c.userId, req.user.id));
+  if (!card) return res.status(404).json({ error: "Credit card not found" });
+  card.isActive = true;
+  card.status = "Active";
+  saveDatabase();
+  await persistCreditCard(card);
+  res.json({ message: "Credit card reopened successfully", card });
 });
 router.post("/credit-cards/pay-bill", authenticate, async (req, res) => {
   try {
@@ -3219,9 +3386,12 @@ router.post("/credit-cards/pay-bill", authenticate, async (req, res) => {
       return res.status(400).json({ error: "Card, bank account, and payment amount are required" });
     }
     const db = getDb();
-    const card = db.creditCards.find((c) => c.id === creditCardId && c.userId === req.user.id);
-    const bank = db.bankAccounts.find((b) => b.id === sourceAccountId && b.userId === req.user.id);
+    const card = db.creditCards.find((c) => c.id === creditCardId && isOwner(c.userId, req.user.id));
+    const bank = db.bankAccounts.find((b) => b.id === sourceAccountId && isOwner(b.userId, req.user.id));
     if (!card || !bank) return res.status(404).json({ error: "Credit card or source bank not found" });
+    if (bank.isActive === false || bank.status === "Closed") {
+      return res.status(400).json({ error: "Cannot pay credit card bill using a closed bank account" });
+    }
     if (bank.balanceInPaise < paymentAmountInPaise) {
       return res.status(400).json({ error: "Insufficient bank account balance to complete bill payment" });
     }
@@ -3259,7 +3429,7 @@ router.post("/credit-cards/pay-bill", authenticate, async (req, res) => {
 });
 router.get("/transactions", authenticate, (req, res) => {
   const db = getDb();
-  let txs = db.transactions.filter((t) => t.userId === req.user.id);
+  let txs = db.transactions.filter((t) => isOwner(t.userId, req.user.id));
   const { search, category, paymentMethod, type, startDate, endDate } = req.query;
   if (search) {
     const q = search.toLowerCase();
@@ -3318,18 +3488,27 @@ router.post("/transactions", authenticate, async (req, res) => {
       if (!card) {
         return res.status(404).json({ error: "Selected credit card not found" });
       }
-      if (card.userId !== req.user.id) {
+      if (!isOwner(card.userId, req.user.id)) {
         return res.status(403).json({ error: "Access denied: Credit card belongs to another user" });
+      }
+      if (card.isActive === false || card.status === "Closed") {
+        return res.status(400).json({ error: "Cannot charge new expenses to a closed or deactivated credit card" });
       }
       effectiveCreditCardId = card.id;
     } else if (type === "transfer") {
       if (!sourceAccountId || !destinationAccountId || sourceAccountId === destinationAccountId) {
         return res.status(400).json({ error: "Select two different accounts for transfer" });
       }
-      const srcBank = db.bankAccounts.find((b) => b.id === sourceAccountId && b.userId === req.user.id);
-      const destBank = db.bankAccounts.find((b) => b.id === destinationAccountId && b.userId === req.user.id);
+      const srcBank = db.bankAccounts.find((b) => b.id === sourceAccountId && isOwner(b.userId, req.user.id));
+      const destBank = db.bankAccounts.find((b) => b.id === destinationAccountId && isOwner(b.userId, req.user.id));
       if (!srcBank || !destBank) {
         return res.status(404).json({ error: "Bank accounts for transfer not found or unauthorized" });
+      }
+      if (srcBank.isActive === false || srcBank.status === "Closed") {
+        return res.status(400).json({ error: "Cannot transfer funds from a closed bank account" });
+      }
+      if (destBank.isActive === false || destBank.status === "Closed") {
+        return res.status(400).json({ error: "Cannot transfer funds to a closed bank account" });
       }
       effectiveSourceAccountId = srcBank.id;
       effectiveDestinationAccountId = destBank.id;
@@ -3338,15 +3517,24 @@ router.post("/transactions", authenticate, async (req, res) => {
         return res.status(400).json({ error: "Please select a source bank account" });
       }
       if (sourceAccountId) {
-        const bank = db.bankAccounts.find((b) => b.id === sourceAccountId && b.userId === req.user.id);
+        const bank = db.bankAccounts.find((b) => b.id === sourceAccountId && isOwner(b.userId, req.user.id));
         if (!bank) {
           return res.status(404).json({ error: "Selected bank account not found or unauthorized" });
+        }
+        if (bank.isActive === false || bank.status === "Closed") {
+          return res.status(400).json({ error: "Cannot transact using a closed bank account" });
         }
         effectiveSourceAccountId = bank.id;
       }
       if (destinationAccountId) {
-        const bank = db.bankAccounts.find((b) => b.id === destinationAccountId && b.userId === req.user.id);
-        if (bank) effectiveDestinationAccountId = bank.id;
+        const bank = db.bankAccounts.find((b) => b.id === destinationAccountId && isOwner(b.userId, req.user.id));
+        if (!bank) {
+          return res.status(404).json({ error: "Receiving bank account not found or unauthorized" });
+        }
+        if (bank.isActive === false || bank.status === "Closed") {
+          return res.status(400).json({ error: "Cannot deposit funds into a closed bank account" });
+        }
+        effectiveDestinationAccountId = bank.id;
       }
     } else if (paymentMethod === "Cash") {
     }
@@ -3384,6 +3572,10 @@ router.post("/transactions", authenticate, async (req, res) => {
       const bank = db.bankAccounts.find((b) => b.id === effectiveDestinationAccountId);
       if (bank) await persistBankAccount(bank);
     }
+    if (paymentMethod === "Cash" || type === "cash_withdrawal" || type === "cash_deposit" || type === "emergency_deposit" || type === "investment_deposit") {
+      const userCash = db.cashWallets.find((w) => isOwner(w.userId, req.user.id));
+      if (userCash) await persistCashWallet(userCash);
+    }
     return res.status(201).json(tx);
   } catch (err) {
     return res.status(400).json({ error: err.message || "Transaction recording failed" });
@@ -3392,7 +3584,7 @@ router.post("/transactions", authenticate, async (req, res) => {
 router.put("/transactions/:id", authenticate, async (req, res) => {
   try {
     const db = getDb();
-    const existingIndex = db.transactions.findIndex((t) => t.id === req.params.id && t.userId === req.user.id);
+    const existingIndex = db.transactions.findIndex((t) => t.id === req.params.id && isOwner(t.userId, req.user.id));
     if (existingIndex === -1) return res.status(404).json({ error: "Transaction not found" });
     const existingTx = db.transactions[existingIndex];
     LedgerService.reverseTransaction(existingTx);
@@ -3418,6 +3610,14 @@ router.put("/transactions/:id", authenticate, async (req, res) => {
       const bank = db.bankAccounts.find((b) => b.id === updatedTx.destinationAccountId);
       if (bank) await persistBankAccount(bank);
     }
+    if (
+      updatedTx.paymentMethod === "Cash" || existingTx.paymentMethod === "Cash" ||
+      updatedTx.type === "cash_withdrawal" || updatedTx.type === "cash_deposit" ||
+      existingTx.type === "cash_withdrawal" || existingTx.type === "cash_deposit"
+    ) {
+      const userCash = db.cashWallets.find((w) => isOwner(w.userId, req.user.id));
+      if (userCash) await persistCashWallet(userCash);
+    }
     res.json(updatedTx);
   } catch (err) {
     res.status(400).json({ error: err.message || "Transaction update failed" });
@@ -3426,7 +3626,7 @@ router.put("/transactions/:id", authenticate, async (req, res) => {
 router.delete("/transactions/:id", authenticate, async (req, res) => {
   try {
     const db = getDb();
-    const existingIndex = db.transactions.findIndex((t) => t.id === req.params.id && t.userId === req.user.id);
+    const existingIndex = db.transactions.findIndex((t) => t.id === req.params.id && isOwner(t.userId, req.user.id));
     if (existingIndex === -1) return res.status(404).json({ error: "Transaction not found" });
     const existingTx = db.transactions[existingIndex];
     LedgerService.reverseTransaction(existingTx);
@@ -3445,6 +3645,10 @@ router.delete("/transactions/:id", authenticate, async (req, res) => {
       const bank = db.bankAccounts.find((b) => b.id === existingTx.destinationAccountId);
       if (bank) await persistBankAccount(bank);
     }
+    if (existingTx.paymentMethod === "Cash" || existingTx.type === "cash_withdrawal" || existingTx.type === "cash_deposit") {
+      const userCash = db.cashWallets.find((w) => isOwner(w.userId, req.user.id));
+      if (userCash) await persistCashWallet(userCash);
+    }
     res.json({ message: "Transaction reversed and deleted successfully" });
   } catch (err) {
     res.status(400).json({ error: err.message || "Transaction deletion failed" });
@@ -3452,7 +3656,7 @@ router.delete("/transactions/:id", authenticate, async (req, res) => {
 });
 router.get("/transactions/export/csv", authenticate, (req, res) => {
   const db = getDb();
-  const txs = db.transactions.filter((t) => t.userId === req.user.id);
+  const txs = db.transactions.filter((t) => isOwner(t.userId, req.user.id));
   txs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const headers = ["Transaction ID", "Date", "Type", "Main Category", "Subcategory", "Amount (INR)", "Payment Method", "Description", "Notes", "Status"];
   const rows = txs.map((t) => [
@@ -3478,9 +3682,9 @@ router.get("/budget", authenticate, (req, res) => {
   const now = /* @__PURE__ */ new Date();
   const currentMonthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const targetMonthYear = req.query.month || currentMonthYear;
-  const user = db.users.find((u) => u.id === userId);
+  const user = db.users.find((u) => isOwner(u.id, userId));
   const userDefaultBudget = user?.monthlyBudgetInPaise || 4e6;
-  let allocation = db.budgetAllocations.find((b) => b.userId === userId && b.monthYear === targetMonthYear);
+  let allocation = db.budgetAllocations.find((b) => isOwner(b.userId, userId) && b.monthYear === targetMonthYear);
   if (!allocation) {
     allocation = {
       id: `budget-${userId}-${targetMonthYear}`,
@@ -3499,7 +3703,7 @@ router.get("/budget", authenticate, (req, res) => {
   } else if (!allocation.totalBudgetInPaise) {
     allocation.totalBudgetInPaise = userDefaultBudget;
   }
-  const monthTxs = db.transactions.filter((t) => t.userId === userId && t.date.startsWith(targetMonthYear));
+  const monthTxs = db.transactions.filter((t) => isOwner(t.userId, userId) && t.date.startsWith(targetMonthYear));
   const essentialSpentPaise = monthTxs.filter((t) => (t.type === "expense" || t.type === "credit_card_expense") && t.mainCategory === "Essential").reduce((sum, t) => sum + t.amountInPaise, 0);
   const funSpentPaise = monthTxs.filter((t) => (t.type === "expense" || t.type === "credit_card_expense") && t.mainCategory === "Fun").reduce((sum, t) => sum + t.amountInPaise, 0);
   const investmentSpentPaise = monthTxs.filter((t) => t.type === "investment_deposit").reduce((sum, t) => sum + t.amountInPaise, 0);
@@ -3568,9 +3772,9 @@ router.post("/budget", authenticate, async (req, res) => {
   const now = /* @__PURE__ */ new Date();
   const currentMonthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const targetMonthYear = req.body.monthYear || currentMonthYear;
-  const user = db.users.find((u) => u.id === userId);
+  const user = db.users.find((u) => isOwner(u.id, userId));
   const userDefaultBudget = user?.monthlyBudgetInPaise || 4e6;
-  let allocation = db.budgetAllocations.find((b) => b.userId === userId && b.monthYear === targetMonthYear);
+  let allocation = db.budgetAllocations.find((b) => isOwner(b.userId, userId) && b.monthYear === targetMonthYear);
   if (!allocation) {
     allocation = {
       id: `budget-${userId}-${targetMonthYear}`,
@@ -3629,7 +3833,7 @@ router.post("/budget/total", authenticate, async (req, res) => {
       error: "Invalid total monthly budget. Amount must be a positive number greater than zero."
     });
   }
-  let allocation = db.budgetAllocations.find((b) => b.userId === userId && b.monthYear === targetMonthYear);
+  let allocation = db.budgetAllocations.find((b) => isOwner(b.userId, userId) && b.monthYear === targetMonthYear);
   if (!allocation) {
     allocation = {
       id: `budget-${userId}-${targetMonthYear}`,
@@ -3654,7 +3858,7 @@ router.post("/budget/total", authenticate, async (req, res) => {
   }
   saveDatabase();
   await persistBudgetAllocation(allocation);
-  const monthTxs = db.transactions.filter((t) => t.userId === userId && t.date.startsWith(targetMonthYear));
+  const monthTxs = db.transactions.filter((t) => isOwner(t.userId, userId) && t.date.startsWith(targetMonthYear));
   const essentialSpentPaise = monthTxs.filter((t) => (t.type === "expense" || t.type === "credit_card_expense") && t.mainCategory === "Essential").reduce((sum, t) => sum + t.amountInPaise, 0);
   const funSpentPaise = monthTxs.filter((t) => (t.type === "expense" || t.type === "credit_card_expense") && t.mainCategory === "Fun").reduce((sum, t) => sum + t.amountInPaise, 0);
   const investmentSpentPaise = monthTxs.filter((t) => t.type === "investment_deposit").reduce((sum, t) => sum + t.amountInPaise, 0);
@@ -3719,7 +3923,7 @@ router.post("/budget/total", authenticate, async (req, res) => {
 });
 router.get("/investments", authenticate, (req, res) => {
   const db = getDb();
-  const investments = db.investments.filter((i) => i.userId === req.user.id);
+  const investments = db.investments.filter((i) => isOwner(i.userId, req.user.id));
   const totalInvested = investments.reduce((sum, i) => sum + i.investedAmountInPaise, 0);
   const totalCurrent = investments.reduce((sum, i) => sum + i.currentValueInPaise, 0);
   const totalGainLoss = totalCurrent - totalInvested;
@@ -3752,6 +3956,11 @@ router.post("/investments", authenticate, async (req, res) => {
   };
   db.investments.push(newInv);
   if (sourceAccountId) {
+    const bank = db.bankAccounts.find((b) => b.id === sourceAccountId && isOwner(b.userId, req.user.id));
+    if (!bank) return res.status(404).json({ error: "Source bank account not found or unauthorized" });
+    if (bank.isActive === false || bank.status === "Closed") {
+      return res.status(400).json({ error: "Cannot fund investment using a closed bank account" });
+    }
     const tx = {
       id: `tx-inv-${Date.now()}`,
       userId: req.user.id,
@@ -3769,8 +3978,7 @@ router.post("/investments", authenticate, async (req, res) => {
     LedgerService.applyTransaction(tx);
     db.transactions.unshift(tx);
     await persistTransaction(tx);
-    const bank = db.bankAccounts.find((b) => b.id === sourceAccountId);
-    if (bank) await persistBankAccount(bank);
+    await persistBankAccount(bank);
   }
   saveDatabase();
   await persistInvestment(newInv);
@@ -3778,7 +3986,7 @@ router.post("/investments", authenticate, async (req, res) => {
 });
 router.put("/investments/:id/valuation", authenticate, async (req, res) => {
   const db = getDb();
-  const inv = db.investments.find((i) => i.id === req.params.id && i.userId === req.user.id);
+  const inv = db.investments.find((i) => i.id === req.params.id && isOwner(i.userId, req.user.id));
   if (!inv) return res.status(404).json({ error: "Investment not found" });
   const { currentValueInPaise } = req.body;
   if (currentValueInPaise !== void 0) {
@@ -3790,7 +3998,7 @@ router.put("/investments/:id/valuation", authenticate, async (req, res) => {
 });
 router.delete("/investments/:id", authenticate, async (req, res) => {
   const db = getDb();
-  const idx = db.investments.findIndex((i) => i.id === req.params.id && i.userId === req.user.id);
+  const idx = db.investments.findIndex((i) => i.id === req.params.id && isOwner(i.userId, req.user.id));
   if (idx === -1) return res.status(404).json({ error: "Investment not found" });
   db.investments.splice(idx, 1);
   saveDatabase();
@@ -3799,7 +4007,7 @@ router.delete("/investments/:id", authenticate, async (req, res) => {
 });
 router.get("/fixed-deposits", authenticate, (req, res) => {
   const db = getDb();
-  const fds = db.fixedDeposits.filter((f) => f.userId === req.user.id);
+  const fds = db.fixedDeposits.filter((f) => isOwner(f.userId, req.user.id));
   res.json(fds);
 });
 router.post("/fixed-deposits", authenticate, async (req, res) => {
@@ -3834,6 +4042,11 @@ router.post("/fixed-deposits", authenticate, async (req, res) => {
   };
   db.fixedDeposits.push(newFD);
   if (sourceAccountId) {
+    const bank = db.bankAccounts.find((b) => b.id === sourceAccountId && isOwner(b.userId, req.user.id));
+    if (!bank) return res.status(404).json({ error: "Source bank account not found or unauthorized" });
+    if (bank.isActive === false || bank.status === "Closed") {
+      return res.status(400).json({ error: "Cannot create fixed deposit using a closed bank account" });
+    }
     const tx = {
       id: `tx-fd-${Date.now()}`,
       userId: req.user.id,
@@ -3851,8 +4064,7 @@ router.post("/fixed-deposits", authenticate, async (req, res) => {
     LedgerService.applyTransaction(tx);
     db.transactions.unshift(tx);
     await persistTransaction(tx);
-    const bank = db.bankAccounts.find((b) => b.id === sourceAccountId);
-    if (bank) await persistBankAccount(bank);
+    await persistBankAccount(bank);
   }
   saveDatabase();
   await persistFixedDeposit(newFD);
@@ -3860,7 +4072,7 @@ router.post("/fixed-deposits", authenticate, async (req, res) => {
 });
 router.delete("/fixed-deposits/:id", authenticate, async (req, res) => {
   const db = getDb();
-  const idx = db.fixedDeposits.findIndex((f) => f.id === req.params.id && f.userId === req.user.id);
+  const idx = db.fixedDeposits.findIndex((f) => f.id === req.params.id && isOwner(f.userId, req.user.id));
   if (idx === -1) return res.status(404).json({ error: "Fixed deposit not found" });
   db.fixedDeposits.splice(idx, 1);
   saveDatabase();
@@ -3869,7 +4081,7 @@ router.delete("/fixed-deposits/:id", authenticate, async (req, res) => {
 });
 router.get("/emergency-fund", authenticate, (req, res) => {
   const db = getDb();
-  let ef = db.emergencyFunds.find((e) => e.userId === req.user.id);
+  let ef = db.emergencyFunds.find((e) => isOwner(e.userId, req.user.id));
   if (!ef) {
     ef = {
       id: `ef-${Date.now()}`,
@@ -3894,7 +4106,7 @@ router.get("/emergency-fund", authenticate, (req, res) => {
 router.post("/emergency-fund/target", authenticate, async (req, res) => {
   const db = getDb();
   const { targetAmountInPaise } = req.body;
-  let ef = db.emergencyFunds.find((e) => e.userId === req.user.id);
+  let ef = db.emergencyFunds.find((e) => isOwner(e.userId, req.user.id));
   if (!ef) {
     ef = { id: `ef-${Date.now()}`, userId: req.user.id, targetAmountInPaise: Number(targetAmountInPaise), currentBalanceInPaise: 0, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
     db.emergencyFunds.push(ef);
@@ -3912,6 +4124,12 @@ router.post("/emergency-fund/deposit", authenticate, async (req, res) => {
     if (!amountInPaise || !sourceAccountId) {
       return res.status(400).json({ error: "Amount and source bank account required" });
     }
+    const db = getDb();
+    const bank = db.bankAccounts.find((b) => b.id === sourceAccountId && isOwner(b.userId, req.user.id));
+    if (!bank) return res.status(404).json({ error: "Source bank account not found or unauthorized" });
+    if (bank.isActive === false || bank.status === "Closed") {
+      return res.status(400).json({ error: "Cannot deposit into emergency fund using a closed bank account" });
+    }
     const tx = {
       id: `tx-ef-${Date.now()}`,
       userId: req.user.id,
@@ -3928,14 +4146,12 @@ router.post("/emergency-fund/deposit", authenticate, async (req, res) => {
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     };
     LedgerService.applyTransaction(tx);
-    const db = getDb();
     db.transactions.unshift(tx);
     saveDatabase();
-    const ef = db.emergencyFunds.find((e) => e.userId === req.user.id);
+    const ef = db.emergencyFunds.find((e) => isOwner(e.userId, req.user.id));
     await persistTransaction(tx);
     if (ef) await persistEmergencyFund(ef);
-    const bank = db.bankAccounts.find((b) => b.id === sourceAccountId);
-    if (bank) await persistBankAccount(bank);
+    await persistBankAccount(bank);
     res.json({ message: "Emergency fund deposit successful", ef, transaction: tx });
   } catch (err) {
     res.status(400).json({ error: err.message || "Deposit failed" });
@@ -3946,6 +4162,12 @@ router.post("/emergency-fund/withdraw", authenticate, async (req, res) => {
     const { amountInPaise, destinationAccountId, notes } = req.body;
     if (!amountInPaise || !destinationAccountId) {
       return res.status(400).json({ error: "Amount and receiving account required" });
+    }
+    const db = getDb();
+    const bank = db.bankAccounts.find((b) => b.id === destinationAccountId && isOwner(b.userId, req.user.id));
+    if (!bank) return res.status(404).json({ error: "Destination bank account not found or unauthorized" });
+    if (bank.isActive === false || bank.status === "Closed") {
+      return res.status(400).json({ error: "Cannot withdraw emergency fund into a closed bank account" });
     }
     const tx = {
       id: `tx-efw-${Date.now()}`,
@@ -3963,13 +4185,12 @@ router.post("/emergency-fund/withdraw", authenticate, async (req, res) => {
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     };
     LedgerService.applyTransaction(tx);
-    const db = getDb();
     db.transactions.unshift(tx);
     saveDatabase();
-    const ef = db.emergencyFunds.find((e) => e.userId === req.user.id);
+    const ef = db.emergencyFunds.find((e) => isOwner(e.userId, req.user.id));
     await persistTransaction(tx);
     if (ef) await persistEmergencyFund(ef);
-    const bank = db.bankAccounts.find((b) => b.id === destinationAccountId);
+    await persistBankAccount(bank);
     if (bank) await persistBankAccount(bank);
     res.json({ message: "Emergency fund withdrawal completed", ef, transaction: tx });
   } catch (err) {
@@ -3978,7 +4199,7 @@ router.post("/emergency-fund/withdraw", authenticate, async (req, res) => {
 });
 router.get("/savings-goals", authenticate, (req, res) => {
   const db = getDb();
-  const goals = db.savingsGoals.filter((s) => s.userId === req.user.id);
+  const goals = db.savingsGoals.filter((s) => isOwner(s.userId, req.user.id));
   res.json(goals);
 });
 router.post("/savings-goals", authenticate, async (req, res) => {
@@ -4006,7 +4227,7 @@ router.post("/savings-goals/:id/contribute", authenticate, async (req, res) => {
   try {
     const { amountInPaise, sourceAccountId } = req.body;
     const db = getDb();
-    const goal = db.savingsGoals.find((s) => s.id === req.params.id && s.userId === req.user.id);
+    const goal = db.savingsGoals.find((s) => s.id === req.params.id && isOwner(s.userId, req.user.id));
     if (!goal) return res.status(404).json({ error: "Goal not found" });
     const amt = Number(amountInPaise);
     const tx = {
@@ -4040,7 +4261,7 @@ router.post("/savings-goals/:id/contribute", authenticate, async (req, res) => {
 });
 router.delete("/savings-goals/:id", authenticate, async (req, res) => {
   const db = getDb();
-  const idx = db.savingsGoals.findIndex((s) => s.id === req.params.id && s.userId === req.user.id);
+  const idx = db.savingsGoals.findIndex((s) => s.id === req.params.id && isOwner(s.userId, req.user.id));
   if (idx === -1) return res.status(404).json({ error: "Goal not found" });
   db.savingsGoals.splice(idx, 1);
   saveDatabase();
@@ -4049,13 +4270,13 @@ router.delete("/savings-goals/:id", authenticate, async (req, res) => {
 });
 router.get("/notifications", authenticate, (req, res) => {
   const db = getDb();
-  const list = db.notifications.filter((n) => n.userId === req.user.id);
+  const list = db.notifications.filter((n) => isOwner(n.userId, req.user.id));
   const unreadCount = list.filter((n) => !n.isRead).length;
   res.json({ notifications: list, unreadCount });
 });
 router.post("/notifications/:id/read", authenticate, (req, res) => {
   const db = getDb();
-  const notif = db.notifications.find((n) => n.id === req.params.id && n.userId === req.user.id);
+  const notif = db.notifications.find((n) => n.id === req.params.id && isOwner(n.userId, req.user.id));
   if (notif) {
     notif.isRead = true;
     saveDatabase();
@@ -4064,14 +4285,14 @@ router.post("/notifications/:id/read", authenticate, (req, res) => {
 });
 router.post("/notifications/mark-all-read", authenticate, (req, res) => {
   const db = getDb();
-  db.notifications.filter((n) => n.userId === req.user.id).forEach((n) => n.isRead = true);
+  db.notifications.filter((n) => isOwner(n.userId, req.user.id)).forEach((n) => n.isRead = true);
   saveDatabase();
   res.json({ success: true });
 });
 router.post("/notifications/trigger-check", authenticate, async (req, res) => {
   await SchedulerService.runChecks(req.user.id);
   const db = getDb();
-  const list = db.notifications.filter((n) => n.userId === req.user.id);
+  const list = db.notifications.filter((n) => isOwner(n.userId, req.user.id));
   res.json({ message: "Reminders check executed", notifications: list });
 });
 router.post("/scenarios/reset", authenticate, async (req, res) => {

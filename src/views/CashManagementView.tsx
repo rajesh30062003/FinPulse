@@ -6,11 +6,13 @@ import { api, formatINR } from '../services/api';
 export const CashManagementView: React.FC = () => {
   const { cash, accounts, refreshAll, transactions } = useFinancial();
 
+  const activeAccounts = accounts.filter(a => a.isActive !== false && a.status !== 'Closed');
+
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [isAdjustOpen, setIsAdjustOpen] = useState(false);
 
-  const [bankId, setBankId] = useState(accounts[0]?.id || '');
+  const [bankId, setBankId] = useState(activeAccounts[0]?.id || '');
   const [amountRupees, setAmountRupees] = useState('');
   const [adjustAmountRupees, setAdjustAmountRupees] = useState('');
   const [adjustReason, setAdjustReason] = useState('');
@@ -231,7 +233,7 @@ export const CashManagementView: React.FC = () => {
                   onChange={e => setBankId(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
                 >
-                  {accounts.map(a => <option key={a.id} value={a.id}>{a.bankName} (Available: {formatINR(a.balanceInPaise)})</option>)}
+                  {activeAccounts.map(a => <option key={a.id} value={a.id}>{a.bankName} (Available: {formatINR(a.balanceInPaise)})</option>)}
                 </select>
               </div>
               <div>
@@ -280,7 +282,7 @@ export const CashManagementView: React.FC = () => {
                   onChange={e => setBankId(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
                 >
-                  {accounts.map(a => <option key={a.id} value={a.id}>{a.bankName}</option>)}
+                  {activeAccounts.map(a => <option key={a.id} value={a.id}>{a.bankName}</option>)}
                 </select>
               </div>
               <div>

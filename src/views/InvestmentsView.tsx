@@ -6,6 +6,8 @@ import { api, formatINR } from '../services/api';
 export const InvestmentsView: React.FC = () => {
   const { investmentsData, accounts, refreshAll } = useFinancial();
 
+  const activeAccounts = accounts.filter(a => a.isActive !== false && a.status !== 'Closed');
+
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValuationRupees, setEditValuationRupees] = useState('');
@@ -17,7 +19,7 @@ export const InvestmentsView: React.FC = () => {
   const [currentValuationRupees, setCurrentValuationRupees] = useState('');
   const [expectedReturnRate, setExpectedReturnRate] = useState('');
   const [riskLevel, setRiskLevel] = useState<'Very Low Risk' | 'Low Risk' | 'Moderate Risk' | 'High Risk' | 'Very High Risk'>('Moderate Risk');
-  const [sourceAccountId, setSourceAccountId] = useState(accounts[0]?.id || '');
+  const [sourceAccountId, setSourceAccountId] = useState(activeAccounts[0]?.id || '');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -313,7 +315,7 @@ export const InvestmentsView: React.FC = () => {
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
                 >
                   <option value="">No bank deduction (already funded)</option>
-                  {accounts.map(a => <option key={a.id} value={a.id}>{a.bankName} ({formatINR(a.balanceInPaise)})</option>)}
+                  {activeAccounts.map(a => <option key={a.id} value={a.id}>{a.bankName} ({formatINR(a.balanceInPaise)})</option>)}
                 </select>
               </div>
               <div className="flex gap-2 pt-2">
