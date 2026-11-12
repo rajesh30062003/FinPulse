@@ -521,9 +521,6 @@ router.post('/auth/login', async (req: Request, res: Response) => {
 
     setRefreshTokenCookie(res, refreshToken);
 
-    // Reconcile user financial data ownership safely
-    await reconcileUserData(user);
-
     return res.json({
       success: true,
       message: 'Login successful',
@@ -652,8 +649,6 @@ router.get('/auth/me', authenticate, async (req: AuthRequest, res: Response) => 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-    // Reconcile user financial data ownership safely
-    await reconcileUserData(user);
     const { passwordHash, verificationToken, verificationOtp, ...safeUser } = user;
     return res.json(safeUser);
   } catch (err: any) {
