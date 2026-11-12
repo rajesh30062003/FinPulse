@@ -393,12 +393,20 @@ export const api = {
   },
 
   // Budget
-  async getBudget() {
-    return apiRequest('/budget');
+  async getBudget(month?: string) {
+    const q = month ? `?month=${encodeURIComponent(month)}` : '';
+    return apiRequest(`/budget${q}`);
   },
 
   async updateBudget(data: any) {
     return apiRequest('/budget', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async updateTotalBudget(data: { monthYear?: string; totalBudgetInPaise: number }) {
+    return apiRequest('/budget/total', {
       method: 'POST',
       body: JSON.stringify(data)
     });

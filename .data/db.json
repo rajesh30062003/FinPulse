@@ -26,7 +26,7 @@
       "isVerified": true,
       "monthlyBudgetInPaise": 4000000,
       "name": "Aarav Patel",
-      "passwordHash": "$2b$10$ovkq6Qd0zM3/spGv28yAkOfaX/IOswzJxxpt.ygjq2Xpzui6PPd.G",
+      "passwordHash": "$2b$10$5nqGF1aEERUktvlkVY8xY.B/dBVpjNmJZFwM8vuxPMDifEwtoCAxm",
       "reminderDayOfMonth": 25,
       "updatedAt": "2026-11-11T10:41:59.245Z",
       "failedLoginAttempts": 0,
@@ -81,22 +81,6 @@
       "updatedAt": "2026-11-12T08:44:38.196Z"
     },
     {
-      "id": "user-1794473436793-0d16c1",
-      "accountStatus": "active",
-      "createdAt": "Thu Nov 12 2026 08:50:36 GMT+0000 (Coordinated Universal Time)",
-      "currency": "INR",
-      "email": "rjrajeshpal30062003@gmail.com",
-      "emailNotificationsEnabled": true,
-      "failedLoginAttempts": 0,
-      "isVerified": true,
-      "lockUntil": null,
-      "monthlyBudgetInPaise": 4000000,
-      "name": "Rajesh Pal",
-      "passwordHash": "$2b$10$zBVOewVzWi7EocFwUHdeP.Rk.XL7I9r9NQGtaksne15XputCZ/lWi",
-      "reminderDayOfMonth": 25,
-      "updatedAt": "2026-11-12T09:45:12.774Z"
-    },
-    {
       "id": "user-1794474969244-7c7af4",
       "accountStatus": "active",
       "createdAt": "Thu Nov 12 2026 09:16:09 GMT+0000 (Coordinated Universal Time)",
@@ -135,12 +119,24 @@
       "passwordHash": "$2b$10$0L42kmR7sk3hadA6iiG0i.5f0PDpLvYlL1lI1JvWjiKJTQT0Q0b.y",
       "isVerified": true,
       "currency": "INR",
+      "monthlyBudgetInPaise": 4500000,
+      "reminderDayOfMonth": 25,
+      "emailNotificationsEnabled": true,
+      "createdAt": "Thu Nov 12 2026 09:53:58 GMT+0000 (Coordinated Universal Time)",
+      "failedLoginAttempts": 0,
+      "lockUntil": null
+    },
+    {
+      "id": "user-1794473436793-0d16c1",
+      "name": "Rajesh Sharma",
+      "email": "rjrajeshpal30@gmail.com",
+      "passwordHash": "$2b$10$UPHGT81BxF7A13TVlqitFePhdtgK7aK1ibqA3eD.apkEVeTbpB44W",
+      "isVerified": true,
+      "currency": "INR",
       "monthlyBudgetInPaise": 4000000,
       "reminderDayOfMonth": 25,
       "emailNotificationsEnabled": true,
-      "createdAt": "2026-11-12T09:53:51.952Z",
-      "failedLoginAttempts": 0,
-      "lockUntil": null
+      "createdAt": "2026-11-12T10:09:44.065Z"
     }
   ],
   "bankAccounts": [
@@ -159,31 +155,31 @@
     },
     {
       "id": "bank-hdfc-01",
-      "userId": "user-rjrajeshpal30",
-      "bankName": "HDFC Bank",
       "accountHolderName": "Rajesh Sharma",
-      "accountType": "Savings",
       "accountNickname": "HDFC Salary Account",
       "accountNumberMasked": "•••• 4892",
-      "openingBalanceInPaise": 0,
+      "accountType": "Savings",
       "balanceInPaise": 6700000,
+      "bankName": "HDFC Bank",
+      "createdAt": "2026-11-12T10:02:55.261Z",
       "isActive": true,
       "notes": "Primary salary account",
-      "createdAt": "2026-11-11T10:08:08.138Z"
+      "openingBalanceInPaise": 0,
+      "userId": "user-rjrajeshpal30"
     },
     {
       "id": "bank-sbi-01",
-      "userId": "user-rjrajeshpal30",
-      "bankName": "State Bank of India",
       "accountHolderName": "Rajesh Sharma",
-      "accountType": "Savings",
       "accountNickname": "SBI Savings",
       "accountNumberMasked": "•••• 7120",
-      "openingBalanceInPaise": 1500000,
+      "accountType": "Savings",
       "balanceInPaise": 1800000,
+      "bankName": "State Bank of India",
+      "createdAt": "2026-11-12T10:02:55.261Z",
       "isActive": true,
       "notes": "Secondary emergency & bill pay account",
-      "createdAt": "2026-11-11T10:08:08.138Z"
+      "openingBalanceInPaise": 1500000,
+      "userId": "user-rjrajeshpal30"
     },
     {
       "id": "bank-1794473018154",
@@ -262,6 +258,48 @@
       "isActive": true,
       "openingBalanceInPaise": 0,
       "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "bank-1794477883701",
+      "accountHolderName": "Rajesh Sharma",
+      "accountNickname": "Rajesh Pal",
+      "accountNumberMasked": "•••• 1004",
+      "accountType": "Savings",
+      "balanceInPaise": -8000000,
+      "bankName": "State Bank Of India",
+      "createdAt": "2026-11-12T10:04:43.701Z",
+      "isActive": true,
+      "notes": "",
+      "openingBalanceInPaise": 0,
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "bank-hdfc-01",
+      "userId": "user-rjrajeshpal30",
+      "bankName": "HDFC Bank",
+      "accountHolderName": "Rajesh Sharma",
+      "accountType": "Savings",
+      "accountNickname": "HDFC Salary Account",
+      "accountNumberMasked": "•••• 4892",
+      "openingBalanceInPaise": 0,
+      "balanceInPaise": 6700000,
+      "isActive": true,
+      "notes": "Primary salary account",
+      "createdAt": "2026-11-12T10:09:44.065Z"
+    },
+    {
+      "id": "bank-sbi-01",
+      "userId": "user-rjrajeshpal30",
+      "bankName": "State Bank of India",
+      "accountHolderName": "Rajesh Sharma",
+      "accountType": "Savings",
+      "accountNickname": "SBI Savings",
+      "accountNumberMasked": "•••• 7120",
+      "openingBalanceInPaise": 1500000,
+      "balanceInPaise": 1800000,
+      "isActive": true,
+      "notes": "Secondary emergency & bill pay account",
+      "createdAt": "2026-11-12T10:09:44.065Z"
     }
   ],
   "cashWallets": [
@@ -273,10 +311,10 @@
     },
     {
       "id": "cash-wallet-01",
-      "userId": "user-rjrajeshpal30",
       "balanceInPaise": 450000,
       "notes": "Physical cash on hand",
-      "updatedAt": "2026-11-11T10:08:08.138Z"
+      "updatedAt": "2026-11-12T10:02:55.261Z",
+      "userId": "user-rjrajeshpal30"
     },
     {
       "id": "cash-1794473018297",
@@ -318,26 +356,39 @@
       "notes": "Primary Cash Wallet",
       "updatedAt": "2026-11-12T08:50:37.282Z",
       "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "cash-1794477428060",
+      "balanceInPaise": 0,
+      "updatedAt": "2026-11-12T09:57:08.060Z",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "cash-wallet-01",
+      "userId": "user-rjrajeshpal30",
+      "balanceInPaise": 450000,
+      "notes": "Physical cash on hand",
+      "updatedAt": "2026-11-12T10:09:44.065Z"
     }
   ],
   "creditCards": [
     {
       "id": "cc-hdfc-01",
-      "userId": "user-rjrajeshpal30",
-      "cardName": "HDFC Regalia Gold",
-      "bankName": "HDFC Bank",
-      "cardNickname": "HDFC Card",
-      "lastFourDigits": "9182",
-      "creditLimitInPaise": 15000000,
-      "outstandingBalanceInPaise": 300000,
       "availableCreditInPaise": 14700000,
-      "statementDay": 15,
-      "dueDay": 5,
+      "bankName": "HDFC Bank",
       "billingCycle": "16th to 15th",
-      "notes": "Rewards on dining & travel",
+      "cardName": "HDFC Regalia Gold",
+      "cardNickname": "HDFC Card",
+      "creditLimitInPaise": 15000000,
+      "dueDay": 5,
       "isActive": true,
-      "lastPaymentDate": "2026-11-09T10:08:08.139Z",
-      "lastPaymentAmountInPaise": 700000
+      "lastFourDigits": "9182",
+      "lastPaymentAmountInPaise": 700000,
+      "lastPaymentDate": "2026-11-10T10:02:55.261Z",
+      "notes": "Rewards on dining & travel",
+      "outstandingBalanceInPaise": 300000,
+      "statementDay": 15,
+      "userId": "user-rjrajeshpal30"
     },
     {
       "id": "cc-1794474970150",
@@ -401,7 +452,7 @@
     },
     {
       "id": "cc-1794475637883",
-      "availableCreditInPaise": 3540462,
+      "availableCreditInPaise": 3506250,
       "bankName": "HDFC Bank",
       "billingCycle": "16th to 15th",
       "cardName": "TATA Neu",
@@ -411,9 +462,27 @@
       "isActive": true,
       "lastFourDigits": "1435",
       "notes": "",
-      "outstandingBalanceInPaise": 459538,
+      "outstandingBalanceInPaise": 493750,
       "statementDay": 22,
       "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "cc-hdfc-01",
+      "userId": "user-rjrajeshpal30",
+      "cardName": "HDFC Regalia Gold",
+      "bankName": "HDFC Bank",
+      "cardNickname": "HDFC Card",
+      "lastFourDigits": "9182",
+      "creditLimitInPaise": 15000000,
+      "outstandingBalanceInPaise": 300000,
+      "availableCreditInPaise": 14700000,
+      "statementDay": 15,
+      "dueDay": 5,
+      "billingCycle": "16th to 15th",
+      "notes": "Rewards on dining & travel",
+      "isActive": true,
+      "lastPaymentDate": "2026-11-10T10:09:44.065Z",
+      "lastPaymentAmountInPaise": 700000
     }
   ],
   "transactions": [
@@ -500,126 +569,111 @@
       "userId": "user-1794474969244-7c7af4"
     },
     {
-      "id": "tx-scenario-1",
-      "userId": "user-rjrajeshpal30",
-      "date": "2026-11-01T10:08:08.139Z",
-      "type": "income",
-      "mainCategory": "Essential",
-      "subCategory": "Salary",
-      "amountInPaise": 4000000,
-      "paymentMethod": "Bank Account",
-      "destinationAccountId": "bank-hdfc-01",
-      "description": "Monthly Salary Credit",
-      "notes": "Scenario 1: Verified salary inflow directly to HDFC",
-      "status": "Completed",
-      "createdAt": "2026-11-01T10:08:08.139Z"
-    },
-    {
       "id": "tx-scenario-2",
-      "userId": "user-rjrajeshpal30",
-      "date": "2026-11-03T10:08:08.139Z",
-      "type": "expense",
-      "mainCategory": "Essential",
-      "subCategory": "Food",
       "amountInPaise": 50000,
-      "paymentMethod": "Cash",
+      "createdAt": "2026-11-04T10:02:55.262Z",
+      "date": "2026-11-04T10:02:55.262Z",
       "description": "Grocery & Fresh Food Market",
+      "mainCategory": "Essential",
       "notes": "Scenario 2: Cash expense deducts cash balance & Essential allocation",
+      "paymentMethod": "Cash",
       "status": "Completed",
-      "createdAt": "2026-11-03T10:08:08.139Z"
+      "subCategory": "Food",
+      "type": "expense",
+      "userId": "user-rjrajeshpal30"
     },
     {
       "id": "tx-scenario-3",
-      "userId": "user-rjrajeshpal30",
-      "date": "2026-11-04T10:08:08.139Z",
-      "type": "credit_card_expense",
-      "mainCategory": "Essential",
-      "subCategory": "Groceries",
       "amountInPaise": 200000,
-      "paymentMethod": "Credit Card",
+      "createdAt": "2026-11-05T10:02:55.262Z",
       "creditCardId": "cc-hdfc-01",
+      "date": "2026-11-05T10:02:55.262Z",
       "description": "Supermarket Household Supplies",
+      "mainCategory": "Essential",
       "notes": "Scenario 3: Card outstanding increases without deducting bank balance",
+      "paymentMethod": "Credit Card",
       "status": "Completed",
-      "createdAt": "2026-11-04T10:08:08.139Z"
+      "subCategory": "Groceries",
+      "type": "credit_card_expense",
+      "userId": "user-rjrajeshpal30"
     },
     {
       "id": "tx-scenario-4",
-      "userId": "user-rjrajeshpal30",
-      "date": "2026-11-05T10:08:08.139Z",
-      "type": "credit_card_payment",
-      "mainCategory": "Liability Settlement",
-      "subCategory": "Credit Card Bill Payment",
       "amountInPaise": 200000,
+      "createdAt": "2026-11-06T10:02:55.262Z",
+      "creditCardId": "cc-hdfc-01",
+      "date": "2026-11-06T10:02:55.262Z",
+      "description": "Bill Settlement for HDFC Card",
+      "mainCategory": "Liability Settlement",
+      "notes": "Scenario 4: Paid from SBI; liability settled without duplicate expense",
       "paymentMethod": "Bank Account",
       "sourceAccountId": "bank-sbi-01",
-      "creditCardId": "cc-hdfc-01",
-      "description": "Bill Settlement for HDFC Card",
-      "notes": "Scenario 4: Paid from SBI; liability settled without duplicate expense",
       "status": "Completed",
-      "createdAt": "2026-11-05T10:08:08.139Z"
+      "subCategory": "Credit Card Bill Payment",
+      "type": "credit_card_payment",
+      "userId": "user-rjrajeshpal30"
     },
     {
       "id": "tx-scenario-5",
-      "userId": "user-rjrajeshpal30",
-      "date": "2026-11-06T10:08:08.139Z",
-      "type": "transfer",
-      "mainCategory": "Transfer",
-      "subCategory": "Bank to Bank Transfer",
       "amountInPaise": 500000,
+      "createdAt": "2026-11-07T10:02:55.262Z",
+      "date": "2026-11-07T10:02:55.262Z",
+      "description": "Fund transfer to SBI for bill coverage",
+      "destinationAccountId": "bank-sbi-01",
+      "mainCategory": "Transfer",
+      "notes": "Scenario 5: Interbank transfer; total wealth unchanged",
       "paymentMethod": "Bank Account",
       "sourceAccountId": "bank-hdfc-01",
-      "destinationAccountId": "bank-sbi-01",
-      "description": "Fund transfer to SBI for bill coverage",
-      "notes": "Scenario 5: Interbank transfer; total wealth unchanged",
       "status": "Completed",
-      "createdAt": "2026-11-06T10:08:08.139Z"
+      "subCategory": "Bank to Bank Transfer",
+      "type": "transfer",
+      "userId": "user-rjrajeshpal30"
     },
     {
       "id": "tx-scenario-6",
-      "userId": "user-rjrajeshpal30",
-      "date": "2026-11-07T10:08:08.139Z",
-      "type": "investment_deposit",
-      "mainCategory": "Investment",
-      "subCategory": "Mutual Funds",
       "amountInPaise": 500000,
+      "createdAt": "2026-11-08T10:02:55.262Z",
+      "date": "2026-11-08T10:02:55.262Z",
+      "description": "SIP in Parag Parikh Flexi Cap",
+      "mainCategory": "Investment",
+      "notes": "Scenario 6: Asset reallocation into investment holdings",
       "paymentMethod": "Bank Account",
       "sourceAccountId": "bank-hdfc-01",
-      "description": "SIP in Parag Parikh Flexi Cap",
-      "notes": "Scenario 6: Asset reallocation into investment holdings",
       "status": "Completed",
-      "createdAt": "2026-11-07T10:08:08.139Z"
+      "subCategory": "Mutual Funds",
+      "type": "investment_deposit",
+      "userId": "user-rjrajeshpal30"
     },
     {
       "id": "tx-scenario-7",
-      "userId": "user-rjrajeshpal30",
-      "date": "2026-11-08T10:08:08.139Z",
-      "type": "emergency_deposit",
-      "mainCategory": "Emergency Fund",
-      "subCategory": "Emergency Fund Deposit",
       "amountInPaise": 300000,
+      "createdAt": "2026-11-09T10:02:55.262Z",
+      "date": "2026-11-09T10:02:55.262Z",
+      "description": "Monthly emergency cushion deposit",
+      "mainCategory": "Emergency Fund",
+      "notes": "Scenario 7: Dedicated reserve build without double expense",
       "paymentMethod": "Bank Account",
       "sourceAccountId": "bank-hdfc-01",
-      "description": "Monthly emergency cushion deposit",
-      "notes": "Scenario 7: Dedicated reserve build without double expense",
       "status": "Completed",
-      "createdAt": "2026-11-08T10:08:08.139Z"
+      "subCategory": "Emergency Fund Deposit",
+      "type": "emergency_deposit",
+      "userId": "user-rjrajeshpal30"
     },
     {
       "id": "tx-scenario-8",
-      "userId": "user-rjrajeshpal30",
-      "date": "2026-11-09T10:08:08.139Z",
-      "type": "credit_card_payment",
-      "mainCategory": "Liability Settlement",
-      "subCategory": "Credit Card Bill Payment",
       "amountInPaise": 700000,
+      "createdAt": "2026-11-10T10:02:55.262Z",
+      "creditCardId": "cc-hdfc-01",
+      "date": "2026-11-10T10:02:55.262Z",
+      "description": "Partial Bill Settlement for HDFC Card",
+      "mainCategory": "Liability Settlement",
+      "notes": "Scenario 8: Paid ₹7,000 against ₹10,000 outstanding; ₹3,000 remains",
       "paymentMethod": "Bank Account",
       "sourceAccountId": "bank-hdfc-01",
-      "creditCardId": "cc-hdfc-01",
-      "description": "Partial Bill Settlement for HDFC Card",
-      "notes": "Scenario 8: Paid ₹7,000 against ₹10,000 outstanding; ₹3,000 remains",
       "status": "Completed",
-      "createdAt": "2026-11-09T10:08:08.139Z"
+      "subCategory": "Credit Card Bill Payment",
+      "type": "credit_card_payment",
+      "userId": "user-rjrajeshpal30"
     },
     {
       "id": "tx-1794475727617-3dfh",
@@ -785,6 +839,186 @@
       "subCategory": "Groceries",
       "type": "credit_card_expense",
       "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "tx-1794477274500-2erl",
+      "amountInPaise": 34212,
+      "createdAt": "2026-11-12T09:54:34.500Z",
+      "creditCardId": "cc-1794475637883",
+      "date": "2026-11-12T00:00:00.000Z",
+      "description": "Tea,milk, suger, towal,body wash",
+      "mainCategory": "Essential",
+      "notes": "",
+      "paymentMethod": "Credit Card",
+      "status": "Completed",
+      "subCategory": "Groceries",
+      "type": "credit_card_expense",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "tx-scenario-1",
+      "amountInPaise": 4000000,
+      "createdAt": "2026-11-02T10:02:55.262Z",
+      "date": "2026-11-02T10:02:55.262Z",
+      "description": "Monthly Salary Credit",
+      "destinationAccountId": "bank-hdfc-01",
+      "mainCategory": "Essential",
+      "notes": "Scenario 1: Verified salary inflow directly to HDFC",
+      "paymentMethod": "Bank Account",
+      "status": "Completed",
+      "subCategory": "Salary",
+      "type": "income",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "tx-1794477686443-t0fd",
+      "amountInPaise": 10000,
+      "createdAt": "2026-11-12T10:01:26.443Z",
+      "date": "2026-11-12T00:00:00.000Z",
+      "description": "eg",
+      "mainCategory": "Essential",
+      "notes": "",
+      "paymentMethod": "Cash",
+      "status": "Completed",
+      "subCategory": "Food",
+      "type": "expense",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "tx-fd-1794478147227",
+      "amountInPaise": 8000000,
+      "createdAt": "2026-11-12T10:09:07.227Z",
+      "date": "2026-11-12T10:09:07.227Z",
+      "description": "Fixed Deposit creation: Regular FD",
+      "mainCategory": "Investment",
+      "paymentMethod": "Bank Account",
+      "sourceAccountId": "bank-1794477883701",
+      "status": "Completed",
+      "subCategory": "Fixed Deposit",
+      "type": "investment_deposit",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "tx-scenario-1",
+      "userId": "user-rjrajeshpal30",
+      "date": "2026-11-02T10:09:44.065Z",
+      "type": "income",
+      "mainCategory": "Essential",
+      "subCategory": "Salary",
+      "amountInPaise": 4000000,
+      "paymentMethod": "Bank Account",
+      "destinationAccountId": "bank-hdfc-01",
+      "description": "Monthly Salary Credit",
+      "notes": "Scenario 1: Verified salary inflow directly to HDFC",
+      "status": "Completed",
+      "createdAt": "2026-11-02T10:09:44.065Z"
+    },
+    {
+      "id": "tx-scenario-2",
+      "userId": "user-rjrajeshpal30",
+      "date": "2026-11-04T10:09:44.065Z",
+      "type": "expense",
+      "mainCategory": "Essential",
+      "subCategory": "Food",
+      "amountInPaise": 50000,
+      "paymentMethod": "Cash",
+      "description": "Grocery & Fresh Food Market",
+      "notes": "Scenario 2: Cash expense deducts cash balance & Essential allocation",
+      "status": "Completed",
+      "createdAt": "2026-11-04T10:09:44.066Z"
+    },
+    {
+      "id": "tx-scenario-3",
+      "userId": "user-rjrajeshpal30",
+      "date": "2026-11-05T10:09:44.066Z",
+      "type": "credit_card_expense",
+      "mainCategory": "Essential",
+      "subCategory": "Groceries",
+      "amountInPaise": 200000,
+      "paymentMethod": "Credit Card",
+      "creditCardId": "cc-hdfc-01",
+      "description": "Supermarket Household Supplies",
+      "notes": "Scenario 3: Card outstanding increases without deducting bank balance",
+      "status": "Completed",
+      "createdAt": "2026-11-05T10:09:44.066Z"
+    },
+    {
+      "id": "tx-scenario-4",
+      "userId": "user-rjrajeshpal30",
+      "date": "2026-11-06T10:09:44.066Z",
+      "type": "credit_card_payment",
+      "mainCategory": "Liability Settlement",
+      "subCategory": "Credit Card Bill Payment",
+      "amountInPaise": 200000,
+      "paymentMethod": "Bank Account",
+      "sourceAccountId": "bank-sbi-01",
+      "creditCardId": "cc-hdfc-01",
+      "description": "Bill Settlement for HDFC Card",
+      "notes": "Scenario 4: Paid from SBI; liability settled without duplicate expense",
+      "status": "Completed",
+      "createdAt": "2026-11-06T10:09:44.066Z"
+    },
+    {
+      "id": "tx-scenario-5",
+      "userId": "user-rjrajeshpal30",
+      "date": "2026-11-07T10:09:44.066Z",
+      "type": "transfer",
+      "mainCategory": "Transfer",
+      "subCategory": "Bank to Bank Transfer",
+      "amountInPaise": 500000,
+      "paymentMethod": "Bank Account",
+      "sourceAccountId": "bank-hdfc-01",
+      "destinationAccountId": "bank-sbi-01",
+      "description": "Fund transfer to SBI for bill coverage",
+      "notes": "Scenario 5: Interbank transfer; total wealth unchanged",
+      "status": "Completed",
+      "createdAt": "2026-11-07T10:09:44.066Z"
+    },
+    {
+      "id": "tx-scenario-6",
+      "userId": "user-rjrajeshpal30",
+      "date": "2026-11-08T10:09:44.066Z",
+      "type": "investment_deposit",
+      "mainCategory": "Investment",
+      "subCategory": "Mutual Funds",
+      "amountInPaise": 500000,
+      "paymentMethod": "Bank Account",
+      "sourceAccountId": "bank-hdfc-01",
+      "description": "SIP in Parag Parikh Flexi Cap",
+      "notes": "Scenario 6: Asset reallocation into investment holdings",
+      "status": "Completed",
+      "createdAt": "2026-11-08T10:09:44.066Z"
+    },
+    {
+      "id": "tx-scenario-7",
+      "userId": "user-rjrajeshpal30",
+      "date": "2026-11-09T10:09:44.066Z",
+      "type": "emergency_deposit",
+      "mainCategory": "Emergency Fund",
+      "subCategory": "Emergency Fund Deposit",
+      "amountInPaise": 300000,
+      "paymentMethod": "Bank Account",
+      "sourceAccountId": "bank-hdfc-01",
+      "description": "Monthly emergency cushion deposit",
+      "notes": "Scenario 7: Dedicated reserve build without double expense",
+      "status": "Completed",
+      "createdAt": "2026-11-09T10:09:44.066Z"
+    },
+    {
+      "id": "tx-scenario-8",
+      "userId": "user-rjrajeshpal30",
+      "date": "2026-11-10T10:09:44.066Z",
+      "type": "credit_card_payment",
+      "mainCategory": "Liability Settlement",
+      "subCategory": "Credit Card Bill Payment",
+      "amountInPaise": 700000,
+      "paymentMethod": "Bank Account",
+      "sourceAccountId": "bank-hdfc-01",
+      "creditCardId": "cc-hdfc-01",
+      "description": "Partial Bill Settlement for HDFC Card",
+      "notes": "Scenario 8: Paid ₹7,000 against ₹10,000 outstanding; ₹3,000 remains",
+      "status": "Completed",
+      "createdAt": "2026-11-10T10:09:44.066Z"
     }
   ],
   "budgetAllocations": [
@@ -808,7 +1042,8 @@
       "investmentBudgetInPaise": 800000,
       "emergencyBudgetInPaise": 500000,
       "savingsBudgetInPaise": 500000,
-      "carryForwardEnabled": false
+      "carryForwardEnabled": false,
+      "totalBudgetInPaise": 4500000
     },
     {
       "id": "budget-user-1794473018005-1c1b67",
@@ -875,9 +1110,67 @@
       "monthYear": "2026-11",
       "savingsBudgetInPaise": 500000,
       "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "budget-user-1794473436793-0d16c1-2026-11",
+      "carryForwardEnabled": false,
+      "emergencyBudgetInPaise": 500000,
+      "essentialBudgetInPaise": 1800000,
+      "funBudgetInPaise": 400000,
+      "investmentBudgetInPaise": 800000,
+      "monthYear": "2026-11",
+      "savingsBudgetInPaise": 500000,
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "budget-user-1794473436793-0d16c1-2026-11",
+      "userId": "user-rjrajeshpal30",
+      "monthYear": "2026-11",
+      "essentialBudgetInPaise": 1800000,
+      "funBudgetInPaise": 400000,
+      "investmentBudgetInPaise": 800000,
+      "emergencyBudgetInPaise": 500000,
+      "savingsBudgetInPaise": 500000,
+      "carryForwardEnabled": false
+    },
+    {
+      "id": "budget-user-rjrajeshpal30-2026-12",
+      "userId": "user-rjrajeshpal30",
+      "monthYear": "2026-12",
+      "totalBudgetInPaise": 5500000,
+      "essentialBudgetInPaise": 1800000,
+      "funBudgetInPaise": 400000,
+      "investmentBudgetInPaise": 800000,
+      "emergencyBudgetInPaise": 500000,
+      "savingsBudgetInPaise": 500000,
+      "carryForwardEnabled": false
     }
   ],
   "investments": [
+    {
+      "id": "inv-mf-01",
+      "currentValueInPaise": 545000,
+      "expectedReturnRate": 14.5,
+      "investedAmountInPaise": 500000,
+      "investmentDate": "2026-10-28T10:02:55.261Z",
+      "name": "Parag Parikh Flexi Cap Fund",
+      "notes": "Monthly SIP",
+      "riskLevel": "Moderate Risk",
+      "type": "Mutual Funds",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "inv-stocks-01",
+      "currentValueInPaise": 2820000,
+      "expectedReturnRate": 12,
+      "investedAmountInPaise": 2500000,
+      "investmentDate": "2026-08-14T10:02:55.261Z",
+      "name": "NIFTY 50 Index Basket",
+      "notes": "Long-term equity allocation",
+      "riskLevel": "Moderate Risk",
+      "type": "Stocks",
+      "userId": "user-rjrajeshpal30"
+    },
     {
       "id": "inv-mf-01",
       "userId": "user-rjrajeshpal30",
@@ -885,7 +1178,7 @@
       "type": "Mutual Funds",
       "investedAmountInPaise": 500000,
       "currentValueInPaise": 545000,
-      "investmentDate": "2026-10-27T10:08:08.139Z",
+      "investmentDate": "2026-10-28T10:09:44.065Z",
       "expectedReturnRate": 14.5,
       "riskLevel": "Moderate Risk",
       "notes": "Monthly SIP"
@@ -897,7 +1190,7 @@
       "type": "Stocks",
       "investedAmountInPaise": 2500000,
       "currentValueInPaise": 2820000,
-      "investmentDate": "2026-08-13T10:08:08.139Z",
+      "investmentDate": "2026-08-14T10:09:44.065Z",
       "expectedReturnRate": 12,
       "riskLevel": "Moderate Risk",
       "notes": "Long-term equity allocation"
@@ -906,14 +1199,50 @@
   "fixedDeposits": [
     {
       "id": "fd-hdfc-01",
+      "autoRenewal": false,
+      "bankName": "HDFC Bank",
+      "compoundingFrequency": "Quarterly",
+      "durationMonths": 12,
+      "fdName": "HDFC High Yield FD 1-Year",
+      "interestEarnedInPaise": 385679,
+      "interestRate": 7.5,
+      "maturityAmountInPaise": 5385679,
+      "maturityDate": "2026-12-12T10:02:55.261Z",
+      "principalInPaise": 5000000,
+      "remindersSent": [
+        "30d"
+      ],
+      "startDate": "2025-12-12T10:02:55.261Z",
+      "status": "Active",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "fd-1794478147227",
+      "autoRenewal": false,
+      "bankName": "State Bank Of India",
+      "compoundingFrequency": "Annually",
+      "durationMonths": 1,
+      "fdName": "Regular FD",
+      "interestEarnedInPaise": 20055,
+      "interestRate": 3.05,
+      "maturityAmountInPaise": 8020055,
+      "maturityDate": "2026-12-12T20:39:07.227Z",
+      "principalInPaise": 8000000,
+      "remindersSent": [],
+      "startDate": "2026-11-12T10:09:07.227Z",
+      "status": "Active",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "fd-hdfc-01",
       "userId": "user-rjrajeshpal30",
       "bankName": "HDFC Bank",
       "fdName": "HDFC High Yield FD 1-Year",
       "principalInPaise": 5000000,
       "interestRate": 7.5,
       "compoundingFrequency": "Quarterly",
-      "startDate": "2025-12-11T10:08:08.139Z",
-      "maturityDate": "2026-12-11T10:08:08.139Z",
+      "startDate": "2025-12-12T10:09:44.065Z",
+      "maturityDate": "2026-12-12T10:09:44.065Z",
       "durationMonths": 12,
       "maturityAmountInPaise": 5385679,
       "interestEarnedInPaise": 385679,
@@ -934,10 +1263,10 @@
     },
     {
       "id": "emergency-fund-01",
-      "userId": "user-rjrajeshpal30",
-      "targetAmountInPaise": 10000000,
       "currentBalanceInPaise": 3300000,
-      "updatedAt": "2026-11-11T10:08:08.138Z"
+      "targetAmountInPaise": 10000000,
+      "updatedAt": "2026-11-12T10:02:55.261Z",
+      "userId": "user-rjrajeshpal30"
     },
     {
       "id": "ef-1794473018582",
@@ -980,9 +1309,43 @@
       "targetAmountInPaise": 10000000,
       "updatedAt": "2026-11-12T08:50:37.757Z",
       "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "ef-1794477428069",
+      "currentBalanceInPaise": 0,
+      "targetAmountInPaise": 10000000,
+      "updatedAt": "2026-11-12T09:57:08.069Z",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "emergency-fund-01",
+      "userId": "user-rjrajeshpal30",
+      "targetAmountInPaise": 10000000,
+      "currentBalanceInPaise": 3300000,
+      "updatedAt": "2026-11-12T10:09:44.065Z"
     }
   ],
   "savingsGoals": [
+    {
+      "id": "saving-laptop-01",
+      "monthlyContributionInPaise": 1000000,
+      "name": "MacBook Pro Upgrade",
+      "notes": "For coding and freelance projects",
+      "savedAmountInPaise": 4500000,
+      "targetAmountInPaise": 12000000,
+      "targetDate": "2027-03-31",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "saving-travel-01",
+      "monthlyContributionInPaise": 500000,
+      "name": "Annual Family Vacation",
+      "notes": "Year-end holiday",
+      "savedAmountInPaise": 3000000,
+      "targetAmountInPaise": 6000000,
+      "targetDate": "2026-12-25",
+      "userId": "user-rjrajeshpal30"
+    },
     {
       "id": "saving-laptop-01",
       "userId": "user-rjrajeshpal30",
@@ -1007,6 +1370,32 @@
   "notifications": [
     {
       "id": "notif-fd-01",
+      "createdAt": "2026-11-11T10:02:55.262Z",
+      "isRead": false,
+      "message": "Your HDFC High Yield FD (₹50,000 principal) matures soon. Projected payout: ₹53,854.",
+      "metadata": {
+        "fdId": "fd-hdfc-01",
+        "daysRemaining": 30
+      },
+      "title": "Upcoming FD Maturity in 30 Days",
+      "type": "fd_maturity",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "notif-cc-01",
+      "createdAt": "2026-11-12T06:02:55.262Z",
+      "isRead": false,
+      "message": "HDFC Regalia Gold has ₹3,000 outstanding due on the 5th. Avoid late fees.",
+      "metadata": {
+        "cardId": "cc-hdfc-01",
+        "amountInPaise": 300000
+      },
+      "title": "Credit Card Bill Reminder",
+      "type": "bill_reminder",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "notif-fd-01",
       "userId": "user-rjrajeshpal30",
       "title": "Upcoming FD Maturity in 30 Days",
       "message": "Your HDFC High Yield FD (₹50,000 principal) matures soon. Projected payout: ₹53,854.",
@@ -1016,7 +1405,7 @@
         "fdId": "fd-hdfc-01",
         "daysRemaining": 30
       },
-      "createdAt": "2026-11-10T10:08:08.139Z"
+      "createdAt": "2026-11-11T10:09:44.066Z"
     },
     {
       "id": "notif-cc-01",
@@ -1029,7 +1418,7 @@
         "cardId": "cc-hdfc-01",
         "amountInPaise": 300000
       },
-      "createdAt": "2026-11-11T06:08:08.139Z"
+      "createdAt": "2026-11-12T06:09:44.066Z"
     }
   ],
   "emailLogs": [],
@@ -1190,7 +1579,7 @@
       "id": "token-1794476118574-vi6m9",
       "createdAt": "2026-11-12T09:35:18.574Z",
       "expiresAt": "2026-11-19T09:35:18.574Z",
-      "revoked": false,
+      "revoked": true,
       "tokenHash": "427d65fc71638ba73533aa7af40457cbfdc4c60b5fe3a7945c4431f20ea37827",
       "userId": "user-1794473436793-0d16c1"
     },
@@ -1204,11 +1593,51 @@
     },
     {
       "id": "token-1794477238756-wtxxv",
-      "userId": "user-rjrajeshpal30",
-      "tokenHash": "3201f74e04424624bfecb89ba29fbf3c42e6a1f384c07ab9bcdf1f3aa56989da",
+      "createdAt": "2026-11-12T09:53:58.756Z",
       "expiresAt": "2026-11-19T09:53:58.756Z",
       "revoked": false,
-      "createdAt": "2026-11-12T09:53:58.756Z"
+      "tokenHash": "3201f74e04424624bfecb89ba29fbf3c42e6a1f384c07ab9bcdf1f3aa56989da",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "token-1794477315571-dwyda",
+      "createdAt": "2026-11-12T09:55:15.571Z",
+      "expiresAt": "2026-11-19T09:55:15.571Z",
+      "revoked": true,
+      "tokenHash": "ad376b9aa7f190f54d2f964caf0a1124b8727af432506447cec1d4775cc85102",
+      "userId": "user-1794473436793-0d16c1"
+    },
+    {
+      "id": "token-1794477426890-dlfkf",
+      "createdAt": "2026-11-12T09:57:06.890Z",
+      "expiresAt": "2026-11-19T09:57:06.890Z",
+      "revoked": false,
+      "tokenHash": "5d2af895772193e09a6c7a711baa0fdabfc1ea8da86ce15e3a530abc540ef29f",
+      "userId": "user-1794473436793-0d16c1"
+    },
+    {
+      "id": "token-1794478199685-bckip",
+      "userId": "user-rjrajeshpal30",
+      "tokenHash": "5d97ec1f25faa799e025436a961c54220fa4edeac6db3b31f2c867d9b447df19",
+      "expiresAt": "2026-11-19T10:09:59.685Z",
+      "revoked": false,
+      "createdAt": "2026-11-12T10:09:59.685Z"
+    },
+    {
+      "id": "token-1794478218790-pa80z",
+      "userId": "user-rjrajeshpal30",
+      "tokenHash": "c67833618cdc449882ba3249da09b42d3b8563d25d0c7f3a670c6f40e577102c",
+      "expiresAt": "2026-11-19T10:10:18.790Z",
+      "revoked": false,
+      "createdAt": "2026-11-12T10:10:18.790Z"
+    },
+    {
+      "id": "token-1794478220072-9z71d",
+      "userId": "user-rjrajeshpal30",
+      "tokenHash": "59513b2a94223023f267e62dd90eb73fae83480cf2332c2a13676baca6ec0e07",
+      "expiresAt": "2026-11-19T10:10:20.072Z",
+      "revoked": false,
+      "createdAt": "2026-11-12T10:10:20.072Z"
     }
   ],
   "emailVerifications": []

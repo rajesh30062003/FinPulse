@@ -147,6 +147,7 @@ export const BudgetAllocationSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   userId: { type: String, required: true, index: true },
   monthYear: { type: String, required: true },
+  totalBudgetInPaise: { type: Number },
   essentialBudgetInPaise: { type: Number, default: 0 },
   funBudgetInPaise: { type: Number, default: 0 },
   investmentBudgetInPaise: { type: Number, default: 0 },
@@ -154,6 +155,7 @@ export const BudgetAllocationSchema = new mongoose.Schema({
   savingsBudgetInPaise: { type: Number, default: 0 },
   carryForwardEnabled: { type: Boolean, default: false }
 });
+BudgetAllocationSchema.index({ userId: 1, monthYear: 1 }, { unique: true });
 
 export const EmergencyFundSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
@@ -649,7 +651,9 @@ export async function persistTransaction(tx: ITransaction): Promise<void> {
 }
 
 export async function persistBudgetAllocation(budget: IBudgetAllocation): Promise<void> {
-  const idx = memoryDb.budgetAllocations.findIndex(b => b.id === budget.id);
+  const idx = memoryDb.budgetAllocations.findIndex(
+    b => b.id === budget.id || (b.userId === budget.userId && b.monthYear === budget.monthYear)
+  );
   if (idx >= 0) {
     memoryDb.budgetAllocations[idx] = budget;
   } else {
@@ -659,7 +663,11 @@ export async function persistBudgetAllocation(budget: IBudgetAllocation): Promis
 
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await BudgetAllocationModel.findOneAndUpdate({ id: budget.id }, budget, { upsert: true });
+      await BudgetAllocationModel.findOneAndUpdate(
+        { $or: [{ id: budget.id }, { userId: budget.userId, monthYear: budget.monthYear }] },
+        budget,
+        { upsert: true, new: true }
+      );
     } catch (err) {
       console.error('Error saving budget allocation to MongoDB Atlas:', err);
     }

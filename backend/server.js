@@ -116,6 +116,7 @@ var BudgetAllocationSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   userId: { type: String, required: true, index: true },
   monthYear: { type: String, required: true },
+  totalBudgetInPaise: { type: Number },
   essentialBudgetInPaise: { type: Number, default: 0 },
   funBudgetInPaise: { type: Number, default: 0 },
   investmentBudgetInPaise: { type: Number, default: 0 },
@@ -123,6 +124,7 @@ var BudgetAllocationSchema = new mongoose.Schema({
   savingsBudgetInPaise: { type: Number, default: 0 },
   carryForwardEnabled: { type: Boolean, default: false }
 });
+BudgetAllocationSchema.index({ userId: 1, monthYear: 1 }, { unique: true });
 var EmergencyFundSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   userId: { type: String, required: true, index: true },
@@ -570,7 +572,9 @@ async function persistTransaction(tx) {
   }
 }
 async function persistBudgetAllocation(budget) {
-  const idx = memoryDb.budgetAllocations.findIndex((b) => b.id === budget.id);
+  const idx = memoryDb.budgetAllocations.findIndex(
+    (b) => b.id === budget.id || b.userId === budget.userId && b.monthYear === budget.monthYear
+  );
   if (idx >= 0) {
     memoryDb.budgetAllocations[idx] = budget;
   } else {
@@ -579,7 +583,11 @@ async function persistBudgetAllocation(budget) {
   saveDatabase();
   if (mongoConnected && mongoose.connection.readyState === 1) {
     try {
-      await BudgetAllocationModel.findOneAndUpdate({ id: budget.id }, budget, { upsert: true });
+      await BudgetAllocationModel.findOneAndUpdate(
+        { $or: [{ id: budget.id }, { userId: budget.userId, monthYear: budget.monthYear }] },
+        budget,
+        { upsert: true, new: true }
+      );
     } catch (err) {
       console.error("Error saving budget allocation to MongoDB Atlas:", err);
     }
@@ -2677,12 +2685,12 @@ router.get("/dashboard/summary", authenticate, (req, res) => {
   const userSavings = db.savingsGoals.filter((s) => s.userId === userId);
   const totalSavingsPaise = userSavings.reduce((sum, s) => sum + s.savedAmountInPaise, 0);
   const user = db.users.find((u) => u.id === userId);
-  const monthlyBudgetPaise = user?.monthlyBudgetInPaise || 4e6;
+  const currentAllocation = db.budgetAllocations.find((b) => b.userId === userId && b.monthYear === currentMonthYear);
+  const monthlyBudgetPaise = currentAllocation?.totalBudgetInPaise || user?.monthlyBudgetInPaise || 4e6;
   const remainingBudgetPaise = Math.max(0, monthlyBudgetPaise - totalMonthlyExpensesPaise);
   const budgetUtilizationPercent = monthlyBudgetPaise > 0 ? Math.round(totalMonthlyExpensesPaise / monthlyBudgetPaise * 100) : 0;
-  const currentAllocation = db.budgetAllocations.find((b) => b.userId === userId && b.monthYear === currentMonthYear);
   const totalPlannedAllocationPaise = currentAllocation ? currentAllocation.essentialBudgetInPaise + currentAllocation.funBudgetInPaise + currentAllocation.investmentBudgetInPaise + currentAllocation.emergencyBudgetInPaise + currentAllocation.savingsBudgetInPaise : 32e5;
-  const unallocatedBudgetPaise = Math.max(0, monthlyBudgetPaise - totalPlannedAllocationPaise);
+  const unallocatedBudgetPaise = monthlyBudgetPaise - totalPlannedAllocationPaise;
   const unallocatedCushionPaise = totalMonthlyIncomePaise - totalPlannedAllocationPaise;
   const upcomingBills = userCards.filter((c) => c.outstandingBalanceInPaise > 0).map((c) => ({
     cardId: c.id,
@@ -3119,12 +3127,16 @@ router.get("/budget", authenticate, (req, res) => {
   const userId = req.user.id;
   const now = /* @__PURE__ */ new Date();
   const currentMonthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  let allocation = db.budgetAllocations.find((b) => b.userId === userId && b.monthYear === currentMonthYear);
+  const targetMonthYear = req.query.month || currentMonthYear;
+  const user = db.users.find((u) => u.id === userId);
+  const userDefaultBudget = user?.monthlyBudgetInPaise || 4e6;
+  let allocation = db.budgetAllocations.find((b) => b.userId === userId && b.monthYear === targetMonthYear);
   if (!allocation) {
     allocation = {
-      id: `budget-${userId}-${currentMonthYear}`,
+      id: `budget-${userId}-${targetMonthYear}`,
       userId,
-      monthYear: currentMonthYear,
+      monthYear: targetMonthYear,
+      totalBudgetInPaise: userDefaultBudget,
       essentialBudgetInPaise: 18e5,
       funBudgetInPaise: 4e5,
       investmentBudgetInPaise: 8e5,
@@ -3134,27 +3146,31 @@ router.get("/budget", authenticate, (req, res) => {
     };
     db.budgetAllocations.push(allocation);
     saveDatabase();
+  } else if (!allocation.totalBudgetInPaise) {
+    allocation.totalBudgetInPaise = userDefaultBudget;
   }
-  const monthTxs = db.transactions.filter((t) => t.userId === userId && t.date.startsWith(currentMonthYear));
+  const monthTxs = db.transactions.filter((t) => t.userId === userId && t.date.startsWith(targetMonthYear));
   const essentialSpentPaise = monthTxs.filter((t) => (t.type === "expense" || t.type === "credit_card_expense") && t.mainCategory === "Essential").reduce((sum, t) => sum + t.amountInPaise, 0);
   const funSpentPaise = monthTxs.filter((t) => (t.type === "expense" || t.type === "credit_card_expense") && t.mainCategory === "Fun").reduce((sum, t) => sum + t.amountInPaise, 0);
   const investmentSpentPaise = monthTxs.filter((t) => t.type === "investment_deposit").reduce((sum, t) => sum + t.amountInPaise, 0);
   const emergencySpentPaise = monthTxs.filter((t) => t.type === "emergency_deposit").reduce((sum, t) => sum + t.amountInPaise, 0);
   const savingsSpentPaise = monthTxs.filter((t) => t.type === "savings_deposit").reduce((sum, t) => sum + t.amountInPaise, 0);
-  const user = db.users.find((u) => u.id === userId);
-  const totalBudgetPaise = user?.monthlyBudgetInPaise || 4e6;
+  const totalBudgetPaise = allocation.totalBudgetInPaise || userDefaultBudget;
   const totalPlannedAllocationPaise = allocation.essentialBudgetInPaise + allocation.funBudgetInPaise + allocation.investmentBudgetInPaise + allocation.emergencyBudgetInPaise + allocation.savingsBudgetInPaise;
-  const unallocatedBudgetPaise = Math.max(0, totalBudgetPaise - totalPlannedAllocationPaise);
+  const unallocatedBudgetPaise = totalBudgetPaise - totalPlannedAllocationPaise;
   const eligibleExpensesPaise = essentialSpentPaise + funSpentPaise;
-  const remainingBudgetPaise = Math.max(0, totalBudgetPaise - eligibleExpensesPaise);
+  const remainingBudgetPaise = totalBudgetPaise - eligibleExpensesPaise;
   const budgetUtilizationPercent = totalBudgetPaise > 0 ? Math.round(eligibleExpensesPaise / totalBudgetPaise * 100) : 0;
   const monthlyInflowPaise = monthTxs.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amountInPaise, 0);
   const unallocatedCushionPaise = monthlyInflowPaise - totalPlannedAllocationPaise;
   res.json({
     allocation,
+    selectedMonthYear: targetMonthYear,
     totalBudgetPaise,
     totalPlannedAllocationPaise,
     unallocatedBudgetPaise,
+    isOverAllocated: totalPlannedAllocationPaise > totalBudgetPaise,
+    shortfallPaise: Math.max(0, totalPlannedAllocationPaise - totalBudgetPaise),
     eligibleExpensesPaise,
     remainingBudgetPaise,
     budgetUtilizationPercent,
@@ -3201,12 +3217,16 @@ router.post("/budget", authenticate, async (req, res) => {
   const userId = req.user.id;
   const now = /* @__PURE__ */ new Date();
   const currentMonthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  let allocation = db.budgetAllocations.find((b) => b.userId === userId && b.monthYear === currentMonthYear);
+  const targetMonthYear = req.body.monthYear || currentMonthYear;
+  const user = db.users.find((u) => u.id === userId);
+  const userDefaultBudget = user?.monthlyBudgetInPaise || 4e6;
+  let allocation = db.budgetAllocations.find((b) => b.userId === userId && b.monthYear === targetMonthYear);
   if (!allocation) {
     allocation = {
-      id: `budget-${userId}-${currentMonthYear}`,
+      id: `budget-${userId}-${targetMonthYear}`,
       userId,
-      monthYear: currentMonthYear,
+      monthYear: targetMonthYear,
+      totalBudgetInPaise: userDefaultBudget,
       essentialBudgetInPaise: 0,
       funBudgetInPaise: 0,
       investmentBudgetInPaise: 0,
@@ -3216,7 +3236,26 @@ router.post("/budget", authenticate, async (req, res) => {
     };
     db.budgetAllocations.push(allocation);
   }
-  const { essentialBudgetInPaise, funBudgetInPaise, investmentBudgetInPaise, emergencyBudgetInPaise, savingsBudgetInPaise, carryForwardEnabled } = req.body;
+  const {
+    totalBudgetInPaise,
+    essentialBudgetInPaise,
+    funBudgetInPaise,
+    investmentBudgetInPaise,
+    emergencyBudgetInPaise,
+    savingsBudgetInPaise,
+    carryForwardEnabled
+  } = req.body;
+  if (totalBudgetInPaise !== void 0) {
+    const numBudget = Number(totalBudgetInPaise);
+    if (isNaN(numBudget) || !isFinite(numBudget) || numBudget <= 0) {
+      return res.status(400).json({ error: "Monthly budget must be a positive number greater than zero." });
+    }
+    allocation.totalBudgetInPaise = numBudget;
+    if (user) {
+      user.monthlyBudgetInPaise = numBudget;
+      await persistUser(user);
+    }
+  }
   if (essentialBudgetInPaise !== void 0) allocation.essentialBudgetInPaise = Number(essentialBudgetInPaise);
   if (funBudgetInPaise !== void 0) allocation.funBudgetInPaise = Number(funBudgetInPaise);
   if (investmentBudgetInPaise !== void 0) allocation.investmentBudgetInPaise = Number(investmentBudgetInPaise);
@@ -3226,6 +3265,107 @@ router.post("/budget", authenticate, async (req, res) => {
   saveDatabase();
   await persistBudgetAllocation(allocation);
   res.json({ message: "Budget allocation updated successfully", allocation });
+});
+router.post("/budget/total", authenticate, async (req, res) => {
+  const db = getDb();
+  const userId = req.user.id;
+  const now = /* @__PURE__ */ new Date();
+  const currentMonthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const targetMonthYear = req.body.monthYear || currentMonthYear;
+  const { totalBudgetInPaise } = req.body;
+  const numBudget = Number(totalBudgetInPaise);
+  if (typeof totalBudgetInPaise === "undefined" || isNaN(numBudget) || !isFinite(numBudget) || numBudget <= 0) {
+    return res.status(400).json({
+      error: "Invalid total monthly budget. Amount must be a positive number greater than zero."
+    });
+  }
+  let allocation = db.budgetAllocations.find((b) => b.userId === userId && b.monthYear === targetMonthYear);
+  if (!allocation) {
+    allocation = {
+      id: `budget-${userId}-${targetMonthYear}`,
+      userId,
+      monthYear: targetMonthYear,
+      totalBudgetInPaise: numBudget,
+      essentialBudgetInPaise: 18e5,
+      funBudgetInPaise: 4e5,
+      investmentBudgetInPaise: 8e5,
+      emergencyBudgetInPaise: 5e5,
+      savingsBudgetInPaise: 5e5,
+      carryForwardEnabled: false
+    };
+    db.budgetAllocations.push(allocation);
+  } else {
+    allocation.totalBudgetInPaise = numBudget;
+  }
+  const user = db.users.find((u) => u.id === userId);
+  if (user) {
+    user.monthlyBudgetInPaise = numBudget;
+    await persistUser(user);
+  }
+  saveDatabase();
+  await persistBudgetAllocation(allocation);
+  const monthTxs = db.transactions.filter((t) => t.userId === userId && t.date.startsWith(targetMonthYear));
+  const essentialSpentPaise = monthTxs.filter((t) => (t.type === "expense" || t.type === "credit_card_expense") && t.mainCategory === "Essential").reduce((sum, t) => sum + t.amountInPaise, 0);
+  const funSpentPaise = monthTxs.filter((t) => (t.type === "expense" || t.type === "credit_card_expense") && t.mainCategory === "Fun").reduce((sum, t) => sum + t.amountInPaise, 0);
+  const investmentSpentPaise = monthTxs.filter((t) => t.type === "investment_deposit").reduce((sum, t) => sum + t.amountInPaise, 0);
+  const emergencySpentPaise = monthTxs.filter((t) => t.type === "emergency_deposit").reduce((sum, t) => sum + t.amountInPaise, 0);
+  const savingsSpentPaise = monthTxs.filter((t) => t.type === "savings_deposit").reduce((sum, t) => sum + t.amountInPaise, 0);
+  const totalPlannedAllocationPaise = allocation.essentialBudgetInPaise + allocation.funBudgetInPaise + allocation.investmentBudgetInPaise + allocation.emergencyBudgetInPaise + allocation.savingsBudgetInPaise;
+  const unallocatedBudgetPaise = numBudget - totalPlannedAllocationPaise;
+  const eligibleExpensesPaise = essentialSpentPaise + funSpentPaise;
+  const remainingBudgetPaise = numBudget - eligibleExpensesPaise;
+  const budgetUtilizationPercent = numBudget > 0 ? Math.round(eligibleExpensesPaise / numBudget * 100) : 0;
+  const monthlyInflowPaise = monthTxs.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amountInPaise, 0);
+  const unallocatedCushionPaise = monthlyInflowPaise - totalPlannedAllocationPaise;
+  return res.json({
+    message: "Total monthly budget updated successfully",
+    allocation,
+    selectedMonthYear: targetMonthYear,
+    totalBudgetPaise: numBudget,
+    totalPlannedAllocationPaise,
+    unallocatedBudgetPaise,
+    isOverAllocated: totalPlannedAllocationPaise > numBudget,
+    shortfallPaise: Math.max(0, totalPlannedAllocationPaise - numBudget),
+    eligibleExpensesPaise,
+    remainingBudgetPaise,
+    budgetUtilizationPercent,
+    monthlyInflowPaise,
+    unallocatedCushionPaise,
+    actuals: {
+      Essential: {
+        budgetPaise: allocation.essentialBudgetInPaise,
+        spentPaise: essentialSpentPaise,
+        remainingPaise: Math.max(0, allocation.essentialBudgetInPaise - essentialSpentPaise),
+        utilizationPercent: allocation.essentialBudgetInPaise > 0 ? Math.round(essentialSpentPaise / allocation.essentialBudgetInPaise * 100) : 0,
+        exceededPaise: Math.max(0, essentialSpentPaise - allocation.essentialBudgetInPaise)
+      },
+      Fun: {
+        budgetPaise: allocation.funBudgetInPaise,
+        spentPaise: funSpentPaise,
+        remainingPaise: Math.max(0, allocation.funBudgetInPaise - funSpentPaise),
+        utilizationPercent: allocation.funBudgetInPaise > 0 ? Math.round(funSpentPaise / allocation.funBudgetInPaise * 100) : 0,
+        exceededPaise: Math.max(0, funSpentPaise - allocation.funBudgetInPaise)
+      },
+      Investment: {
+        budgetPaise: allocation.investmentBudgetInPaise,
+        spentPaise: investmentSpentPaise,
+        remainingPaise: Math.max(0, allocation.investmentBudgetInPaise - investmentSpentPaise),
+        utilizationPercent: allocation.investmentBudgetInPaise > 0 ? Math.round(investmentSpentPaise / allocation.investmentBudgetInPaise * 100) : 0
+      },
+      EmergencyFund: {
+        budgetPaise: allocation.emergencyBudgetInPaise,
+        spentPaise: emergencySpentPaise,
+        remainingPaise: Math.max(0, allocation.emergencyBudgetInPaise - emergencySpentPaise),
+        utilizationPercent: allocation.emergencyBudgetInPaise > 0 ? Math.round(emergencySpentPaise / allocation.emergencyBudgetInPaise * 100) : 0
+      },
+      Savings: {
+        budgetPaise: allocation.savingsBudgetInPaise,
+        spentPaise: savingsSpentPaise,
+        remainingPaise: Math.max(0, allocation.savingsBudgetInPaise - savingsSpentPaise),
+        utilizationPercent: allocation.savingsBudgetInPaise > 0 ? Math.round(savingsSpentPaise / allocation.savingsBudgetInPaise * 100) : 0
+      }
+    }
+  });
 });
 router.get("/investments", authenticate, (req, res) => {
   const db = getDb();

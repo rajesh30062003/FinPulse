@@ -116,6 +116,7 @@ export interface IBudgetAllocation {
   id: string;
   userId: string;
   monthYear: string; // e.g. "2026-11"
+  totalBudgetInPaise?: number;
   essentialBudgetInPaise: number;
   funBudgetInPaise: number;
   investmentBudgetInPaise: number;
