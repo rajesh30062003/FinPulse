@@ -248,7 +248,3 @@ export const CreditCardBillModal: React.FC = () => {
     </div>
   );
 };
-      </div>
-    </div>
-  );
-};

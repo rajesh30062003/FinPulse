@@ -1042,14 +1042,14 @@ router.post('/accounts/reset-financial-setup', authenticate, async (req: AuthReq
     const userId = req.user!.id;
 
     // 1. Close all active bank accounts for this user
-    const userBanks = db.bankAccounts.filter(b => isOwner(b.userId, userId) && b.isActive);
+    const userBanks = db.bankAccounts.filter(b => isOwner(b.userId, userId) && b.isActive !== false && b.status !== 'Closed');
     for (const bank of userBanks) {
       bank.isActive = false;
       bank.status = 'Closed';
     }
 
     // 2. Close all active credit cards for this user
-    const userCards = db.creditCards.filter(c => isOwner(c.userId, userId) && c.isActive);
+    const userCards = db.creditCards.filter(c => isOwner(c.userId, userId) && c.isActive !== false && c.status !== 'Closed');
     for (const card of userCards) {
       card.isActive = false;
       card.status = 'Closed';
@@ -1062,11 +1062,11 @@ router.post('/accounts/reset-financial-setup', authenticate, async (req: AuthReq
     if (status.connected) {
       const ownerFilter = getOwnerFilter(userId);
       await BankAccountModel.updateMany(
-        { userId: ownerFilter, isActive: true },
+        { userId: ownerFilter, isActive: { $ne: false }, status: { $ne: 'Closed' } },
         { $set: { isActive: false, status: 'Closed' } }
       );
       await CreditCardModel.updateMany(
-        { userId: ownerFilter, isActive: true },
+        { userId: ownerFilter, isActive: { $ne: false }, status: { $ne: 'Closed' } },
         { $set: { isActive: false, status: 'Closed' } }
       );
     }
@@ -1074,6 +1074,8 @@ router.post('/accounts/reset-financial-setup', authenticate, async (req: AuthReq
     res.json({
       success: true,
       message: `Reset complete: Closed ${userBanks.length} bank account(s) and ${userCards.length} credit card(s). Historical transactions and all other records have been preserved.`,
+      closedAccountsCount: userBanks.length,
+      closedCardsCount: userCards.length,
       closedBankCount: userBanks.length,
       closedCardCount: userCards.length
     });
@@ -1564,7 +1566,6 @@ router.delete('/transactions/:id', authenticate, async (req: AuthRequest, res: R
     if (existingTx.paymentMethod === 'Cash' || existingTx.type === 'cash_withdrawal' || existingTx.type === 'cash_deposit') {
       const userCash = db.cashWallets.find(w => isOwner(w.userId, req.user!.id));
       if (userCash) await persistCashWallet(userCash);
-    }
     }
 
     res.json({ message: 'Transaction reversed and deleted successfully' });
@@ -2234,18 +2235,6 @@ router.post('/emergency-fund/withdraw', authenticate, async (req: AuthRequest, r
     await persistTransaction(tx);
     if (ef) await persistEmergencyFund(ef);
     await persistBankAccount(bank);
-
-    res.json({ message: 'Emergency fund withdrawal completed', ef, transaction: tx });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message || 'Withdrawal failed' });
-  }
-});
-
-    const ef = db.emergencyFunds.find(e => isOwner(e.userId, req.user!.id));
-    await persistTransaction(tx);
-    if (ef) await persistEmergencyFund(ef);
-    const bank = db.bankAccounts.find(b => b.id === destinationAccountId);
-    if (bank) await persistBankAccount(bank);
 
     res.json({ message: 'Emergency fund withdrawal completed', ef, transaction: tx });
   } catch (err: any) {

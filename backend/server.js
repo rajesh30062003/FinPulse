@@ -3217,12 +3217,12 @@ router.post("/accounts/reset-financial-setup", authenticate, async (req, res) =>
     }
     const db = getDb();
     const userId = req.user.id;
-    const userBanks = db.bankAccounts.filter((b) => isOwner(b.userId, userId) && b.isActive);
+    const userBanks = db.bankAccounts.filter((b) => isOwner(b.userId, userId) && b.isActive !== false && b.status !== "Closed");
     for (const bank of userBanks) {
       bank.isActive = false;
       bank.status = "Closed";
     }
-    const userCards = db.creditCards.filter((c) => isOwner(c.userId, userId) && c.isActive);
+    const userCards = db.creditCards.filter((c) => isOwner(c.userId, userId) && c.isActive !== false && c.status !== "Closed");
     for (const card of userCards) {
       card.isActive = false;
       card.status = "Closed";
@@ -3232,17 +3232,19 @@ router.post("/accounts/reset-financial-setup", authenticate, async (req, res) =>
     if (status.connected) {
       const ownerFilter = getOwnerFilter(userId);
       await BankAccountModel.updateMany(
-        { userId: ownerFilter, isActive: true },
+        { userId: ownerFilter, isActive: { $ne: false }, status: { $ne: "Closed" } },
         { $set: { isActive: false, status: "Closed" } }
       );
       await CreditCardModel.updateMany(
-        { userId: ownerFilter, isActive: true },
+        { userId: ownerFilter, isActive: { $ne: false }, status: { $ne: "Closed" } },
         { $set: { isActive: false, status: "Closed" } }
       );
     }
     res.json({
       success: true,
       message: `Reset complete: Closed ${userBanks.length} bank account(s) and ${userCards.length} credit card(s). Historical transactions and all other records have been preserved.`,
+      closedAccountsCount: userBanks.length,
+      closedCardsCount: userCards.length,
       closedBankCount: userBanks.length,
       closedCardCount: userCards.length
     });
@@ -4191,7 +4193,6 @@ router.post("/emergency-fund/withdraw", authenticate, async (req, res) => {
     await persistTransaction(tx);
     if (ef) await persistEmergencyFund(ef);
     await persistBankAccount(bank);
-    if (bank) await persistBankAccount(bank);
     res.json({ message: "Emergency fund withdrawal completed", ef, transaction: tx });
   } catch (err) {
     res.status(400).json({ error: err.message || "Withdrawal failed" });
