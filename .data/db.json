@@ -5,7 +5,7 @@
       "name": "rty",
       "email": "finalsemprojectmail@gmail.com",
       "passwordHash": "$2b$10$JCGHesqMHeb2dJqCQ92DTeWz3sC/K0jW4kuQv.xQoZjQkB1s46vnO",
-      "isVerified": false,
+      "isVerified": true,
       "verificationToken": "dXNlci0xNzk0MzIxNTkwOTEzLTE3OTQzMjE1OTA5MTMtMC40NDEzNzM0NzQxOTEyODk3",
       "verificationOtp": "914207",
       "currency": "INR",
@@ -18,7 +18,7 @@
       "id": "user-1794323316803",
       "name": "Aarav Patel",
       "email": "aarav@test.local",
-      "passwordHash": "$2b$10$3CK20O.Cd2EBv6BpVQ0.duz2kbQi40imeOwqpt49MAK6/4auTEplG",
+      "passwordHash": "$2b$10$frEW4tWID.XNIKMWJJ8YAO8Io7g1ExxNLVUf.L.fVVT3/w/dmk3.G",
       "isVerified": true,
       "currency": "INR",
       "monthlyBudgetInPaise": 4000000,
@@ -50,8 +50,7 @@
       "monthlyBudgetInPaise": 4000000,
       "reminderDayOfMonth": 25,
       "emailNotificationsEnabled": true,
-      "createdAt": "Thu Nov 12 2026 08:44:35 GMT+0000 (Coordinated Universal Time)",
-      "failedLoginAttempts": 1
+      "createdAt": "Thu Nov 12 2026 08:44:35 GMT+0000 (Coordinated Universal Time)"
     },
     {
       "id": "legacy-1794473077958",
@@ -59,12 +58,53 @@
       "email": "legacy_unverified_1794473077820@finpulse.local",
       "passwordHash": "$2b$10$amWUeC1mHe5U/AVgI21hdOkcWGuiG3/Sy6tbdIESvb/OCnYJbxLg6",
       "isVerified": true,
+      "currency": "INR",
+      "monthlyBudgetInPaise": 3000000,
+      "reminderDayOfMonth": 25,
+      "emailNotificationsEnabled": true,
+      "createdAt": "Thu Nov 12 2026 08:44:38 GMT+0000 (Coordinated Universal Time)"
+    },
+    {
+      "id": "user-1794473436793-0d16c1",
+      "name": "Rajesh Pal",
+      "email": "rjrajeshpal30062003@gmail.com",
+      "passwordHash": "$2b$10$pjqJ.K/vQ8xqXMy3ufxXu.wSq4zOa5c6664.Y94qbD2D0XHo90pdm",
+      "isVerified": true,
+      "currency": "INR",
+      "monthlyBudgetInPaise": 4000000,
+      "reminderDayOfMonth": 25,
+      "emailNotificationsEnabled": true,
+      "createdAt": "Thu Nov 12 2026 08:50:36 GMT+0000 (Coordinated Universal Time)"
+    },
+    {
+      "id": "user-1794474969244-7c7af4",
+      "name": "CC Tester",
+      "email": "cctest_1794474968933@finpulse.local",
+      "passwordHash": "$2b$10$Cpr/eDGWvOWDVdvANXF8eeey/4/m3Um8b/3.C9g6Sgm3QVP9fXrjy",
+      "isVerified": true,
       "accountStatus": "active",
       "failedLoginAttempts": 0,
       "lockUntil": null,
       "currency": "INR",
-      "monthlyBudgetInPaise": 3000000,
-      "createdAt": "2026-11-12T08:44:37.958Z"
+      "monthlyBudgetInPaise": 4000000,
+      "reminderDayOfMonth": 25,
+      "emailNotificationsEnabled": true,
+      "createdAt": "2026-11-12T09:16:09.245Z"
+    },
+    {
+      "id": "user-1794474979241-33c854",
+      "name": "CC Tester",
+      "email": "cctest_1794474978963@finpulse.local",
+      "passwordHash": "$2b$10$FFW24.Fz8GRLJxx1HFzOwuwcQkOFWLC97d6ihrmbofPELhWFR1w5m",
+      "isVerified": true,
+      "accountStatus": "active",
+      "failedLoginAttempts": 0,
+      "lockUntil": null,
+      "currency": "INR",
+      "monthlyBudgetInPaise": 4000000,
+      "reminderDayOfMonth": 25,
+      "emailNotificationsEnabled": true,
+      "createdAt": "2026-11-12T09:16:19.241Z"
     }
   ],
   "bankAccounts": [
@@ -134,6 +174,32 @@
       "openingBalanceInPaise": 0,
       "isActive": true,
       "createdAt": "2026-11-12T08:44:36.054Z"
+    },
+    {
+      "id": "bank-1794474969398",
+      "userId": "user-1794474969244-7c7af4",
+      "bankName": "Primary Bank",
+      "accountHolderName": "CC Tester",
+      "accountType": "Savings",
+      "accountNickname": "Primary Savings",
+      "accountNumberMasked": "•••• 1234",
+      "balanceInPaise": 0,
+      "openingBalanceInPaise": 0,
+      "isActive": true,
+      "createdAt": "2026-11-12T09:16:09.398Z"
+    },
+    {
+      "id": "bank-1794474979387",
+      "userId": "user-1794474979241-33c854",
+      "bankName": "Primary Bank",
+      "accountHolderName": "CC Tester",
+      "accountType": "Savings",
+      "accountNickname": "Primary Savings",
+      "accountNumberMasked": "•••• 1234",
+      "balanceInPaise": 0,
+      "openingBalanceInPaise": 0,
+      "isActive": true,
+      "createdAt": "2026-11-12T09:16:19.387Z"
     }
   ],
   "cashWallets": [
@@ -163,6 +229,20 @@
       "balanceInPaise": 0,
       "notes": "Primary Cash Wallet",
       "updatedAt": "2026-11-12T08:44:36.193Z"
+    },
+    {
+      "id": "cash-1794474969549",
+      "userId": "user-1794474969244-7c7af4",
+      "balanceInPaise": -50000,
+      "notes": "Primary Cash Wallet",
+      "updatedAt": "2026-11-12T09:16:09.549Z"
+    },
+    {
+      "id": "cash-1794474979530",
+      "userId": "user-1794474979241-33c854",
+      "balanceInPaise": -50000,
+      "notes": "Primary Cash Wallet",
+      "updatedAt": "2026-11-12T09:16:19.530Z"
     }
   ],
   "creditCards": [
@@ -183,9 +263,151 @@
       "isActive": true,
       "lastPaymentDate": "2026-11-09T10:08:08.139Z",
       "lastPaymentAmountInPaise": 700000
+    },
+    {
+      "id": "cc-1794474970150",
+      "userId": "user-1794474969244-7c7af4",
+      "cardName": "TATA Neu Infinity",
+      "bankName": "HDFC Bank",
+      "cardNickname": "TATA Neu",
+      "lastFourDigits": "3535",
+      "creditLimitInPaise": 5000000,
+      "outstandingBalanceInPaise": 1000000,
+      "availableCreditInPaise": 4000000,
+      "statementDay": 15,
+      "dueDay": 5,
+      "billingCycle": "Monthly",
+      "isActive": true
+    },
+    {
+      "id": "cc-1794474970154",
+      "userId": "user-1794474969244-7c7af4",
+      "cardName": "Amazon Pay ICICI Card",
+      "bankName": "ICICI Bank",
+      "cardNickname": "Amazon Pay",
+      "lastFourDigits": "9876",
+      "creditLimitInPaise": 10000000,
+      "outstandingBalanceInPaise": 1500000,
+      "availableCreditInPaise": 8500000,
+      "statementDay": 15,
+      "dueDay": 5,
+      "billingCycle": "Monthly",
+      "isActive": true
+    },
+    {
+      "id": "cc-1794474980116",
+      "userId": "user-1794474979241-33c854",
+      "cardName": "TATA Neu Infinity",
+      "bankName": "HDFC Bank",
+      "cardNickname": "TATA Neu",
+      "lastFourDigits": "3535",
+      "creditLimitInPaise": 5000000,
+      "outstandingBalanceInPaise": 1000000,
+      "availableCreditInPaise": 4000000,
+      "statementDay": 15,
+      "dueDay": 5,
+      "billingCycle": "Monthly",
+      "isActive": true
+    },
+    {
+      "id": "cc-1794474980119",
+      "userId": "user-1794474979241-33c854",
+      "cardName": "Amazon Pay ICICI Card",
+      "bankName": "ICICI Bank",
+      "cardNickname": "Amazon Pay",
+      "lastFourDigits": "9876",
+      "creditLimitInPaise": 10000000,
+      "outstandingBalanceInPaise": 1500000,
+      "availableCreditInPaise": 8500000,
+      "statementDay": 15,
+      "dueDay": 5,
+      "billingCycle": "Monthly",
+      "isActive": true
     }
   ],
   "transactions": [
+    {
+      "id": "tx-1794474980570-ktfp",
+      "userId": "user-1794474979241-33c854",
+      "date": "2026-11-12T09:16:20.570Z",
+      "type": "credit_card_expense",
+      "mainCategory": "Essential",
+      "subCategory": "Shopping",
+      "amountInPaise": 1500000,
+      "paymentMethod": "Credit Card",
+      "creditCardId": "cc-1794474980119",
+      "description": "Amazon Great Indian Festival",
+      "status": "Completed",
+      "createdAt": "2026-11-12T09:16:20.570Z"
+    },
+    {
+      "id": "tx-1794474980422-mhpx",
+      "userId": "user-1794474979241-33c854",
+      "date": "2026-11-12T09:16:20.422Z",
+      "type": "expense",
+      "mainCategory": "Fun",
+      "subCategory": "Restaurants",
+      "amountInPaise": 50000,
+      "paymentMethod": "Cash",
+      "description": "Dinner cash payment",
+      "status": "Completed",
+      "createdAt": "2026-11-12T09:16:20.422Z"
+    },
+    {
+      "id": "tx-1794474980125-x35n",
+      "userId": "user-1794474979241-33c854",
+      "date": "2026-11-12T09:16:20.125Z",
+      "type": "credit_card_expense",
+      "mainCategory": "Essential",
+      "subCategory": "Electronics",
+      "amountInPaise": 1000000,
+      "paymentMethod": "Credit Card",
+      "creditCardId": "cc-1794474980116",
+      "description": "Purchase on TATA Neu",
+      "status": "Completed",
+      "createdAt": "2026-11-12T09:16:20.125Z"
+    },
+    {
+      "id": "tx-1794474970615-ci4b",
+      "userId": "user-1794474969244-7c7af4",
+      "date": "2026-11-12T09:16:10.615Z",
+      "type": "credit_card_expense",
+      "mainCategory": "Essential",
+      "subCategory": "Shopping",
+      "amountInPaise": 1500000,
+      "paymentMethod": "Credit Card",
+      "creditCardId": "cc-1794474970154",
+      "description": "Amazon Great Indian Festival",
+      "status": "Completed",
+      "createdAt": "2026-11-12T09:16:10.615Z"
+    },
+    {
+      "id": "tx-1794474970467-m4id",
+      "userId": "user-1794474969244-7c7af4",
+      "date": "2026-11-12T09:16:10.467Z",
+      "type": "expense",
+      "mainCategory": "Fun",
+      "subCategory": "Restaurants",
+      "amountInPaise": 50000,
+      "paymentMethod": "Cash",
+      "description": "Dinner cash payment",
+      "status": "Completed",
+      "createdAt": "2026-11-12T09:16:10.467Z"
+    },
+    {
+      "id": "tx-1794474970163-cb64",
+      "userId": "user-1794474969244-7c7af4",
+      "date": "2026-11-12T09:16:10.163Z",
+      "type": "credit_card_expense",
+      "mainCategory": "Essential",
+      "subCategory": "Electronics",
+      "amountInPaise": 1000000,
+      "paymentMethod": "Credit Card",
+      "creditCardId": "cc-1794474970150",
+      "description": "Purchase on TATA Neu",
+      "status": "Completed",
+      "createdAt": "2026-11-12T09:16:10.163Z"
+    },
     {
       "id": "tx-scenario-1",
       "userId": "demo-user-id",
@@ -353,6 +575,28 @@
       "emergencyBudgetInPaise": 500000,
       "savingsBudgetInPaise": 500000,
       "carryForwardEnabled": false
+    },
+    {
+      "id": "budget-user-1794474969244-7c7af4",
+      "userId": "user-1794474969244-7c7af4",
+      "monthYear": "2026-11",
+      "essentialBudgetInPaise": 2000000,
+      "funBudgetInPaise": 500000,
+      "investmentBudgetInPaise": 500000,
+      "emergencyBudgetInPaise": 500000,
+      "savingsBudgetInPaise": 500000,
+      "carryForwardEnabled": false
+    },
+    {
+      "id": "budget-user-1794474979241-33c854",
+      "userId": "user-1794474979241-33c854",
+      "monthYear": "2026-11",
+      "essentialBudgetInPaise": 2000000,
+      "funBudgetInPaise": 500000,
+      "investmentBudgetInPaise": 500000,
+      "emergencyBudgetInPaise": 500000,
+      "savingsBudgetInPaise": 500000,
+      "carryForwardEnabled": false
     }
   ],
   "investments": [
@@ -430,6 +674,20 @@
       "targetAmountInPaise": 10000000,
       "currentBalanceInPaise": 0,
       "updatedAt": "2026-11-12T08:44:36.470Z"
+    },
+    {
+      "id": "ef-1794474969842",
+      "userId": "user-1794474969244-7c7af4",
+      "targetAmountInPaise": 10000000,
+      "currentBalanceInPaise": 0,
+      "updatedAt": "2026-11-12T09:16:09.842Z"
+    },
+    {
+      "id": "ef-1794474979817",
+      "userId": "user-1794474979241-33c854",
+      "targetAmountInPaise": 10000000,
+      "currentBalanceInPaise": 0,
+      "updatedAt": "2026-11-12T09:16:19.817Z"
     }
   ],
   "savingsGoals": [
@@ -571,6 +829,22 @@
       "expiresAt": "2026-11-19T08:44:38.895Z",
       "revoked": false,
       "createdAt": "2026-11-12T08:44:38.895Z"
+    },
+    {
+      "id": "token-1794474969992-4nqu6",
+      "userId": "user-1794474969244-7c7af4",
+      "tokenHash": "f4d2c4786a195a3dac1d38f7c83980f18f3cecca8cc55229b2c6a8c5b75af523",
+      "expiresAt": "2026-11-19T09:16:09.992Z",
+      "revoked": false,
+      "createdAt": "2026-11-12T09:16:09.992Z"
+    },
+    {
+      "id": "token-1794474979964-ebl3z",
+      "userId": "user-1794474979241-33c854",
+      "tokenHash": "5805e59c79224cc471cbb3e33cf2ccfef162ab8905150a0da8726c9e569605e0",
+      "expiresAt": "2026-11-19T09:16:19.964Z",
+      "revoked": false,
+      "createdAt": "2026-11-12T09:16:19.964Z"
     }
   ],
   "emailVerifications": []

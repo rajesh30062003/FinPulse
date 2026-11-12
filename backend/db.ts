@@ -468,7 +468,7 @@ export async function persistUser(user: IUser): Promise<void> {
       await UserModel.findOneAndUpdate(
         { id: user.id },
         { ...user, email: user.email.toLowerCase().trim() },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
     } catch (err) {
       console.error('Error saving user to MongoDB Atlas:', err);

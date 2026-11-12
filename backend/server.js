@@ -406,7 +406,7 @@ async function persistUser(user) {
       await UserModel.findOneAndUpdate(
         { id: user.id },
         { ...user, email: user.email.toLowerCase().trim() },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: "after" }
       );
     } catch (err) {
       console.error("Error saving user to MongoDB Atlas:", err);
@@ -442,6 +442,38 @@ async function persistCashWallet(wallet) {
       await CashWalletModel.findOneAndUpdate({ id: wallet.id }, wallet, { upsert: true });
     } catch (err) {
       console.error("Error saving cash wallet to MongoDB Atlas:", err);
+    }
+  }
+}
+async function persistCreditCard(card) {
+  const idx = memoryDb.creditCards.findIndex((c) => c.id === card.id);
+  if (idx >= 0) {
+    memoryDb.creditCards[idx] = card;
+  } else {
+    memoryDb.creditCards.push(card);
+  }
+  saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await CreditCardModel.findOneAndUpdate({ id: card.id }, card, { upsert: true });
+    } catch (err) {
+      console.error("Error saving credit card to MongoDB Atlas:", err);
+    }
+  }
+}
+async function persistTransaction(tx) {
+  const idx = memoryDb.transactions.findIndex((t) => t.id === tx.id);
+  if (idx >= 0) {
+    memoryDb.transactions[idx] = tx;
+  } else {
+    memoryDb.transactions.unshift(tx);
+  }
+  saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await TransactionModel.findOneAndUpdate({ id: tx.id }, tx, { upsert: true });
+    } catch (err) {
+      console.error("Error saving transaction to MongoDB Atlas:", err);
     }
   }
 }
@@ -2482,7 +2514,7 @@ router.get("/transactions", authenticate, (req, res) => {
   txs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   res.json(txs);
 });
-router.post("/transactions", authenticate, (req, res) => {
+router.post("/transactions", authenticate, async (req, res) => {
   try {
     const {
       type,
@@ -2501,31 +2533,91 @@ router.post("/transactions", authenticate, (req, res) => {
     if (!type || !amountInPaise || !paymentMethod) {
       return res.status(400).json({ error: "Type, amount, and payment method are required" });
     }
+    const numAmount = Number(amountInPaise);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return res.status(400).json({ error: "Valid positive amount in paise is required" });
+    }
+    const db = getDb();
+    let effectiveCreditCardId = void 0;
+    let effectiveSourceAccountId = void 0;
+    let effectiveDestinationAccountId = void 0;
+    if (paymentMethod === "Credit Card" || type === "credit_card_expense") {
+      if (!creditCardId || typeof creditCardId !== "string" || !creditCardId.trim()) {
+        return res.status(400).json({ error: "Please select a valid credit card" });
+      }
+      const card = db.creditCards.find((c) => c.id === creditCardId.trim());
+      if (!card) {
+        return res.status(404).json({ error: "Selected credit card not found" });
+      }
+      if (card.userId !== req.user.id) {
+        return res.status(403).json({ error: "Access denied: Credit card belongs to another user" });
+      }
+      effectiveCreditCardId = card.id;
+    } else if (type === "transfer") {
+      if (!sourceAccountId || !destinationAccountId || sourceAccountId === destinationAccountId) {
+        return res.status(400).json({ error: "Select two different accounts for transfer" });
+      }
+      const srcBank = db.bankAccounts.find((b) => b.id === sourceAccountId && b.userId === req.user.id);
+      const destBank = db.bankAccounts.find((b) => b.id === destinationAccountId && b.userId === req.user.id);
+      if (!srcBank || !destBank) {
+        return res.status(404).json({ error: "Bank accounts for transfer not found or unauthorized" });
+      }
+      effectiveSourceAccountId = srcBank.id;
+      effectiveDestinationAccountId = destBank.id;
+    } else if (paymentMethod === "Bank Account") {
+      if (type === "expense" && !sourceAccountId) {
+        return res.status(400).json({ error: "Please select a source bank account" });
+      }
+      if (sourceAccountId) {
+        const bank = db.bankAccounts.find((b) => b.id === sourceAccountId && b.userId === req.user.id);
+        if (!bank) {
+          return res.status(404).json({ error: "Selected bank account not found or unauthorized" });
+        }
+        effectiveSourceAccountId = bank.id;
+      }
+      if (destinationAccountId) {
+        const bank = db.bankAccounts.find((b) => b.id === destinationAccountId && b.userId === req.user.id);
+        if (bank) effectiveDestinationAccountId = bank.id;
+      }
+    } else if (paymentMethod === "Cash") {
+    }
     const tx = {
-      id: `tx-${Date.now()}`,
+      id: `tx-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       userId: req.user.id,
       date: date || (/* @__PURE__ */ new Date()).toISOString(),
-      type,
+      type: paymentMethod === "Credit Card" ? "credit_card_expense" : type,
       mainCategory: mainCategory || "Other",
       subCategory: customSubCategory || subCategory || "General",
       customSubCategory,
-      amountInPaise: Number(amountInPaise),
-      paymentMethod,
-      sourceAccountId,
-      destinationAccountId,
-      creditCardId,
+      amountInPaise: numAmount,
+      paymentMethod: paymentMethod === "Credit Card" ? "Credit Card" : paymentMethod,
+      sourceAccountId: effectiveSourceAccountId,
+      destinationAccountId: effectiveDestinationAccountId,
+      creditCardId: effectiveCreditCardId,
       description: description || `${type} transaction`,
       notes,
       status: "Completed",
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     };
     LedgerService.applyTransaction(tx);
-    const db = getDb();
     db.transactions.unshift(tx);
     saveDatabase();
-    res.status(201).json(tx);
+    await persistTransaction(tx);
+    if (effectiveCreditCardId) {
+      const card = db.creditCards.find((c) => c.id === effectiveCreditCardId);
+      if (card) await persistCreditCard(card);
+    }
+    if (effectiveSourceAccountId) {
+      const bank = db.bankAccounts.find((b) => b.id === effectiveSourceAccountId);
+      if (bank) await persistBankAccount(bank);
+    }
+    if (effectiveDestinationAccountId) {
+      const bank = db.bankAccounts.find((b) => b.id === effectiveDestinationAccountId);
+      if (bank) await persistBankAccount(bank);
+    }
+    return res.status(201).json(tx);
   } catch (err) {
-    res.status(400).json({ error: err.message || "Transaction recording failed" });
+    return res.status(400).json({ error: err.message || "Transaction recording failed" });
   }
 });
 router.put("/transactions/:id", authenticate, (req, res) => {

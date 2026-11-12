@@ -18,6 +18,8 @@ import {
   findRefreshTokenByHash,
   revokeRefreshToken,
   revokeAllUserRefreshTokens,
+  persistCreditCard,
+  persistTransaction,
   persistEmailVerification,
   findEmailVerification,
   deleteEmailVerification
@@ -975,7 +977,7 @@ router.get('/transactions', authenticate, (req: AuthRequest, res: Response) => {
   res.json(txs);
 });
 
-router.post('/transactions', authenticate, (req: AuthRequest, res: Response) => {
+router.post('/transactions', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const {
       type,
@@ -996,19 +998,78 @@ router.post('/transactions', authenticate, (req: AuthRequest, res: Response) => 
       return res.status(400).json({ error: 'Type, amount, and payment method are required' });
     }
 
+    const numAmount = Number(amountInPaise);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return res.status(400).json({ error: 'Valid positive amount in paise is required' });
+    }
+
+    const db = getDb();
+    let effectiveCreditCardId: string | undefined = undefined;
+    let effectiveSourceAccountId: string | undefined = undefined;
+    let effectiveDestinationAccountId: string | undefined = undefined;
+
+    // 1. Credit Card Expense Validation
+    if (paymentMethod === 'Credit Card' || type === 'credit_card_expense') {
+      if (!creditCardId || typeof creditCardId !== 'string' || !creditCardId.trim()) {
+        return res.status(400).json({ error: 'Please select a valid credit card' });
+      }
+      const card = db.creditCards.find(c => c.id === creditCardId.trim());
+      if (!card) {
+        return res.status(404).json({ error: 'Selected credit card not found' });
+      }
+      if (card.userId !== req.user!.id) {
+        return res.status(403).json({ error: 'Access denied: Credit card belongs to another user' });
+      }
+      effectiveCreditCardId = card.id;
+    }
+    // 2. Transfer Validation
+    else if (type === 'transfer') {
+      if (!sourceAccountId || !destinationAccountId || sourceAccountId === destinationAccountId) {
+        return res.status(400).json({ error: 'Select two different accounts for transfer' });
+      }
+      const srcBank = db.bankAccounts.find(b => b.id === sourceAccountId && b.userId === req.user!.id);
+      const destBank = db.bankAccounts.find(b => b.id === destinationAccountId && b.userId === req.user!.id);
+      if (!srcBank || !destBank) {
+        return res.status(404).json({ error: 'Bank accounts for transfer not found or unauthorized' });
+      }
+      effectiveSourceAccountId = srcBank.id;
+      effectiveDestinationAccountId = destBank.id;
+    }
+    // 3. Bank Account Validation
+    else if (paymentMethod === 'Bank Account') {
+      if (type === 'expense' && !sourceAccountId) {
+        return res.status(400).json({ error: 'Please select a source bank account' });
+      }
+      if (sourceAccountId) {
+        const bank = db.bankAccounts.find(b => b.id === sourceAccountId && b.userId === req.user!.id);
+        if (!bank) {
+          return res.status(404).json({ error: 'Selected bank account not found or unauthorized' });
+        }
+        effectiveSourceAccountId = bank.id;
+      }
+      if (destinationAccountId) {
+        const bank = db.bankAccounts.find(b => b.id === destinationAccountId && b.userId === req.user!.id);
+        if (bank) effectiveDestinationAccountId = bank.id;
+      }
+    }
+    // 4. Cash Payment
+    else if (paymentMethod === 'Cash') {
+      // Cash payment requires neither bank account nor credit card
+    }
+
     const tx: ITransaction = {
-      id: `tx-${Date.now()}`,
+      id: `tx-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       userId: req.user!.id,
       date: date || new Date().toISOString(),
-      type,
+      type: paymentMethod === 'Credit Card' ? 'credit_card_expense' : type,
       mainCategory: mainCategory || 'Other',
       subCategory: customSubCategory || subCategory || 'General',
       customSubCategory,
-      amountInPaise: Number(amountInPaise),
-      paymentMethod,
-      sourceAccountId,
-      destinationAccountId,
-      creditCardId,
+      amountInPaise: numAmount,
+      paymentMethod: paymentMethod === 'Credit Card' ? 'Credit Card' : paymentMethod,
+      sourceAccountId: effectiveSourceAccountId,
+      destinationAccountId: effectiveDestinationAccountId,
+      creditCardId: effectiveCreditCardId,
       description: description || `${type} transaction`,
       notes,
       status: 'Completed',
@@ -1016,13 +1077,27 @@ router.post('/transactions', authenticate, (req: AuthRequest, res: Response) => 
     };
 
     LedgerService.applyTransaction(tx);
-    const db = getDb();
     db.transactions.unshift(tx);
     saveDatabase();
 
-    res.status(201).json(tx);
+    // Persist to MongoDB Atlas
+    await persistTransaction(tx);
+    if (effectiveCreditCardId) {
+      const card = db.creditCards.find(c => c.id === effectiveCreditCardId);
+      if (card) await persistCreditCard(card);
+    }
+    if (effectiveSourceAccountId) {
+      const bank = db.bankAccounts.find(b => b.id === effectiveSourceAccountId);
+      if (bank) await persistBankAccount(bank);
+    }
+    if (effectiveDestinationAccountId) {
+      const bank = db.bankAccounts.find(b => b.id === effectiveDestinationAccountId);
+      if (bank) await persistBankAccount(bank);
+    }
+
+    return res.status(201).json(tx);
   } catch (err: any) {
-    res.status(400).json({ error: err.message || 'Transaction recording failed' });
+    return res.status(400).json({ error: err.message || 'Transaction recording failed' });
   }
 });
 

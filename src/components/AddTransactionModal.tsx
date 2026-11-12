@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, CheckCircle, ArrowRightLeft, CreditCard, Wallet, Landmark } from 'lucide-react';
 import { useFinancial } from '../context/FinancialContext';
 import { api } from '../services/api';
@@ -31,6 +31,48 @@ export const AddTransactionModal: React.FC = () => {
   const [incomeSource, setIncomeSource] = useState('Salary');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Synchronize creditCardId when creditCards load or update
+  useEffect(() => {
+    if (creditCards.length > 0) {
+      if (!creditCardId || !creditCards.some(c => c.id === creditCardId)) {
+        setCreditCardId(creditCards[0].id);
+      }
+    } else {
+      setCreditCardId('');
+    }
+  }, [creditCards, creditCardId]);
+
+  // Synchronize bank accounts when accounts load or update
+  useEffect(() => {
+    if (accounts.length > 0) {
+      if (!sourceAccountId || !accounts.some(a => a.id === sourceAccountId)) {
+        setSourceAccountId(accounts[0].id);
+      }
+      if (!destinationAccountId || !accounts.some(a => a.id === destinationAccountId)) {
+        const otherAccount = accounts.find(a => a.id !== sourceAccountId) || accounts[1] || accounts[0];
+        setDestinationAccountId(otherAccount.id);
+      }
+    } else {
+      setSourceAccountId('');
+      setDestinationAccountId('');
+    }
+  }, [accounts, sourceAccountId, destinationAccountId]);
+
+  // Reset modal state when opened
+  useEffect(() => {
+    if (isAddTxOpen) {
+      setError(null);
+      setLoading(false);
+      setMode(addTxDefaultType === 'income' ? 'income' : 'expense');
+      if (creditCards.length > 0 && (!creditCardId || !creditCards.some(c => c.id === creditCardId))) {
+        setCreditCardId(creditCards[0].id);
+      }
+      if (accounts.length > 0 && (!sourceAccountId || !accounts.some(a => a.id === sourceAccountId))) {
+        setSourceAccountId(accounts[0].id);
+      }
+    }
+  }, [isAddTxOpen, addTxDefaultType]);
 
   if (!isAddTxOpen) return null;
 
@@ -66,6 +108,7 @@ export const AddTransactionModal: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError(null);
 
     const parsedRupees = parseFloat(amountRupees);
@@ -83,6 +126,10 @@ export const AddTransactionModal: React.FC = () => {
       txType = 'income';
       finalMainCategory = 'Essential';
       finalSubCategory = incomeSource;
+      if (!sourceAccountId || !accounts.some(a => a.id === sourceAccountId)) {
+        setError('Please select a receiving bank account');
+        return;
+      }
     } else if (mode === 'transfer') {
       txType = 'transfer';
       finalMainCategory = 'Transfer';
@@ -95,16 +142,19 @@ export const AddTransactionModal: React.FC = () => {
       // Expense mode
       if (paymentMethod === 'Credit Card') {
         txType = 'credit_card_expense';
-        if (!creditCardId) {
+        if (!creditCardId || !creditCards.some(c => c.id === creditCardId)) {
           setError('Please select a credit card');
           return;
         }
-      } else {
+      } else if (paymentMethod === 'Bank Account') {
         txType = 'expense';
-        if (paymentMethod === 'Bank Account' && !sourceAccountId) {
+        if (!sourceAccountId || !accounts.some(a => a.id === sourceAccountId)) {
           setError('Please select a source bank account');
           return;
         }
+      } else {
+        // Cash payment
+        txType = 'expense';
       }
     }
 
@@ -117,8 +167,8 @@ export const AddTransactionModal: React.FC = () => {
         customSubCategory: subCategory === 'Other' ? customSubCategory : undefined,
         amountInPaise,
         paymentMethod: mode === 'transfer' ? 'Bank Account' : paymentMethod,
-        sourceAccountId: mode === 'income' ? undefined : sourceAccountId,
-        destinationAccountId: mode === 'income' ? sourceAccountId : destinationAccountId,
+        sourceAccountId: mode === 'income' ? undefined : (paymentMethod === 'Bank Account' || mode === 'transfer' ? sourceAccountId : undefined),
+        destinationAccountId: mode === 'income' ? sourceAccountId : (mode === 'transfer' ? destinationAccountId : undefined),
         creditCardId: paymentMethod === 'Credit Card' ? creditCardId : undefined,
         description: description || `${finalSubCategory} ${mode}`,
         notes,
@@ -366,8 +416,14 @@ export const AddTransactionModal: React.FC = () => {
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod('Bank Account')}
-                    className={`py-2 px-2.5 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                    onClick={() => {
+                      setPaymentMethod('Bank Account');
+                      if (!sourceAccountId && accounts.length > 0) {
+                        setSourceAccountId(accounts[0].id);
+                      }
+                      setError(null);
+                    }}
+                    className={`py-2 px-2.5 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                       paymentMethod === 'Bank Account'
                         ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-semibold'
                         : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
@@ -378,8 +434,14 @@ export const AddTransactionModal: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod('Credit Card')}
-                    className={`py-2 px-2.5 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                    onClick={() => {
+                      setPaymentMethod('Credit Card');
+                      if (creditCards.length > 0 && (!creditCardId || !creditCards.some(c => c.id === creditCardId))) {
+                        setCreditCardId(creditCards[0].id);
+                      }
+                      setError(null);
+                    }}
+                    className={`py-2 px-2.5 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                       paymentMethod === 'Credit Card'
                         ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-semibold'
                         : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
@@ -390,8 +452,11 @@ export const AddTransactionModal: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod('Cash')}
-                    className={`py-2 px-2.5 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                    onClick={() => {
+                      setPaymentMethod('Cash');
+                      setError(null);
+                    }}
+                    className={`py-2 px-2.5 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                       paymentMethod === 'Cash'
                         ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-semibold'
                         : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
@@ -406,39 +471,61 @@ export const AddTransactionModal: React.FC = () => {
               {/* Account/Card Dropdown */}
               {paymentMethod === 'Bank Account' && (
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  <label htmlFor="payingBankAccountSelect" className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                     Paying Bank Account
                   </label>
-                  <select
-                    value={sourceAccountId}
-                    onChange={e => setSourceAccountId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                  >
-                    {accounts.map(a => (
-                      <option key={a.id} value={a.id}>
-                        {a.bankName} - {a.accountNickname} (₹{(a.balanceInPaise / 100).toLocaleString('en-IN')})
-                      </option>
-                    ))}
-                  </select>
+                  {accounts.length === 0 ? (
+                    <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-xs">
+                      No bank accounts registered. Please add a bank account first.
+                    </div>
+                  ) : (
+                    <select
+                      id="payingBankAccountSelect"
+                      value={sourceAccountId}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setSourceAccountId(val);
+                        if (val) setError(null);
+                      }}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      {accounts.map(a => (
+                        <option key={a.id} value={a.id}>
+                          {a.bankName} - {a.accountNickname} (₹{(a.balanceInPaise / 100).toLocaleString('en-IN')})
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               )}
 
               {paymentMethod === 'Credit Card' && (
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                  <label htmlFor="creditCardSelect" className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                     Select Credit Card (Will increase card outstanding)
                   </label>
-                  <select
-                    value={creditCardId}
-                    onChange={e => setCreditCardId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                  >
-                    {creditCards.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.cardName} (•••• {c.lastFourDigits}) - Avail: ₹{(c.availableCreditInPaise / 100).toLocaleString('en-IN')}
-                      </option>
-                    ))}
-                  </select>
+                  {creditCards.length === 0 ? (
+                    <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-xs">
+                      No active credit cards registered. Please add a credit card in the Credit Cards section first.
+                    </div>
+                  ) : (
+                    <select
+                      id="creditCardSelect"
+                      value={creditCardId}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setCreditCardId(val);
+                        if (val) setError(null);
+                      }}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      {creditCards.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.cardName} (•••• {c.lastFourDigits}) - Avail: ₹{(c.availableCreditInPaise / 100).toLocaleString('en-IN')}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               )}
             </>
