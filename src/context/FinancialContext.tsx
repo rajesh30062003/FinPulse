@@ -43,6 +43,7 @@ interface FinancialContextType {
   refreshAll: () => Promise<void>;
   clearFinancialData: () => void;
   isLoading: boolean;
+  fetchError: string | null;
 }
 
 const FinancialContext = createContext<FinancialContextType | undefined>(undefined);
@@ -64,6 +65,7 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isLoading, setIsLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Modals
   const [isAddTxOpen, setIsAddTxOpen] = useState(false);
@@ -86,6 +88,7 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setSavingsGoals([]);
     setNotifications([]);
     setUnreadNotificationsCount(0);
+    setFetchError(null);
   }, []);
 
   const refreshAll = useCallback(async () => {
@@ -96,6 +99,18 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     try {
       setIsLoading(true);
+      let errorOccurred = false;
+
+      const safeFetch = async <T,>(fn: () => Promise<T>, name: string): Promise<T | null> => {
+        try {
+          return await fn();
+        } catch (err: any) {
+          console.error(`Failed to fetch ${name}:`, err);
+          errorOccurred = true;
+          return null;
+        }
+      };
+
       const [
         sumData,
         accData,
@@ -109,33 +124,44 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         saveData,
         notifData
       ] = await Promise.all([
-        api.getDashboardSummary().catch(() => null),
-        api.getAccounts().catch(() => []),
-        api.getCash().catch(() => null),
-        api.getCreditCards().catch(() => []),
-        api.getTransactions().catch(() => []),
-        api.getBudget().catch(() => null),
-        api.getInvestments().catch(() => null),
-        api.getFixedDeposits().catch(() => []),
-        api.getEmergencyFund().catch(() => null),
-        api.getSavingsGoals().catch(() => []),
-        api.getNotifications().catch(() => ({ notifications: [], unreadCount: 0 }))
+        safeFetch(() => api.getDashboardSummary(), 'dashboard summary'),
+        safeFetch(() => api.getAccounts(), 'bank accounts'),
+        safeFetch(() => api.getCash(), 'cash wallet'),
+        safeFetch(() => api.getCreditCards(), 'credit cards'),
+        safeFetch(() => api.getTransactions(), 'transactions'),
+        safeFetch(() => api.getBudget(), 'budget'),
+        safeFetch(() => api.getInvestments(), 'investments'),
+        safeFetch(() => api.getFixedDeposits(), 'fixed deposits'),
+        safeFetch(() => api.getEmergencyFund(), 'emergency fund'),
+        safeFetch(() => api.getSavingsGoals(), 'savings goals'),
+        safeFetch(() => api.getNotifications(), 'notifications')
       ]);
 
-      if (sumData) setSummary(sumData);
-      setAccounts(accData || []);
-      setCash(cashData);
-      setCreditCards(ccData || []);
-      setTransactions(txData || []);
-      setBudgetData(bgData);
-      setInvestmentsData(invData);
-      setFixedDeposits(fdData || []);
-      setEmergencyFund(efData);
-      setSavingsGoals(saveData || []);
-      setNotifications(notifData?.notifications || []);
-      setUnreadNotificationsCount(notifData?.unreadCount || 0);
+      if (errorOccurred) {
+        setFetchError('Some financial services could not be reached. Retaining existing records.');
+      } else {
+        setFetchError(null);
+      }
+
+      // CRITICAL: Only update state if data was successfully fetched (not null)!
+      // Do NOT convert failed API calls or database errors into empty arrays!
+      if (sumData !== null) setSummary(sumData);
+      if (accData !== null) setAccounts(accData);
+      if (cashData !== null) setCash(cashData);
+      if (ccData !== null) setCreditCards(ccData);
+      if (txData !== null) setTransactions(txData);
+      if (bgData !== null) setBudgetData(bgData);
+      if (invData !== null) setInvestmentsData(invData);
+      if (fdData !== null) setFixedDeposits(fdData);
+      if (efData !== null) setEmergencyFund(efData);
+      if (saveData !== null) setSavingsGoals(saveData);
+      if (notifData !== null) {
+        setNotifications(notifData.notifications || []);
+        setUnreadNotificationsCount(notifData.unreadCount || 0);
+      }
     } catch (err) {
       console.error('Error fetching financial datasets:', err);
+      setFetchError('An unexpected error occurred while synchronizing financial records.');
     } finally {
       setIsLoading(false);
     }
@@ -181,7 +207,8 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setIsAuthModalOpen,
         refreshAll,
         clearFinancialData,
-        isLoading
+        isLoading,
+        fetchError
       }}
     >
       {children}

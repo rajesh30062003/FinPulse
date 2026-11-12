@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Landmark, Plus, ArrowRightLeft, ArrowDownRight, ArrowUpRight, CheckCircle2, ShieldCheck, Edit3 } from 'lucide-react';
 import { useFinancial } from '../context/FinancialContext';
+import { useAuth } from '../context/AuthContext';
 import { api, formatINR } from '../services/api';
 
 export const BankAccountsView: React.FC = () => {
   const { accounts, refreshAll, transactions } = useFinancial();
+  const { user } = useAuth();
 
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
   const [isDepositOpen, setIsDepositOpen] = useState(false);
@@ -12,7 +14,7 @@ export const BankAccountsView: React.FC = () => {
 
   // Form states
   const [bankName, setBankName] = useState('');
-  const [accountHolderName, setAccountHolderName] = useState('Rajesh Sharma');
+  const [accountHolderName, setAccountHolderName] = useState(user?.name || 'Rajesh Pal');
   const [accountType, setAccountType] = useState<'Savings' | 'Current' | 'Salary' | 'Other'>('Savings');
   const [accountNickname, setAccountNickname] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
