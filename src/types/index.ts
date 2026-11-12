@@ -210,7 +210,11 @@ export interface IDashboardSummary {
   emergencyFundTargetPaise: number;
   totalSavingsPaise: number;
   monthlyBudgetPaise: number;
+  totalPlannedAllocationPaise?: number;
+  unallocatedBudgetPaise?: number;
   remainingBudgetPaise: number;
+  budgetUtilizationPercent?: number;
+  unallocatedCushionPaise?: number;
   upcomingBills: Array<{
     cardId: string;
     cardName: string;

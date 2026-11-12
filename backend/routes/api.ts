@@ -11,18 +11,38 @@ import {
   findUserById,
   persistUser,
   persistBankAccount,
+  deleteBankAccount,
   persistCashWallet,
   persistBudgetAllocation,
   persistEmergencyFund,
+  persistSavingsGoal,
+  deleteSavingsGoal,
+  persistInvestment,
+  deleteInvestment,
+  persistFixedDeposit,
+  deleteFixedDeposit,
   persistRefreshToken,
   findRefreshTokenByHash,
   revokeRefreshToken,
   revokeAllUserRefreshTokens,
   persistCreditCard,
+  deleteCreditCard,
   persistTransaction,
+  deleteTransaction,
   persistEmailVerification,
   findEmailVerification,
-  deleteEmailVerification
+  deleteEmailVerification,
+  reconcileUserData,
+  UserModel,
+  BankAccountModel,
+  CashWalletModel,
+  CreditCardModel,
+  TransactionModel,
+  BudgetAllocationModel,
+  InvestmentModel,
+  FixedDepositModel,
+  EmergencyFundModel,
+  SavingsGoalModel
 } from '../db.js';
 import { LedgerService } from '../services/ledgerService.js';
 import { EmailService, maskEmail } from '../services/emailService.js';
@@ -81,6 +101,104 @@ router.get('/health', (req: Request, res: Response) => {
     timestamp: new Date().toISOString()
   });
 });
+
+// Non-destructive read-only Atlas Diagnostics endpoint
+router.get('/system/atlas-diagnostics', async (req: Request, res: Response) => {
+  const db = getDb();
+  const mongoStatus = getMongoStatus();
+
+  let atlasCounts = {
+    users: 0,
+    bankAccounts: 0,
+    cashWallets: 0,
+    creditCards: 0,
+    transactions: 0,
+    budgetAllocations: 0,
+    investments: 0,
+    fixedDeposits: 0,
+    emergencyFunds: 0,
+    savingsGoals: 0
+  };
+
+  let distinctUserIdsInAtlas: Record<string, string[]> = {};
+
+  if (mongoStatus.connected) {
+    try {
+      const [
+        users,
+        bankAccounts,
+        cashWallets,
+        creditCards,
+        transactions,
+        budgetAllocations,
+        investments,
+        fixedDeposits,
+        emergencyFunds,
+        savingsGoals
+      ] = await Promise.all([
+        UserModel.countDocuments(),
+        BankAccountModel.countDocuments(),
+        CashWalletModel.countDocuments(),
+        CreditCardModel.countDocuments(),
+        TransactionModel.countDocuments(),
+        BudgetAllocationModel.countDocuments(),
+        InvestmentModel.countDocuments(),
+        FixedDepositModel.countDocuments(),
+        EmergencyFundModel.countDocuments(),
+        SavingsGoalModel.countDocuments()
+      ]);
+
+      atlasCounts = {
+        users,
+        bankAccounts,
+        cashWallets,
+        creditCards,
+        transactions,
+        budgetAllocations,
+        investments,
+        fixedDeposits,
+        emergencyFunds,
+        savingsGoals
+      };
+
+      const accountUsers = await BankAccountModel.distinct('userId');
+      const cardUsers = await CreditCardModel.distinct('userId');
+      const txUsers = await TransactionModel.distinct('userId');
+      distinctUserIdsInAtlas = {
+        bankAccountUserIds: accountUsers,
+        creditCardUserIds: cardUsers,
+        transactionUserIds: txUsers
+      };
+    } catch (err: any) {
+      console.error('Atlas diagnostics count error:', err);
+    }
+  }
+
+  res.json({
+    status: 'ok',
+    database: mongoStatus,
+    atlasCounts,
+    memoryDbCounts: {
+      users: db.users.length,
+      bankAccounts: db.bankAccounts.length,
+      cashWallets: db.cashWallets.length,
+      creditCards: db.creditCards.length,
+      transactions: db.transactions.length,
+      budgetAllocations: db.budgetAllocations.length,
+      investments: db.investments.length,
+      fixedDeposits: db.fixedDeposits.length,
+      emergencyFunds: db.emergencyFunds.length,
+      savingsGoals: db.savingsGoals.length
+    },
+    distinctUserIdsInAtlas,
+    distinctUserIdsInMemory: {
+      bankAccountUserIds: [...new Set(db.bankAccounts.map(b => b.userId))],
+      creditCardUserIds: [...new Set(db.creditCards.map(c => c.userId))],
+      transactionUserIds: [...new Set(db.transactions.map(t => t.userId))]
+    }
+  });
+});
+
 
 // SMTP Status and Diagnostics (safe; never exposes passwords or secrets)
 router.get('/system/smtp-status', async (req: Request, res: Response) => {
@@ -403,6 +521,9 @@ router.post('/auth/login', async (req: Request, res: Response) => {
 
     setRefreshTokenCookie(res, refreshToken);
 
+    // Reconcile user financial data ownership safely
+    await reconcileUserData(user);
+
     return res.json({
       success: true,
       message: 'Login successful',
@@ -531,6 +652,8 @@ router.get('/auth/me', authenticate, async (req: AuthRequest, res: Response) => 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
+    // Reconcile user financial data ownership safely
+    await reconcileUserData(user);
     const { passwordHash, verificationToken, verificationOtp, ...safeUser } = user;
     return res.json(safeUser);
   } catch (err: any) {
@@ -710,6 +833,19 @@ router.get('/dashboard/summary', authenticate, (req: AuthRequest, res: Response)
   const user = db.users.find(u => u.id === userId);
   const monthlyBudgetPaise = user?.monthlyBudgetInPaise || 4000000;
   const remainingBudgetPaise = Math.max(0, monthlyBudgetPaise - totalMonthlyExpensesPaise);
+  const budgetUtilizationPercent = monthlyBudgetPaise > 0 ? Math.round((totalMonthlyExpensesPaise / monthlyBudgetPaise) * 100) : 0;
+
+  const currentAllocation = db.budgetAllocations.find(b => b.userId === userId && b.monthYear === currentMonthYear);
+  const totalPlannedAllocationPaise = currentAllocation ? (
+    currentAllocation.essentialBudgetInPaise +
+    currentAllocation.funBudgetInPaise +
+    currentAllocation.investmentBudgetInPaise +
+    currentAllocation.emergencyBudgetInPaise +
+    currentAllocation.savingsBudgetInPaise
+  ) : 3200000;
+
+  const unallocatedBudgetPaise = Math.max(0, monthlyBudgetPaise - totalPlannedAllocationPaise);
+  const unallocatedCushionPaise = totalMonthlyIncomePaise - totalPlannedAllocationPaise;
 
   // 11. Upcoming CC bills
   const upcomingBills = userCards
@@ -764,7 +900,11 @@ router.get('/dashboard/summary', authenticate, (req: AuthRequest, res: Response)
     emergencyFundTargetPaise,
     totalSavingsPaise,
     monthlyBudgetPaise,
+    totalPlannedAllocationPaise,
+    unallocatedBudgetPaise,
     remainingBudgetPaise,
+    budgetUtilizationPercent,
+    unallocatedCushionPaise,
     upcomingBills,
     upcomingFDs,
     recentTransactions,
@@ -784,7 +924,7 @@ router.get('/accounts', authenticate, (req: AuthRequest, res: Response) => {
   res.json(accounts);
 });
 
-router.post('/accounts', authenticate, (req: AuthRequest, res: Response) => {
+router.post('/accounts', authenticate, async (req: AuthRequest, res: Response) => {
   const db = getDb();
   const { bankName, accountHolderName, accountType, accountNickname, accountNumber, openingBalanceInPaise, notes } = req.body;
 
@@ -810,10 +950,11 @@ router.post('/accounts', authenticate, (req: AuthRequest, res: Response) => {
 
   db.bankAccounts.push(newAccount);
   saveDatabase();
+  await persistBankAccount(newAccount);
   res.status(201).json(newAccount);
 });
 
-router.put('/accounts/:id', authenticate, (req: AuthRequest, res: Response) => {
+router.put('/accounts/:id', authenticate, async (req: AuthRequest, res: Response) => {
   const db = getDb();
   const account = db.bankAccounts.find(b => b.id === req.params.id && b.userId === req.user!.id);
   if (!account) return res.status(404).json({ error: 'Account not found' });
@@ -827,7 +968,16 @@ router.put('/accounts/:id', authenticate, (req: AuthRequest, res: Response) => {
   if (isActive !== undefined) account.isActive = isActive;
 
   saveDatabase();
+  await persistBankAccount(account);
   res.json(account);
+});
+
+router.delete('/accounts/:id', authenticate, async (req: AuthRequest, res: Response) => {
+  const db = getDb();
+  const account = db.bankAccounts.find(b => b.id === req.params.id && b.userId === req.user!.id);
+  if (!account) return res.status(404).json({ error: 'Account not found' });
+  await deleteBankAccount(req.params.id, req.user!.id);
+  res.json({ message: 'Account removed successfully' });
 });
 
 // ================= CASH WALLET ================= //
@@ -839,11 +989,12 @@ router.get('/cash', authenticate, (req: AuthRequest, res: Response) => {
     wallet = { id: `cash-${Date.now()}`, userId: req.user!.id, balanceInPaise: 0, updatedAt: new Date().toISOString() };
     db.cashWallets.push(wallet);
     saveDatabase();
+    persistCashWallet(wallet).catch(() => {});
   }
   res.json(wallet);
 });
 
-router.post('/cash/adjust', authenticate, (req: AuthRequest, res: Response) => {
+router.post('/cash/adjust', authenticate, async (req: AuthRequest, res: Response) => {
   const db = getDb();
   const { newBalanceInPaise, reason } = req.body;
   let wallet = db.cashWallets.find(w => w.userId === req.user!.id);
@@ -856,6 +1007,7 @@ router.post('/cash/adjust', authenticate, (req: AuthRequest, res: Response) => {
   wallet.notes = reason || 'Manual balance adjustment';
   wallet.updatedAt = new Date().toISOString();
   saveDatabase();
+  await persistCashWallet(wallet);
   res.json(wallet);
 });
 
@@ -867,7 +1019,7 @@ router.get('/credit-cards', authenticate, (req: AuthRequest, res: Response) => {
   res.json(cards);
 });
 
-router.post('/credit-cards', authenticate, (req: AuthRequest, res: Response) => {
+router.post('/credit-cards', authenticate, async (req: AuthRequest, res: Response) => {
   const db = getDb();
   const { cardName, bankName, cardNickname, lastFourDigits, creditLimitInPaise, statementDay, dueDay, billingCycle, notes } = req.body;
 
@@ -894,10 +1046,19 @@ router.post('/credit-cards', authenticate, (req: AuthRequest, res: Response) => 
 
   db.creditCards.push(newCard);
   saveDatabase();
+  await persistCreditCard(newCard);
   res.status(201).json(newCard);
 });
 
-router.post('/credit-cards/pay-bill', authenticate, (req: AuthRequest, res: Response) => {
+router.delete('/credit-cards/:id', authenticate, async (req: AuthRequest, res: Response) => {
+  const db = getDb();
+  const card = db.creditCards.find(c => c.id === req.params.id && c.userId === req.user!.id);
+  if (!card) return res.status(404).json({ error: 'Credit card not found' });
+  await deleteCreditCard(req.params.id, req.user!.id);
+  res.json({ message: 'Credit card removed successfully' });
+});
+
+router.post('/credit-cards/pay-bill', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { creditCardId, sourceAccountId, paymentAmountInPaise, notes } = req.body;
     if (!creditCardId || !sourceAccountId || !paymentAmountInPaise) {
@@ -933,6 +1094,10 @@ router.post('/credit-cards/pay-bill', authenticate, (req: AuthRequest, res: Resp
     LedgerService.applyTransaction(tx);
     db.transactions.unshift(tx);
     saveDatabase();
+
+    await persistTransaction(tx);
+    await persistCreditCard(card);
+    await persistBankAccount(bank);
 
     res.json({
       message: 'Credit card bill paid successfully. Outstanding updated without duplicate expense generation.',
@@ -1101,7 +1266,7 @@ router.post('/transactions', authenticate, async (req: AuthRequest, res: Respons
   }
 });
 
-router.put('/transactions/:id', authenticate, (req: AuthRequest, res: Response) => {
+router.put('/transactions/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
     const existingIndex = db.transactions.findIndex(t => t.id === req.params.id && t.userId === req.user!.id);
@@ -1125,13 +1290,27 @@ router.put('/transactions/:id', authenticate, (req: AuthRequest, res: Response) 
     db.transactions[existingIndex] = updatedTx;
     saveDatabase();
 
+    await persistTransaction(updatedTx);
+    if (updatedTx.creditCardId) {
+      const card = db.creditCards.find(c => c.id === updatedTx.creditCardId);
+      if (card) await persistCreditCard(card);
+    }
+    if (updatedTx.sourceAccountId) {
+      const bank = db.bankAccounts.find(b => b.id === updatedTx.sourceAccountId);
+      if (bank) await persistBankAccount(bank);
+    }
+    if (updatedTx.destinationAccountId) {
+      const bank = db.bankAccounts.find(b => b.id === updatedTx.destinationAccountId);
+      if (bank) await persistBankAccount(bank);
+    }
+
     res.json(updatedTx);
   } catch (err: any) {
     res.status(400).json({ error: err.message || 'Transaction update failed' });
   }
 });
 
-router.delete('/transactions/:id', authenticate, (req: AuthRequest, res: Response) => {
+router.delete('/transactions/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const db = getDb();
     const existingIndex = db.transactions.findIndex(t => t.id === req.params.id && t.userId === req.user!.id);
@@ -1142,6 +1321,20 @@ router.delete('/transactions/:id', authenticate, (req: AuthRequest, res: Respons
 
     db.transactions.splice(existingIndex, 1);
     saveDatabase();
+
+    await deleteTransaction(existingTx.id, req.user!.id);
+    if (existingTx.creditCardId) {
+      const card = db.creditCards.find(c => c.id === existingTx.creditCardId);
+      if (card) await persistCreditCard(card);
+    }
+    if (existingTx.sourceAccountId) {
+      const bank = db.bankAccounts.find(b => b.id === existingTx.sourceAccountId);
+      if (bank) await persistBankAccount(bank);
+    }
+    if (existingTx.destinationAccountId) {
+      const bank = db.bankAccounts.find(b => b.id === existingTx.destinationAccountId);
+      if (bank) await persistBankAccount(bank);
+    }
 
     res.json({ message: 'Transaction reversed and deleted successfully' });
   } catch (err: any) {
@@ -1223,8 +1416,36 @@ router.get('/budget', authenticate, (req: AuthRequest, res: Response) => {
     .filter(t => t.type === 'savings_deposit')
     .reduce((sum, t) => sum + t.amountInPaise, 0);
 
+  const user = db.users.find(u => u.id === userId);
+  const totalBudgetPaise = user?.monthlyBudgetInPaise || 4000000;
+  const totalPlannedAllocationPaise =
+    allocation.essentialBudgetInPaise +
+    allocation.funBudgetInPaise +
+    allocation.investmentBudgetInPaise +
+    allocation.emergencyBudgetInPaise +
+    allocation.savingsBudgetInPaise;
+
+  const unallocatedBudgetPaise = Math.max(0, totalBudgetPaise - totalPlannedAllocationPaise);
+  const eligibleExpensesPaise = essentialSpentPaise + funSpentPaise;
+  const remainingBudgetPaise = Math.max(0, totalBudgetPaise - eligibleExpensesPaise);
+  const budgetUtilizationPercent = totalBudgetPaise > 0 ? Math.round((eligibleExpensesPaise / totalBudgetPaise) * 100) : 0;
+
+  const monthlyInflowPaise = monthTxs
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + t.amountInPaise, 0);
+
+  const unallocatedCushionPaise = monthlyInflowPaise - totalPlannedAllocationPaise;
+
   res.json({
     allocation,
+    totalBudgetPaise,
+    totalPlannedAllocationPaise,
+    unallocatedBudgetPaise,
+    eligibleExpensesPaise,
+    remainingBudgetPaise,
+    budgetUtilizationPercent,
+    monthlyInflowPaise,
+    unallocatedCushionPaise,
     actuals: {
       Essential: {
         budgetPaise: allocation.essentialBudgetInPaise,
@@ -1262,7 +1483,7 @@ router.get('/budget', authenticate, (req: AuthRequest, res: Response) => {
   });
 });
 
-router.post('/budget', authenticate, (req: AuthRequest, res: Response) => {
+router.post('/budget', authenticate, async (req: AuthRequest, res: Response) => {
   const db = getDb();
   const userId = req.user!.id;
   const now = new Date();
@@ -1293,6 +1514,7 @@ router.post('/budget', authenticate, (req: AuthRequest, res: Response) => {
   if (carryForwardEnabled !== undefined) allocation.carryForwardEnabled = carryForwardEnabled;
 
   saveDatabase();
+  await persistBudgetAllocation(allocation);
   res.json({ message: 'Budget allocation updated successfully', allocation });
 });
 
@@ -1316,7 +1538,7 @@ router.get('/investments', authenticate, (req: AuthRequest, res: Response) => {
   });
 });
 
-router.post('/investments', authenticate, (req: AuthRequest, res: Response) => {
+router.post('/investments', authenticate, async (req: AuthRequest, res: Response) => {
   const db = getDb();
   const { name, type, investedAmountInPaise, currentValueInPaise, investmentDate, expectedReturnRate, riskLevel, notes, sourceAccountId } = req.body;
 
@@ -1357,13 +1579,17 @@ router.post('/investments', authenticate, (req: AuthRequest, res: Response) => {
     };
     LedgerService.applyTransaction(tx);
     db.transactions.unshift(tx);
+    await persistTransaction(tx);
+    const bank = db.bankAccounts.find(b => b.id === sourceAccountId);
+    if (bank) await persistBankAccount(bank);
   }
 
   saveDatabase();
+  await persistInvestment(newInv);
   res.status(201).json(newInv);
 });
 
-router.put('/investments/:id/valuation', authenticate, (req: AuthRequest, res: Response) => {
+router.put('/investments/:id/valuation', authenticate, async (req: AuthRequest, res: Response) => {
   const db = getDb();
   const inv = db.investments.find(i => i.id === req.params.id && i.userId === req.user!.id);
   if (!inv) return res.status(404).json({ error: 'Investment not found' });
@@ -1372,16 +1598,18 @@ router.put('/investments/:id/valuation', authenticate, (req: AuthRequest, res: R
   if (currentValueInPaise !== undefined) {
     inv.currentValueInPaise = Number(currentValueInPaise);
     saveDatabase();
+    await persistInvestment(inv);
   }
   res.json(inv);
 });
 
-router.delete('/investments/:id', authenticate, (req: AuthRequest, res: Response) => {
+router.delete('/investments/:id', authenticate, async (req: AuthRequest, res: Response) => {
   const db = getDb();
   const idx = db.investments.findIndex(i => i.id === req.params.id && i.userId === req.user!.id);
   if (idx === -1) return res.status(404).json({ error: 'Investment not found' });
   db.investments.splice(idx, 1);
   saveDatabase();
+  await deleteInvestment(req.params.id, req.user!.id);
   res.json({ message: 'Investment removed' });
 });
 
@@ -1392,7 +1620,7 @@ router.get('/fixed-deposits', authenticate, (req: AuthRequest, res: Response) =>
   res.json(fds);
 });
 
-router.post('/fixed-deposits', authenticate, (req: AuthRequest, res: Response) => {
+router.post('/fixed-deposits', authenticate, async (req: AuthRequest, res: Response) => {
   const db = getDb();
   const { bankName, fdName, principalInPaise, interestRate, compoundingFrequency, durationMonths, startDate, autoRenewal, sourceAccountId } = req.body;
 
@@ -1448,18 +1676,23 @@ router.post('/fixed-deposits', authenticate, (req: AuthRequest, res: Response) =
     };
     LedgerService.applyTransaction(tx);
     db.transactions.unshift(tx);
+    await persistTransaction(tx);
+    const bank = db.bankAccounts.find(b => b.id === sourceAccountId);
+    if (bank) await persistBankAccount(bank);
   }
 
   saveDatabase();
+  await persistFixedDeposit(newFD);
   res.status(201).json(newFD);
 });
 
-router.delete('/fixed-deposits/:id', authenticate, (req: AuthRequest, res: Response) => {
+router.delete('/fixed-deposits/:id', authenticate, async (req: AuthRequest, res: Response) => {
   const db = getDb();
   const idx = db.fixedDeposits.findIndex(f => f.id === req.params.id && f.userId === req.user!.id);
   if (idx === -1) return res.status(404).json({ error: 'Fixed deposit not found' });
   db.fixedDeposits.splice(idx, 1);
   saveDatabase();
+  await deleteFixedDeposit(req.params.id, req.user!.id);
   res.json({ message: 'Fixed deposit removed' });
 });
 
@@ -1478,6 +1711,7 @@ router.get('/emergency-fund', authenticate, (req: AuthRequest, res: Response) =>
     };
     db.emergencyFunds.push(ef);
     saveDatabase();
+    persistEmergencyFund(ef).catch(() => {});
   }
 
   const remaining = Math.max(0, ef.targetAmountInPaise - ef.currentBalanceInPaise);
@@ -1490,7 +1724,7 @@ router.get('/emergency-fund', authenticate, (req: AuthRequest, res: Response) =>
   });
 });
 
-router.post('/emergency-fund/target', authenticate, (req: AuthRequest, res: Response) => {
+router.post('/emergency-fund/target', authenticate, async (req: AuthRequest, res: Response) => {
   const db = getDb();
   const { targetAmountInPaise } = req.body;
   let ef = db.emergencyFunds.find(e => e.userId === req.user!.id);
@@ -1502,10 +1736,11 @@ router.post('/emergency-fund/target', authenticate, (req: AuthRequest, res: Resp
     ef.updatedAt = new Date().toISOString();
   }
   saveDatabase();
+  await persistEmergencyFund(ef);
   res.json(ef);
 });
 
-router.post('/emergency-fund/deposit', authenticate, (req: AuthRequest, res: Response) => {
+router.post('/emergency-fund/deposit', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { amountInPaise, sourceAccountId, notes } = req.body;
     if (!amountInPaise || !sourceAccountId) {
@@ -1534,13 +1769,18 @@ router.post('/emergency-fund/deposit', authenticate, (req: AuthRequest, res: Res
     saveDatabase();
 
     const ef = db.emergencyFunds.find(e => e.userId === req.user!.id);
+    await persistTransaction(tx);
+    if (ef) await persistEmergencyFund(ef);
+    const bank = db.bankAccounts.find(b => b.id === sourceAccountId);
+    if (bank) await persistBankAccount(bank);
+
     res.json({ message: 'Emergency fund deposit successful', ef, transaction: tx });
   } catch (err: any) {
     res.status(400).json({ error: err.message || 'Deposit failed' });
   }
 });
 
-router.post('/emergency-fund/withdraw', authenticate, (req: AuthRequest, res: Response) => {
+router.post('/emergency-fund/withdraw', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { amountInPaise, destinationAccountId, notes } = req.body;
     if (!amountInPaise || !destinationAccountId) {
@@ -1569,6 +1809,11 @@ router.post('/emergency-fund/withdraw', authenticate, (req: AuthRequest, res: Re
     saveDatabase();
 
     const ef = db.emergencyFunds.find(e => e.userId === req.user!.id);
+    await persistTransaction(tx);
+    if (ef) await persistEmergencyFund(ef);
+    const bank = db.bankAccounts.find(b => b.id === destinationAccountId);
+    if (bank) await persistBankAccount(bank);
+
     res.json({ message: 'Emergency fund withdrawal completed', ef, transaction: tx });
   } catch (err: any) {
     res.status(400).json({ error: err.message || 'Withdrawal failed' });
@@ -1583,7 +1828,7 @@ router.get('/savings-goals', authenticate, (req: AuthRequest, res: Response) => 
   res.json(goals);
 });
 
-router.post('/savings-goals', authenticate, (req: AuthRequest, res: Response) => {
+router.post('/savings-goals', authenticate, async (req: AuthRequest, res: Response) => {
   const db = getDb();
   const { name, targetAmountInPaise, savedAmountInPaise, targetDate, monthlyContributionInPaise, notes } = req.body;
 
@@ -1604,10 +1849,11 @@ router.post('/savings-goals', authenticate, (req: AuthRequest, res: Response) =>
 
   db.savingsGoals.push(newGoal);
   saveDatabase();
+  await persistSavingsGoal(newGoal);
   res.status(201).json(newGoal);
 });
 
-router.post('/savings-goals/:id/contribute', authenticate, (req: AuthRequest, res: Response) => {
+router.post('/savings-goals/:id/contribute', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { amountInPaise, sourceAccountId } = req.body;
     const db = getDb();
@@ -1635,18 +1881,26 @@ router.post('/savings-goals/:id/contribute', authenticate, (req: AuthRequest, re
     db.transactions.unshift(tx);
     saveDatabase();
 
+    await persistTransaction(tx);
+    await persistSavingsGoal(goal);
+    if (sourceAccountId) {
+      const bank = db.bankAccounts.find(b => b.id === sourceAccountId);
+      if (bank) await persistBankAccount(bank);
+    }
+
     res.json({ message: 'Savings goal contribution recorded', goal, transaction: tx });
   } catch (err: any) {
     res.status(400).json({ error: err.message || 'Contribution failed' });
   }
 });
 
-router.delete('/savings-goals/:id', authenticate, (req: AuthRequest, res: Response) => {
+router.delete('/savings-goals/:id', authenticate, async (req: AuthRequest, res: Response) => {
   const db = getDb();
   const idx = db.savingsGoals.findIndex(s => s.id === req.params.id && s.userId === req.user!.id);
   if (idx === -1) return res.status(404).json({ error: 'Goal not found' });
   db.savingsGoals.splice(idx, 1);
   saveDatabase();
+  await deleteSavingsGoal(req.params.id, req.user!.id);
   res.json({ message: 'Savings goal removed' });
 });
 

@@ -272,24 +272,96 @@ async function initDatabase() {
         mongoConnected = true;
         mongoError = null;
         console.log("Successfully connected to MongoDB Atlas!");
-        const atlasUsers = await UserModel.find({}).lean();
-        if (atlasUsers && atlasUsers.length > 0) {
-          console.log(`Loaded ${atlasUsers.length} users from MongoDB Atlas.`);
-          memoryDb.users = atlasUsers.map((u) => ({
-            id: u.id,
-            name: u.name,
-            email: u.email,
-            passwordHash: u.passwordHash,
-            isVerified: u.isVerified,
-            verificationToken: u.verificationToken,
-            verificationOtp: u.verificationOtp,
-            currency: u.currency || "INR",
-            monthlyBudgetInPaise: u.monthlyBudgetInPaise || 4e6,
-            reminderDayOfMonth: u.reminderDayOfMonth || 25,
-            emailNotificationsEnabled: u.emailNotificationsEnabled !== false,
-            createdAt: u.createdAt || (/* @__PURE__ */ new Date()).toISOString()
-          }));
+        const [
+          atlasUsers,
+          atlasBanks,
+          atlasWallets,
+          atlasCards,
+          atlasTxs,
+          atlasBudgets,
+          atlasInvestments,
+          atlasFDs,
+          atlasEmergency,
+          atlasSavings,
+          atlasNotifs,
+          atlasLogs,
+          atlasTokens,
+          atlasVerifications
+        ] = await Promise.all([
+          UserModel.find({}).lean(),
+          BankAccountModel.find({}).lean(),
+          CashWalletModel.find({}).lean(),
+          CreditCardModel.find({}).lean(),
+          TransactionModel.find({}).lean(),
+          BudgetAllocationModel.find({}).lean(),
+          InvestmentModel.find({}).lean(),
+          FixedDepositModel.find({}).lean(),
+          EmergencyFundModel.find({}).lean(),
+          SavingsGoalModel.find({}).lean(),
+          NotificationModel.find({}).lean(),
+          EmailLogModel.find({}).lean(),
+          RefreshTokenModel.find({}).lean(),
+          EmailVerificationModel.find({}).lean()
+        ]);
+        console.log(`MongoDB Atlas Hydration Report: Users: ${atlasUsers.length}, Accounts: ${atlasBanks.length}, Cards: ${atlasCards.length}, Transactions: ${atlasTxs.length}, Budgets: ${atlasBudgets.length}, Investments: ${atlasInvestments.length}, FDs: ${atlasFDs.length}`);
+        const mergeById = (localArr, atlasArr) => {
+          const map = /* @__PURE__ */ new Map();
+          for (const item of localArr || []) {
+            const key = item.id || item.email;
+            if (key) map.set(key, item);
+          }
+          for (const doc of atlasArr || []) {
+            const key = doc.id || doc.email;
+            if (key) {
+              const { _id, __v, ...cleanDoc } = doc;
+              map.set(key, cleanDoc);
+            }
+          }
+          return Array.from(map.values());
+        };
+        if (atlasUsers.length > 0) {
+          memoryDb.users = mergeById(memoryDb.users, atlasUsers);
         }
+        if (atlasBanks.length > 0) {
+          memoryDb.bankAccounts = mergeById(memoryDb.bankAccounts, atlasBanks);
+        }
+        if (atlasWallets.length > 0) {
+          memoryDb.cashWallets = mergeById(memoryDb.cashWallets, atlasWallets);
+        }
+        if (atlasCards.length > 0) {
+          memoryDb.creditCards = mergeById(memoryDb.creditCards, atlasCards);
+        }
+        if (atlasTxs.length > 0) {
+          memoryDb.transactions = mergeById(memoryDb.transactions, atlasTxs);
+        }
+        if (atlasBudgets.length > 0) {
+          memoryDb.budgetAllocations = mergeById(memoryDb.budgetAllocations, atlasBudgets);
+        }
+        if (atlasInvestments.length > 0) {
+          memoryDb.investments = mergeById(memoryDb.investments, atlasInvestments);
+        }
+        if (atlasFDs.length > 0) {
+          memoryDb.fixedDeposits = mergeById(memoryDb.fixedDeposits, atlasFDs);
+        }
+        if (atlasEmergency.length > 0) {
+          memoryDb.emergencyFunds = mergeById(memoryDb.emergencyFunds, atlasEmergency);
+        }
+        if (atlasSavings.length > 0) {
+          memoryDb.savingsGoals = mergeById(memoryDb.savingsGoals, atlasSavings);
+        }
+        if (atlasNotifs.length > 0) {
+          memoryDb.notifications = mergeById(memoryDb.notifications, atlasNotifs);
+        }
+        if (atlasLogs.length > 0) {
+          memoryDb.emailLogs = mergeById(memoryDb.emailLogs, atlasLogs);
+        }
+        if (atlasTokens.length > 0) {
+          memoryDb.refreshTokens = mergeById(memoryDb.refreshTokens, atlasTokens);
+        }
+        if (atlasVerifications.length > 0) {
+          memoryDb.emailVerifications = mergeById(memoryDb.emailVerifications, atlasVerifications);
+        }
+        saveDatabase();
       } catch (err) {
         mongoConnected = false;
         mongoError = err.message || "Connection timeout";
@@ -306,12 +378,32 @@ async function initDatabase() {
         aaravUser.lockUntil = null;
         aaravUser.isVerified = true;
       }
-      const rjUser = memoryDb.users.find((u) => u.email.toLowerCase() === "rjrajeshpal30@gmail.com");
-      if (rjUser) {
+      const rjUsers = memoryDb.users.filter(
+        (u) => u.email.toLowerCase() === "rjrajeshpal30@gmail.com" || u.email.toLowerCase() === "rjrajeshpal30062003@gmail.com"
+      );
+      for (const rjUser of rjUsers) {
         rjUser.passwordHash = await bcrypt.hash("Demo@1234", 10);
         rjUser.failedLoginAttempts = 0;
         rjUser.lockUntil = null;
         rjUser.isVerified = true;
+        await reconcileUserData(rjUser);
+      }
+      if (!memoryDb.users.some((u) => u.email.toLowerCase() === "rjrajeshpal30@gmail.com")) {
+        const hash = await bcrypt.hash("Demo@1234", 10);
+        const newUser = {
+          id: "user-rjrajeshpal30",
+          name: "Rajesh Pal",
+          email: "rjrajeshpal30@gmail.com",
+          passwordHash: hash,
+          isVerified: true,
+          currency: "INR",
+          monthlyBudgetInPaise: 4e6,
+          reminderDayOfMonth: 25,
+          emailNotificationsEnabled: true,
+          createdAt: (/* @__PURE__ */ new Date()).toISOString()
+        };
+        memoryDb.users.push(newUser);
+        await reconcileUserData(newUser);
       }
       saveDatabase();
     }
@@ -509,6 +601,54 @@ async function persistEmergencyFund(ef) {
     }
   }
 }
+async function persistSavingsGoal(goal) {
+  const idx = memoryDb.savingsGoals.findIndex((s) => s.id === goal.id);
+  if (idx >= 0) {
+    memoryDb.savingsGoals[idx] = goal;
+  } else {
+    memoryDb.savingsGoals.push(goal);
+  }
+  saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await SavingsGoalModel.findOneAndUpdate({ id: goal.id }, goal, { upsert: true });
+    } catch (err) {
+      console.error("Error saving savings goal to MongoDB Atlas:", err);
+    }
+  }
+}
+async function persistInvestment(inv) {
+  const idx = memoryDb.investments.findIndex((i) => i.id === inv.id);
+  if (idx >= 0) {
+    memoryDb.investments[idx] = inv;
+  } else {
+    memoryDb.investments.push(inv);
+  }
+  saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await InvestmentModel.findOneAndUpdate({ id: inv.id }, inv, { upsert: true });
+    } catch (err) {
+      console.error("Error saving investment to MongoDB Atlas:", err);
+    }
+  }
+}
+async function persistFixedDeposit(fd) {
+  const idx = memoryDb.fixedDeposits.findIndex((f) => f.id === fd.id);
+  if (idx >= 0) {
+    memoryDb.fixedDeposits[idx] = fd;
+  } else {
+    memoryDb.fixedDeposits.push(fd);
+  }
+  saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await FixedDepositModel.findOneAndUpdate({ id: fd.id }, fd, { upsert: true });
+    } catch (err) {
+      console.error("Error saving fixed deposit to MongoDB Atlas:", err);
+    }
+  }
+}
 async function persistRefreshToken(token) {
   if (!memoryDb.refreshTokens) memoryDb.refreshTokens = [];
   const idx = memoryDb.refreshTokens.findIndex((t) => t.id === token.id);
@@ -566,6 +706,133 @@ async function revokeAllUserRefreshTokens(userId) {
     } catch (err) {
       console.error("Error revoking user refresh tokens in MongoDB Atlas:", err);
     }
+  }
+}
+async function deleteBankAccount(id, userId) {
+  memoryDb.bankAccounts = memoryDb.bankAccounts.filter((b) => !(b.id === id && b.userId === userId));
+  saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await BankAccountModel.deleteOne({ id, userId });
+    } catch (err) {
+      console.error("Error deleting bank account from MongoDB Atlas:", err);
+    }
+  }
+}
+async function deleteCreditCard(id, userId) {
+  memoryDb.creditCards = memoryDb.creditCards.filter((c) => !(c.id === id && c.userId === userId));
+  saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await CreditCardModel.deleteOne({ id, userId });
+    } catch (err) {
+      console.error("Error deleting credit card from MongoDB Atlas:", err);
+    }
+  }
+}
+async function deleteTransaction(id, userId) {
+  memoryDb.transactions = memoryDb.transactions.filter((t) => !(t.id === id && t.userId === userId));
+  saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await TransactionModel.deleteOne({ id, userId });
+    } catch (err) {
+      console.error("Error deleting transaction from MongoDB Atlas:", err);
+    }
+  }
+}
+async function deleteInvestment(id, userId) {
+  memoryDb.investments = memoryDb.investments.filter((i) => !(i.id === id && i.userId === userId));
+  saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await InvestmentModel.deleteOne({ id, userId });
+    } catch (err) {
+      console.error("Error deleting investment from MongoDB Atlas:", err);
+    }
+  }
+}
+async function deleteFixedDeposit(id, userId) {
+  memoryDb.fixedDeposits = memoryDb.fixedDeposits.filter((f) => !(f.id === id && f.userId === userId));
+  saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await FixedDepositModel.deleteOne({ id, userId });
+    } catch (err) {
+      console.error("Error deleting fixed deposit from MongoDB Atlas:", err);
+    }
+  }
+}
+async function deleteSavingsGoal(id, userId) {
+  memoryDb.savingsGoals = memoryDb.savingsGoals.filter((s) => !(s.id === id && s.userId === userId));
+  saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await SavingsGoalModel.deleteOne({ id, userId });
+    } catch (err) {
+      console.error("Error deleting savings goal from MongoDB Atlas:", err);
+    }
+  }
+}
+async function reconcileUserData(user) {
+  if (!user || !user.id) return;
+  const isPrimaryUser = user.email.toLowerCase() === "rjrajeshpal30@gmail.com" || user.email.toLowerCase() === "rjrajeshpal30062003@gmail.com";
+  const legacyIds = ["demo-user-id", "user-1794473436793-0d16c1"].filter((id) => id !== user.id);
+  if (isPrimaryUser && legacyIds.length > 0) {
+    let memoryReassigned = 0;
+    const reassign = (arr) => {
+      for (const item of arr || []) {
+        if (legacyIds.includes(item.userId)) {
+          item.userId = user.id;
+          memoryReassigned++;
+        }
+      }
+    };
+    reassign(memoryDb.bankAccounts);
+    reassign(memoryDb.cashWallets);
+    reassign(memoryDb.creditCards);
+    reassign(memoryDb.transactions);
+    reassign(memoryDb.budgetAllocations);
+    reassign(memoryDb.investments);
+    reassign(memoryDb.fixedDeposits);
+    reassign(memoryDb.emergencyFunds);
+    reassign(memoryDb.savingsGoals);
+    reassign(memoryDb.notifications);
+    if (memoryReassigned > 0) {
+      saveDatabase();
+      console.log(`Reconciled ${memoryReassigned} in-memory items from ${legacyIds.join(", ")} to user ${user.id}`);
+    }
+    if (mongoConnected && mongoose.connection.readyState === 1) {
+      try {
+        await Promise.all([
+          BankAccountModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
+          CashWalletModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
+          CreditCardModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
+          TransactionModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
+          BudgetAllocationModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
+          InvestmentModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
+          FixedDepositModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
+          EmergencyFundModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
+          SavingsGoalModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
+          NotificationModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } })
+        ]);
+        console.log(`Reconciled MongoDB Atlas collections from ${legacyIds.join(", ")} to user ${user.id}`);
+      } catch (err) {
+        console.error("Error reconciling MongoDB Atlas records:", err);
+      }
+    }
+  }
+  const userBanksInMemory = (memoryDb.bankAccounts || []).filter((b) => b.userId === user.id);
+  let userBanksInAtlas = 0;
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      userBanksInAtlas = await BankAccountModel.countDocuments({ userId: user.id });
+    } catch {
+    }
+  }
+  if (userBanksInMemory.length === 0 && userBanksInAtlas === 0 && isPrimaryUser) {
+    console.log(`User ${user.email} (${user.id}) has no existing financial records. Provisioning initial portfolio...`);
+    await seedDemoUserAndScenarios(user.id);
   }
 }
 async function seedDemoUserAndScenarios(targetUserId) {
@@ -930,6 +1197,27 @@ async function seedDemoUserAndScenarios(targetUserId) {
   memoryDb.notifications = memoryDb.notifications.filter((n2) => n2.userId !== userId).concat(notifications);
   memoryDb.emailLogs = [];
   saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await Promise.all([
+        UserModel.findOneAndUpdate({ id: demoUser.id }, demoUser, { upsert: true }),
+        BankAccountModel.findOneAndUpdate({ id: hdfcAccount.id }, hdfcAccount, { upsert: true }),
+        BankAccountModel.findOneAndUpdate({ id: sbiAccount.id }, sbiAccount, { upsert: true }),
+        CashWalletModel.findOneAndUpdate({ id: cashWallet.id }, cashWallet, { upsert: true }),
+        CreditCardModel.findOneAndUpdate({ id: hdfcCreditCard.id }, hdfcCreditCard, { upsert: true }),
+        BudgetAllocationModel.findOneAndUpdate({ id: budgetAllocation.id }, budgetAllocation, { upsert: true }),
+        EmergencyFundModel.findOneAndUpdate({ id: emergencyFund.id }, emergencyFund, { upsert: true }),
+        ...savingsGoals.map((s) => SavingsGoalModel.findOneAndUpdate({ id: s.id }, s, { upsert: true })),
+        ...investments.map((i) => InvestmentModel.findOneAndUpdate({ id: i.id }, i, { upsert: true })),
+        ...fixedDeposits.map((f) => FixedDepositModel.findOneAndUpdate({ id: f.id }, f, { upsert: true })),
+        ...transactions.map((t2) => TransactionModel.findOneAndUpdate({ id: t2.id }, t2, { upsert: true })),
+        ...notifications.map((n2) => NotificationModel.findOneAndUpdate({ id: n2.id }, n2, { upsert: true }))
+      ]);
+      console.log(`Seeded demo data persisted to MongoDB Atlas for ${userId}`);
+    } catch (err) {
+      console.error("Error persisting seeded data to MongoDB Atlas:", err);
+    }
+  }
   return userId;
 }
 
@@ -1815,6 +2103,95 @@ router.get("/health", (req, res) => {
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
+router.get("/system/atlas-diagnostics", async (req, res) => {
+  const db = getDb();
+  const mongoStatus = getMongoStatus();
+  let atlasCounts = {
+    users: 0,
+    bankAccounts: 0,
+    cashWallets: 0,
+    creditCards: 0,
+    transactions: 0,
+    budgetAllocations: 0,
+    investments: 0,
+    fixedDeposits: 0,
+    emergencyFunds: 0,
+    savingsGoals: 0
+  };
+  let distinctUserIdsInAtlas = {};
+  if (mongoStatus.connected) {
+    try {
+      const [
+        users,
+        bankAccounts,
+        cashWallets,
+        creditCards,
+        transactions,
+        budgetAllocations,
+        investments,
+        fixedDeposits,
+        emergencyFunds,
+        savingsGoals
+      ] = await Promise.all([
+        UserModel.countDocuments(),
+        BankAccountModel.countDocuments(),
+        CashWalletModel.countDocuments(),
+        CreditCardModel.countDocuments(),
+        TransactionModel.countDocuments(),
+        BudgetAllocationModel.countDocuments(),
+        InvestmentModel.countDocuments(),
+        FixedDepositModel.countDocuments(),
+        EmergencyFundModel.countDocuments(),
+        SavingsGoalModel.countDocuments()
+      ]);
+      atlasCounts = {
+        users,
+        bankAccounts,
+        cashWallets,
+        creditCards,
+        transactions,
+        budgetAllocations,
+        investments,
+        fixedDeposits,
+        emergencyFunds,
+        savingsGoals
+      };
+      const accountUsers = await BankAccountModel.distinct("userId");
+      const cardUsers = await CreditCardModel.distinct("userId");
+      const txUsers = await TransactionModel.distinct("userId");
+      distinctUserIdsInAtlas = {
+        bankAccountUserIds: accountUsers,
+        creditCardUserIds: cardUsers,
+        transactionUserIds: txUsers
+      };
+    } catch (err) {
+      console.error("Atlas diagnostics count error:", err);
+    }
+  }
+  res.json({
+    status: "ok",
+    database: mongoStatus,
+    atlasCounts,
+    memoryDbCounts: {
+      users: db.users.length,
+      bankAccounts: db.bankAccounts.length,
+      cashWallets: db.cashWallets.length,
+      creditCards: db.creditCards.length,
+      transactions: db.transactions.length,
+      budgetAllocations: db.budgetAllocations.length,
+      investments: db.investments.length,
+      fixedDeposits: db.fixedDeposits.length,
+      emergencyFunds: db.emergencyFunds.length,
+      savingsGoals: db.savingsGoals.length
+    },
+    distinctUserIdsInAtlas,
+    distinctUserIdsInMemory: {
+      bankAccountUserIds: [...new Set(db.bankAccounts.map((b) => b.userId))],
+      creditCardUserIds: [...new Set(db.creditCards.map((c) => c.userId))],
+      transactionUserIds: [...new Set(db.transactions.map((t) => t.userId))]
+    }
+  });
+});
 router.get("/system/smtp-status", async (req, res) => {
   const status = await EmailService.verifyConnection();
   res.json(status);
@@ -2074,6 +2451,7 @@ router.post("/auth/login", async (req, res) => {
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     });
     setRefreshTokenCookie(res, refreshToken);
+    await reconcileUserData(user);
     return res.json({
       success: true,
       message: "Login successful",
@@ -2173,6 +2551,7 @@ router.get("/auth/me", authenticate, async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
+    await reconcileUserData(user);
     const { passwordHash, verificationToken, verificationOtp, ...safeUser } = user;
     return res.json(safeUser);
   } catch (err) {
@@ -2300,6 +2679,11 @@ router.get("/dashboard/summary", authenticate, (req, res) => {
   const user = db.users.find((u) => u.id === userId);
   const monthlyBudgetPaise = user?.monthlyBudgetInPaise || 4e6;
   const remainingBudgetPaise = Math.max(0, monthlyBudgetPaise - totalMonthlyExpensesPaise);
+  const budgetUtilizationPercent = monthlyBudgetPaise > 0 ? Math.round(totalMonthlyExpensesPaise / monthlyBudgetPaise * 100) : 0;
+  const currentAllocation = db.budgetAllocations.find((b) => b.userId === userId && b.monthYear === currentMonthYear);
+  const totalPlannedAllocationPaise = currentAllocation ? currentAllocation.essentialBudgetInPaise + currentAllocation.funBudgetInPaise + currentAllocation.investmentBudgetInPaise + currentAllocation.emergencyBudgetInPaise + currentAllocation.savingsBudgetInPaise : 32e5;
+  const unallocatedBudgetPaise = Math.max(0, monthlyBudgetPaise - totalPlannedAllocationPaise);
+  const unallocatedCushionPaise = totalMonthlyIncomePaise - totalPlannedAllocationPaise;
   const upcomingBills = userCards.filter((c) => c.outstandingBalanceInPaise > 0).map((c) => ({
     cardId: c.id,
     cardName: c.cardName,
@@ -2336,7 +2720,11 @@ router.get("/dashboard/summary", authenticate, (req, res) => {
     emergencyFundTargetPaise,
     totalSavingsPaise,
     monthlyBudgetPaise,
+    totalPlannedAllocationPaise,
+    unallocatedBudgetPaise,
     remainingBudgetPaise,
+    budgetUtilizationPercent,
+    unallocatedCushionPaise,
     upcomingBills,
     upcomingFDs,
     recentTransactions,
@@ -2352,7 +2740,7 @@ router.get("/accounts", authenticate, (req, res) => {
   const accounts = db.bankAccounts.filter((b) => b.userId === req.user.id);
   res.json(accounts);
 });
-router.post("/accounts", authenticate, (req, res) => {
+router.post("/accounts", authenticate, async (req, res) => {
   const db = getDb();
   const { bankName, accountHolderName, accountType, accountNickname, accountNumber, openingBalanceInPaise, notes } = req.body;
   if (!bankName || !accountHolderName) {
@@ -2375,9 +2763,10 @@ router.post("/accounts", authenticate, (req, res) => {
   };
   db.bankAccounts.push(newAccount);
   saveDatabase();
+  await persistBankAccount(newAccount);
   res.status(201).json(newAccount);
 });
-router.put("/accounts/:id", authenticate, (req, res) => {
+router.put("/accounts/:id", authenticate, async (req, res) => {
   const db = getDb();
   const account = db.bankAccounts.find((b) => b.id === req.params.id && b.userId === req.user.id);
   if (!account) return res.status(404).json({ error: "Account not found" });
@@ -2389,7 +2778,15 @@ router.put("/accounts/:id", authenticate, (req, res) => {
   if (notes !== void 0) account.notes = notes;
   if (isActive !== void 0) account.isActive = isActive;
   saveDatabase();
+  await persistBankAccount(account);
   res.json(account);
+});
+router.delete("/accounts/:id", authenticate, async (req, res) => {
+  const db = getDb();
+  const account = db.bankAccounts.find((b) => b.id === req.params.id && b.userId === req.user.id);
+  if (!account) return res.status(404).json({ error: "Account not found" });
+  await deleteBankAccount(req.params.id, req.user.id);
+  res.json({ message: "Account removed successfully" });
 });
 router.get("/cash", authenticate, (req, res) => {
   const db = getDb();
@@ -2398,10 +2795,12 @@ router.get("/cash", authenticate, (req, res) => {
     wallet = { id: `cash-${Date.now()}`, userId: req.user.id, balanceInPaise: 0, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
     db.cashWallets.push(wallet);
     saveDatabase();
+    persistCashWallet(wallet).catch(() => {
+    });
   }
   res.json(wallet);
 });
-router.post("/cash/adjust", authenticate, (req, res) => {
+router.post("/cash/adjust", authenticate, async (req, res) => {
   const db = getDb();
   const { newBalanceInPaise, reason } = req.body;
   let wallet = db.cashWallets.find((w) => w.userId === req.user.id);
@@ -2413,6 +2812,7 @@ router.post("/cash/adjust", authenticate, (req, res) => {
   wallet.notes = reason || "Manual balance adjustment";
   wallet.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
   saveDatabase();
+  await persistCashWallet(wallet);
   res.json(wallet);
 });
 router.get("/credit-cards", authenticate, (req, res) => {
@@ -2420,7 +2820,7 @@ router.get("/credit-cards", authenticate, (req, res) => {
   const cards = db.creditCards.filter((c) => c.userId === req.user.id);
   res.json(cards);
 });
-router.post("/credit-cards", authenticate, (req, res) => {
+router.post("/credit-cards", authenticate, async (req, res) => {
   const db = getDb();
   const { cardName, bankName, cardNickname, lastFourDigits, creditLimitInPaise, statementDay, dueDay, billingCycle, notes } = req.body;
   if (!cardName || !bankName || !creditLimitInPaise) {
@@ -2444,9 +2844,17 @@ router.post("/credit-cards", authenticate, (req, res) => {
   };
   db.creditCards.push(newCard);
   saveDatabase();
+  await persistCreditCard(newCard);
   res.status(201).json(newCard);
 });
-router.post("/credit-cards/pay-bill", authenticate, (req, res) => {
+router.delete("/credit-cards/:id", authenticate, async (req, res) => {
+  const db = getDb();
+  const card = db.creditCards.find((c) => c.id === req.params.id && c.userId === req.user.id);
+  if (!card) return res.status(404).json({ error: "Credit card not found" });
+  await deleteCreditCard(req.params.id, req.user.id);
+  res.json({ message: "Credit card removed successfully" });
+});
+router.post("/credit-cards/pay-bill", authenticate, async (req, res) => {
   try {
     const { creditCardId, sourceAccountId, paymentAmountInPaise, notes } = req.body;
     if (!creditCardId || !sourceAccountId || !paymentAmountInPaise) {
@@ -2478,6 +2886,9 @@ router.post("/credit-cards/pay-bill", authenticate, (req, res) => {
     LedgerService.applyTransaction(tx);
     db.transactions.unshift(tx);
     saveDatabase();
+    await persistTransaction(tx);
+    await persistCreditCard(card);
+    await persistBankAccount(bank);
     res.json({
       message: "Credit card bill paid successfully. Outstanding updated without duplicate expense generation.",
       transaction: tx,
@@ -2620,7 +3031,7 @@ router.post("/transactions", authenticate, async (req, res) => {
     return res.status(400).json({ error: err.message || "Transaction recording failed" });
   }
 });
-router.put("/transactions/:id", authenticate, (req, res) => {
+router.put("/transactions/:id", authenticate, async (req, res) => {
   try {
     const db = getDb();
     const existingIndex = db.transactions.findIndex((t) => t.id === req.params.id && t.userId === req.user.id);
@@ -2636,12 +3047,25 @@ router.put("/transactions/:id", authenticate, (req, res) => {
     LedgerService.applyTransaction(updatedTx);
     db.transactions[existingIndex] = updatedTx;
     saveDatabase();
+    await persistTransaction(updatedTx);
+    if (updatedTx.creditCardId) {
+      const card = db.creditCards.find((c) => c.id === updatedTx.creditCardId);
+      if (card) await persistCreditCard(card);
+    }
+    if (updatedTx.sourceAccountId) {
+      const bank = db.bankAccounts.find((b) => b.id === updatedTx.sourceAccountId);
+      if (bank) await persistBankAccount(bank);
+    }
+    if (updatedTx.destinationAccountId) {
+      const bank = db.bankAccounts.find((b) => b.id === updatedTx.destinationAccountId);
+      if (bank) await persistBankAccount(bank);
+    }
     res.json(updatedTx);
   } catch (err) {
     res.status(400).json({ error: err.message || "Transaction update failed" });
   }
 });
-router.delete("/transactions/:id", authenticate, (req, res) => {
+router.delete("/transactions/:id", authenticate, async (req, res) => {
   try {
     const db = getDb();
     const existingIndex = db.transactions.findIndex((t) => t.id === req.params.id && t.userId === req.user.id);
@@ -2650,6 +3074,19 @@ router.delete("/transactions/:id", authenticate, (req, res) => {
     LedgerService.reverseTransaction(existingTx);
     db.transactions.splice(existingIndex, 1);
     saveDatabase();
+    await deleteTransaction(existingTx.id, req.user.id);
+    if (existingTx.creditCardId) {
+      const card = db.creditCards.find((c) => c.id === existingTx.creditCardId);
+      if (card) await persistCreditCard(card);
+    }
+    if (existingTx.sourceAccountId) {
+      const bank = db.bankAccounts.find((b) => b.id === existingTx.sourceAccountId);
+      if (bank) await persistBankAccount(bank);
+    }
+    if (existingTx.destinationAccountId) {
+      const bank = db.bankAccounts.find((b) => b.id === existingTx.destinationAccountId);
+      if (bank) await persistBankAccount(bank);
+    }
     res.json({ message: "Transaction reversed and deleted successfully" });
   } catch (err) {
     res.status(400).json({ error: err.message || "Transaction deletion failed" });
@@ -2704,8 +3141,25 @@ router.get("/budget", authenticate, (req, res) => {
   const investmentSpentPaise = monthTxs.filter((t) => t.type === "investment_deposit").reduce((sum, t) => sum + t.amountInPaise, 0);
   const emergencySpentPaise = monthTxs.filter((t) => t.type === "emergency_deposit").reduce((sum, t) => sum + t.amountInPaise, 0);
   const savingsSpentPaise = monthTxs.filter((t) => t.type === "savings_deposit").reduce((sum, t) => sum + t.amountInPaise, 0);
+  const user = db.users.find((u) => u.id === userId);
+  const totalBudgetPaise = user?.monthlyBudgetInPaise || 4e6;
+  const totalPlannedAllocationPaise = allocation.essentialBudgetInPaise + allocation.funBudgetInPaise + allocation.investmentBudgetInPaise + allocation.emergencyBudgetInPaise + allocation.savingsBudgetInPaise;
+  const unallocatedBudgetPaise = Math.max(0, totalBudgetPaise - totalPlannedAllocationPaise);
+  const eligibleExpensesPaise = essentialSpentPaise + funSpentPaise;
+  const remainingBudgetPaise = Math.max(0, totalBudgetPaise - eligibleExpensesPaise);
+  const budgetUtilizationPercent = totalBudgetPaise > 0 ? Math.round(eligibleExpensesPaise / totalBudgetPaise * 100) : 0;
+  const monthlyInflowPaise = monthTxs.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amountInPaise, 0);
+  const unallocatedCushionPaise = monthlyInflowPaise - totalPlannedAllocationPaise;
   res.json({
     allocation,
+    totalBudgetPaise,
+    totalPlannedAllocationPaise,
+    unallocatedBudgetPaise,
+    eligibleExpensesPaise,
+    remainingBudgetPaise,
+    budgetUtilizationPercent,
+    monthlyInflowPaise,
+    unallocatedCushionPaise,
     actuals: {
       Essential: {
         budgetPaise: allocation.essentialBudgetInPaise,
@@ -2742,7 +3196,7 @@ router.get("/budget", authenticate, (req, res) => {
     }
   });
 });
-router.post("/budget", authenticate, (req, res) => {
+router.post("/budget", authenticate, async (req, res) => {
   const db = getDb();
   const userId = req.user.id;
   const now = /* @__PURE__ */ new Date();
@@ -2770,6 +3224,7 @@ router.post("/budget", authenticate, (req, res) => {
   if (savingsBudgetInPaise !== void 0) allocation.savingsBudgetInPaise = Number(savingsBudgetInPaise);
   if (carryForwardEnabled !== void 0) allocation.carryForwardEnabled = carryForwardEnabled;
   saveDatabase();
+  await persistBudgetAllocation(allocation);
   res.json({ message: "Budget allocation updated successfully", allocation });
 });
 router.get("/investments", authenticate, (req, res) => {
@@ -2787,7 +3242,7 @@ router.get("/investments", authenticate, (req, res) => {
     returnPercentage: Number(returnPercentage)
   });
 });
-router.post("/investments", authenticate, (req, res) => {
+router.post("/investments", authenticate, async (req, res) => {
   const db = getDb();
   const { name, type, investedAmountInPaise, currentValueInPaise, investmentDate, expectedReturnRate, riskLevel, notes, sourceAccountId } = req.body;
   if (!name || !type || !investedAmountInPaise) {
@@ -2823,11 +3278,15 @@ router.post("/investments", authenticate, (req, res) => {
     };
     LedgerService.applyTransaction(tx);
     db.transactions.unshift(tx);
+    await persistTransaction(tx);
+    const bank = db.bankAccounts.find((b) => b.id === sourceAccountId);
+    if (bank) await persistBankAccount(bank);
   }
   saveDatabase();
+  await persistInvestment(newInv);
   res.status(201).json(newInv);
 });
-router.put("/investments/:id/valuation", authenticate, (req, res) => {
+router.put("/investments/:id/valuation", authenticate, async (req, res) => {
   const db = getDb();
   const inv = db.investments.find((i) => i.id === req.params.id && i.userId === req.user.id);
   if (!inv) return res.status(404).json({ error: "Investment not found" });
@@ -2835,15 +3294,17 @@ router.put("/investments/:id/valuation", authenticate, (req, res) => {
   if (currentValueInPaise !== void 0) {
     inv.currentValueInPaise = Number(currentValueInPaise);
     saveDatabase();
+    await persistInvestment(inv);
   }
   res.json(inv);
 });
-router.delete("/investments/:id", authenticate, (req, res) => {
+router.delete("/investments/:id", authenticate, async (req, res) => {
   const db = getDb();
   const idx = db.investments.findIndex((i) => i.id === req.params.id && i.userId === req.user.id);
   if (idx === -1) return res.status(404).json({ error: "Investment not found" });
   db.investments.splice(idx, 1);
   saveDatabase();
+  await deleteInvestment(req.params.id, req.user.id);
   res.json({ message: "Investment removed" });
 });
 router.get("/fixed-deposits", authenticate, (req, res) => {
@@ -2851,7 +3312,7 @@ router.get("/fixed-deposits", authenticate, (req, res) => {
   const fds = db.fixedDeposits.filter((f) => f.userId === req.user.id);
   res.json(fds);
 });
-router.post("/fixed-deposits", authenticate, (req, res) => {
+router.post("/fixed-deposits", authenticate, async (req, res) => {
   const db = getDb();
   const { bankName, fdName, principalInPaise, interestRate, compoundingFrequency, durationMonths, startDate, autoRenewal, sourceAccountId } = req.body;
   if (!bankName || !fdName || !principalInPaise || !interestRate || !durationMonths) {
@@ -2899,16 +3360,21 @@ router.post("/fixed-deposits", authenticate, (req, res) => {
     };
     LedgerService.applyTransaction(tx);
     db.transactions.unshift(tx);
+    await persistTransaction(tx);
+    const bank = db.bankAccounts.find((b) => b.id === sourceAccountId);
+    if (bank) await persistBankAccount(bank);
   }
   saveDatabase();
+  await persistFixedDeposit(newFD);
   res.status(201).json(newFD);
 });
-router.delete("/fixed-deposits/:id", authenticate, (req, res) => {
+router.delete("/fixed-deposits/:id", authenticate, async (req, res) => {
   const db = getDb();
   const idx = db.fixedDeposits.findIndex((f) => f.id === req.params.id && f.userId === req.user.id);
   if (idx === -1) return res.status(404).json({ error: "Fixed deposit not found" });
   db.fixedDeposits.splice(idx, 1);
   saveDatabase();
+  await deleteFixedDeposit(req.params.id, req.user.id);
   res.json({ message: "Fixed deposit removed" });
 });
 router.get("/emergency-fund", authenticate, (req, res) => {
@@ -2924,6 +3390,8 @@ router.get("/emergency-fund", authenticate, (req, res) => {
     };
     db.emergencyFunds.push(ef);
     saveDatabase();
+    persistEmergencyFund(ef).catch(() => {
+    });
   }
   const remaining = Math.max(0, ef.targetAmountInPaise - ef.currentBalanceInPaise);
   const progressPercent = ef.targetAmountInPaise > 0 ? Math.min(100, Math.round(ef.currentBalanceInPaise / ef.targetAmountInPaise * 100)) : 0;
@@ -2933,7 +3401,7 @@ router.get("/emergency-fund", authenticate, (req, res) => {
     progressPercent
   });
 });
-router.post("/emergency-fund/target", authenticate, (req, res) => {
+router.post("/emergency-fund/target", authenticate, async (req, res) => {
   const db = getDb();
   const { targetAmountInPaise } = req.body;
   let ef = db.emergencyFunds.find((e) => e.userId === req.user.id);
@@ -2945,9 +3413,10 @@ router.post("/emergency-fund/target", authenticate, (req, res) => {
     ef.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
   }
   saveDatabase();
+  await persistEmergencyFund(ef);
   res.json(ef);
 });
-router.post("/emergency-fund/deposit", authenticate, (req, res) => {
+router.post("/emergency-fund/deposit", authenticate, async (req, res) => {
   try {
     const { amountInPaise, sourceAccountId, notes } = req.body;
     if (!amountInPaise || !sourceAccountId) {
@@ -2973,12 +3442,16 @@ router.post("/emergency-fund/deposit", authenticate, (req, res) => {
     db.transactions.unshift(tx);
     saveDatabase();
     const ef = db.emergencyFunds.find((e) => e.userId === req.user.id);
+    await persistTransaction(tx);
+    if (ef) await persistEmergencyFund(ef);
+    const bank = db.bankAccounts.find((b) => b.id === sourceAccountId);
+    if (bank) await persistBankAccount(bank);
     res.json({ message: "Emergency fund deposit successful", ef, transaction: tx });
   } catch (err) {
     res.status(400).json({ error: err.message || "Deposit failed" });
   }
 });
-router.post("/emergency-fund/withdraw", authenticate, (req, res) => {
+router.post("/emergency-fund/withdraw", authenticate, async (req, res) => {
   try {
     const { amountInPaise, destinationAccountId, notes } = req.body;
     if (!amountInPaise || !destinationAccountId) {
@@ -3004,6 +3477,10 @@ router.post("/emergency-fund/withdraw", authenticate, (req, res) => {
     db.transactions.unshift(tx);
     saveDatabase();
     const ef = db.emergencyFunds.find((e) => e.userId === req.user.id);
+    await persistTransaction(tx);
+    if (ef) await persistEmergencyFund(ef);
+    const bank = db.bankAccounts.find((b) => b.id === destinationAccountId);
+    if (bank) await persistBankAccount(bank);
     res.json({ message: "Emergency fund withdrawal completed", ef, transaction: tx });
   } catch (err) {
     res.status(400).json({ error: err.message || "Withdrawal failed" });
@@ -3014,7 +3491,7 @@ router.get("/savings-goals", authenticate, (req, res) => {
   const goals = db.savingsGoals.filter((s) => s.userId === req.user.id);
   res.json(goals);
 });
-router.post("/savings-goals", authenticate, (req, res) => {
+router.post("/savings-goals", authenticate, async (req, res) => {
   const db = getDb();
   const { name, targetAmountInPaise, savedAmountInPaise, targetDate, monthlyContributionInPaise, notes } = req.body;
   if (!name || !targetAmountInPaise) {
@@ -3032,9 +3509,10 @@ router.post("/savings-goals", authenticate, (req, res) => {
   };
   db.savingsGoals.push(newGoal);
   saveDatabase();
+  await persistSavingsGoal(newGoal);
   res.status(201).json(newGoal);
 });
-router.post("/savings-goals/:id/contribute", authenticate, (req, res) => {
+router.post("/savings-goals/:id/contribute", authenticate, async (req, res) => {
   try {
     const { amountInPaise, sourceAccountId } = req.body;
     const db = getDb();
@@ -3059,17 +3537,24 @@ router.post("/savings-goals/:id/contribute", authenticate, (req, res) => {
     goal.savedAmountInPaise += amt;
     db.transactions.unshift(tx);
     saveDatabase();
+    await persistTransaction(tx);
+    await persistSavingsGoal(goal);
+    if (sourceAccountId) {
+      const bank = db.bankAccounts.find((b) => b.id === sourceAccountId);
+      if (bank) await persistBankAccount(bank);
+    }
     res.json({ message: "Savings goal contribution recorded", goal, transaction: tx });
   } catch (err) {
     res.status(400).json({ error: err.message || "Contribution failed" });
   }
 });
-router.delete("/savings-goals/:id", authenticate, (req, res) => {
+router.delete("/savings-goals/:id", authenticate, async (req, res) => {
   const db = getDb();
   const idx = db.savingsGoals.findIndex((s) => s.id === req.params.id && s.userId === req.user.id);
   if (idx === -1) return res.status(404).json({ error: "Goal not found" });
   db.savingsGoals.splice(idx, 1);
   saveDatabase();
+  await deleteSavingsGoal(req.params.id, req.user.id);
   res.json({ message: "Savings goal removed" });
 });
 router.get("/notifications", authenticate, (req, res) => {

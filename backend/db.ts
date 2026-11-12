@@ -318,25 +318,101 @@ export async function initDatabase() {
         mongoError = null;
         console.log('Successfully connected to MongoDB Atlas!');
 
-        // Sync from MongoDB Atlas if data exists
-        const atlasUsers = await UserModel.find({}).lean();
-        if (atlasUsers && atlasUsers.length > 0) {
-          console.log(`Loaded ${atlasUsers.length} users from MongoDB Atlas.`);
-          memoryDb.users = atlasUsers.map((u: any) => ({
-            id: u.id,
-            name: u.name,
-            email: u.email,
-            passwordHash: u.passwordHash,
-            isVerified: u.isVerified,
-            verificationToken: u.verificationToken,
-            verificationOtp: u.verificationOtp,
-            currency: u.currency || 'INR',
-            monthlyBudgetInPaise: u.monthlyBudgetInPaise || 4000000,
-            reminderDayOfMonth: u.reminderDayOfMonth || 25,
-            emailNotificationsEnabled: u.emailNotificationsEnabled !== false,
-            createdAt: u.createdAt || new Date().toISOString()
-          }));
+        // Hydrate all collections from MongoDB Atlas if data exists
+        const [
+          atlasUsers,
+          atlasBanks,
+          atlasWallets,
+          atlasCards,
+          atlasTxs,
+          atlasBudgets,
+          atlasInvestments,
+          atlasFDs,
+          atlasEmergency,
+          atlasSavings,
+          atlasNotifs,
+          atlasLogs,
+          atlasTokens,
+          atlasVerifications
+        ] = await Promise.all([
+          UserModel.find({}).lean(),
+          BankAccountModel.find({}).lean(),
+          CashWalletModel.find({}).lean(),
+          CreditCardModel.find({}).lean(),
+          TransactionModel.find({}).lean(),
+          BudgetAllocationModel.find({}).lean(),
+          InvestmentModel.find({}).lean(),
+          FixedDepositModel.find({}).lean(),
+          EmergencyFundModel.find({}).lean(),
+          SavingsGoalModel.find({}).lean(),
+          NotificationModel.find({}).lean(),
+          EmailLogModel.find({}).lean(),
+          RefreshTokenModel.find({}).lean(),
+          EmailVerificationModel.find({}).lean()
+        ]);
+
+        console.log(`MongoDB Atlas Hydration Report: Users: ${atlasUsers.length}, Accounts: ${atlasBanks.length}, Cards: ${atlasCards.length}, Transactions: ${atlasTxs.length}, Budgets: ${atlasBudgets.length}, Investments: ${atlasInvestments.length}, FDs: ${atlasFDs.length}`);
+
+        const mergeById = <T extends { id?: string; email?: string }>(localArr: T[], atlasArr: any[]): T[] => {
+          const map = new Map<string, T>();
+          for (const item of (localArr || [])) {
+            const key = (item as any).id || (item as any).email;
+            if (key) map.set(key, item);
+          }
+          for (const doc of (atlasArr || [])) {
+            const key = doc.id || doc.email;
+            if (key) {
+              const { _id, __v, ...cleanDoc } = doc;
+              map.set(key, cleanDoc as T);
+            }
+          }
+          return Array.from(map.values());
+        };
+
+        if (atlasUsers.length > 0) {
+          memoryDb.users = mergeById(memoryDb.users, atlasUsers);
         }
+        if (atlasBanks.length > 0) {
+          memoryDb.bankAccounts = mergeById(memoryDb.bankAccounts, atlasBanks);
+        }
+        if (atlasWallets.length > 0) {
+          memoryDb.cashWallets = mergeById(memoryDb.cashWallets, atlasWallets);
+        }
+        if (atlasCards.length > 0) {
+          memoryDb.creditCards = mergeById(memoryDb.creditCards, atlasCards);
+        }
+        if (atlasTxs.length > 0) {
+          memoryDb.transactions = mergeById(memoryDb.transactions, atlasTxs);
+        }
+        if (atlasBudgets.length > 0) {
+          memoryDb.budgetAllocations = mergeById(memoryDb.budgetAllocations, atlasBudgets);
+        }
+        if (atlasInvestments.length > 0) {
+          memoryDb.investments = mergeById(memoryDb.investments, atlasInvestments);
+        }
+        if (atlasFDs.length > 0) {
+          memoryDb.fixedDeposits = mergeById(memoryDb.fixedDeposits, atlasFDs);
+        }
+        if (atlasEmergency.length > 0) {
+          memoryDb.emergencyFunds = mergeById(memoryDb.emergencyFunds, atlasEmergency);
+        }
+        if (atlasSavings.length > 0) {
+          memoryDb.savingsGoals = mergeById(memoryDb.savingsGoals, atlasSavings);
+        }
+        if (atlasNotifs.length > 0) {
+          memoryDb.notifications = mergeById(memoryDb.notifications, atlasNotifs);
+        }
+        if (atlasLogs.length > 0) {
+          memoryDb.emailLogs = mergeById(memoryDb.emailLogs, atlasLogs);
+        }
+        if (atlasTokens.length > 0) {
+          memoryDb.refreshTokens = mergeById(memoryDb.refreshTokens, atlasTokens);
+        }
+        if (atlasVerifications.length > 0) {
+          memoryDb.emailVerifications = mergeById(memoryDb.emailVerifications, atlasVerifications);
+        }
+
+        saveDatabase();
       } catch (err: any) {
         mongoConnected = false;
         mongoError = err.message || 'Connection timeout';
@@ -356,12 +432,36 @@ export async function initDatabase() {
         aaravUser.lockUntil = null;
         aaravUser.isVerified = true;
       }
-      const rjUser = memoryDb.users.find(u => u.email.toLowerCase() === 'rjrajeshpal30@gmail.com');
-      if (rjUser) {
+
+      const rjUsers = memoryDb.users.filter(u =>
+        u.email.toLowerCase() === 'rjrajeshpal30@gmail.com' ||
+        u.email.toLowerCase() === 'rjrajeshpal30062003@gmail.com'
+      );
+      for (const rjUser of rjUsers) {
         rjUser.passwordHash = await bcrypt.hash('Demo@1234', 10);
         rjUser.failedLoginAttempts = 0;
         rjUser.lockUntil = null;
         rjUser.isVerified = true;
+        await reconcileUserData(rjUser);
+      }
+
+      // Ensure rjrajeshpal30@gmail.com is present in memoryDb and Atlas
+      if (!memoryDb.users.some(u => u.email.toLowerCase() === 'rjrajeshpal30@gmail.com')) {
+        const hash = await bcrypt.hash('Demo@1234', 10);
+        const newUser: IUser = {
+          id: 'user-rjrajeshpal30',
+          name: 'Rajesh Pal',
+          email: 'rjrajeshpal30@gmail.com',
+          passwordHash: hash,
+          isVerified: true,
+          currency: 'INR',
+          monthlyBudgetInPaise: 4000000,
+          reminderDayOfMonth: 25,
+          emailNotificationsEnabled: true,
+          createdAt: new Date().toISOString()
+        };
+        memoryDb.users.push(newUser);
+        await reconcileUserData(newUser);
       }
       saveDatabase();
     }
@@ -788,6 +888,149 @@ export async function deleteEmailVerification(email: string): Promise<void> {
   }
 }
 
+export async function deleteBankAccount(id: string, userId: string): Promise<void> {
+  memoryDb.bankAccounts = memoryDb.bankAccounts.filter(b => !(b.id === id && b.userId === userId));
+  saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await BankAccountModel.deleteOne({ id, userId });
+    } catch (err) {
+      console.error('Error deleting bank account from MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function deleteCreditCard(id: string, userId: string): Promise<void> {
+  memoryDb.creditCards = memoryDb.creditCards.filter(c => !(c.id === id && c.userId === userId));
+  saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await CreditCardModel.deleteOne({ id, userId });
+    } catch (err) {
+      console.error('Error deleting credit card from MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function deleteTransaction(id: string, userId: string): Promise<void> {
+  memoryDb.transactions = memoryDb.transactions.filter(t => !(t.id === id && t.userId === userId));
+  saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await TransactionModel.deleteOne({ id, userId });
+    } catch (err) {
+      console.error('Error deleting transaction from MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function deleteInvestment(id: string, userId: string): Promise<void> {
+  memoryDb.investments = memoryDb.investments.filter(i => !(i.id === id && i.userId === userId));
+  saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await InvestmentModel.deleteOne({ id, userId });
+    } catch (err) {
+      console.error('Error deleting investment from MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function deleteFixedDeposit(id: string, userId: string): Promise<void> {
+  memoryDb.fixedDeposits = memoryDb.fixedDeposits.filter(f => !(f.id === id && f.userId === userId));
+  saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await FixedDepositModel.deleteOne({ id, userId });
+    } catch (err) {
+      console.error('Error deleting fixed deposit from MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function deleteSavingsGoal(id: string, userId: string): Promise<void> {
+  memoryDb.savingsGoals = memoryDb.savingsGoals.filter(s => !(s.id === id && s.userId === userId));
+  saveDatabase();
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await SavingsGoalModel.deleteOne({ id, userId });
+    } catch (err) {
+      console.error('Error deleting savings goal from MongoDB Atlas:', err);
+    }
+  }
+}
+
+export async function reconcileUserData(user: IUser): Promise<void> {
+  if (!user || !user.id) return;
+  const isPrimaryUser = user.email.toLowerCase() === 'rjrajeshpal30@gmail.com' || user.email.toLowerCase() === 'rjrajeshpal30062003@gmail.com';
+
+  // 1. Reassign legacy records ('demo-user-id' and prior test IDs) to this user's active ID
+  const legacyIds = ['demo-user-id', 'user-1794473436793-0d16c1'].filter(id => id !== user.id);
+
+  if (isPrimaryUser && legacyIds.length > 0) {
+    let memoryReassigned = 0;
+    const reassign = (arr: any[]) => {
+      for (const item of (arr || [])) {
+        if (legacyIds.includes(item.userId)) {
+          item.userId = user.id;
+          memoryReassigned++;
+        }
+      }
+    };
+
+    reassign(memoryDb.bankAccounts);
+    reassign(memoryDb.cashWallets);
+    reassign(memoryDb.creditCards);
+    reassign(memoryDb.transactions);
+    reassign(memoryDb.budgetAllocations);
+    reassign(memoryDb.investments);
+    reassign(memoryDb.fixedDeposits);
+    reassign(memoryDb.emergencyFunds);
+    reassign(memoryDb.savingsGoals);
+    reassign(memoryDb.notifications);
+
+    if (memoryReassigned > 0) {
+      saveDatabase();
+      console.log(`Reconciled ${memoryReassigned} in-memory items from ${legacyIds.join(', ')} to user ${user.id}`);
+    }
+
+    if (mongoConnected && mongoose.connection.readyState === 1) {
+      try {
+        await Promise.all([
+          BankAccountModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
+          CashWalletModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
+          CreditCardModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
+          TransactionModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
+          BudgetAllocationModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
+          InvestmentModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
+          FixedDepositModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
+          EmergencyFundModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
+          SavingsGoalModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } }),
+          NotificationModel.updateMany({ userId: { $in: legacyIds } }, { $set: { userId: user.id } })
+        ]);
+        console.log(`Reconciled MongoDB Atlas collections from ${legacyIds.join(', ')} to user ${user.id}`);
+      } catch (err) {
+        console.error('Error reconciling MongoDB Atlas records:', err);
+      }
+    }
+  }
+
+  // 2. Fallback: If user has 0 bank accounts in both memory and Atlas, seed their initial portfolio
+  const userBanksInMemory = (memoryDb.bankAccounts || []).filter(b => b.userId === user.id);
+  let userBanksInAtlas = 0;
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      userBanksInAtlas = await BankAccountModel.countDocuments({ userId: user.id });
+    } catch {}
+  }
+
+  if (userBanksInMemory.length === 0 && userBanksInAtlas === 0 && isPrimaryUser) {
+    console.log(`User ${user.email} (${user.id}) has no existing financial records. Provisioning initial portfolio...`);
+    await seedDemoUserAndScenarios(user.id);
+  }
+}
+
+
 export async function seedDemoUserAndScenarios(targetUserId?: string): Promise<string> {
   const passwordHash = await bcrypt.hash('Demo@1234', 10);
   const now = new Date();
@@ -1146,5 +1389,29 @@ export async function seedDemoUserAndScenarios(targetUserId?: string): Promise<s
   memoryDb.emailLogs = [];
 
   saveDatabase();
+
+  if (mongoConnected && mongoose.connection.readyState === 1) {
+    try {
+      await Promise.all([
+        UserModel.findOneAndUpdate({ id: demoUser.id }, demoUser, { upsert: true }),
+        BankAccountModel.findOneAndUpdate({ id: hdfcAccount.id }, hdfcAccount, { upsert: true }),
+        BankAccountModel.findOneAndUpdate({ id: sbiAccount.id }, sbiAccount, { upsert: true }),
+        CashWalletModel.findOneAndUpdate({ id: cashWallet.id }, cashWallet, { upsert: true }),
+        CreditCardModel.findOneAndUpdate({ id: hdfcCreditCard.id }, hdfcCreditCard, { upsert: true }),
+        BudgetAllocationModel.findOneAndUpdate({ id: budgetAllocation.id }, budgetAllocation, { upsert: true }),
+        EmergencyFundModel.findOneAndUpdate({ id: emergencyFund.id }, emergencyFund, { upsert: true }),
+        ...savingsGoals.map(s => SavingsGoalModel.findOneAndUpdate({ id: s.id }, s, { upsert: true })),
+        ...investments.map(i => InvestmentModel.findOneAndUpdate({ id: i.id }, i, { upsert: true })),
+        ...fixedDeposits.map(f => FixedDepositModel.findOneAndUpdate({ id: f.id }, f, { upsert: true })),
+        ...transactions.map(t => TransactionModel.findOneAndUpdate({ id: t.id }, t, { upsert: true })),
+        ...notifications.map(n => NotificationModel.findOneAndUpdate({ id: n.id }, n, { upsert: true }))
+      ]);
+      console.log(`Seeded demo data persisted to MongoDB Atlas for ${userId}`);
+    } catch (err) {
+      console.error('Error persisting seeded data to MongoDB Atlas:', err);
+    }
+  }
+
   return userId;
 }
+

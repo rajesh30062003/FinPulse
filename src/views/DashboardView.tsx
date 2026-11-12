@@ -178,7 +178,7 @@ export const DashboardView: React.FC = () => {
             {formatINR(s.remainingBudgetPaise)}
           </div>
           <div className="text-[11px] text-slate-400">
-            Of {formatINR(s.monthlyBudgetPaise)} target
+            {formatINR(s.totalMonthlyExpensesPaise)} spent of {formatINR(s.monthlyBudgetPaise)} budget
           </div>
         </div>
 

@@ -34,8 +34,21 @@ export const BudgetAllocationView: React.FC = () => {
     (parseFloat(emergencyRupees) || 0) +
     (parseFloat(savingsRupees) || 0);
 
-  const monthlyIncomeRupees = summary ? summary.totalMonthlyIncomePaise / 100 : 40000;
-  const unallocatedRupees = monthlyIncomeRupees - totalAllocatedRupees;
+  // 1. Total Budget (Configured ceiling)
+  const totalBudgetRupees = (budgetData?.totalBudgetPaise ?? summary?.monthlyBudgetPaise ?? 4000000) / 100;
+  // 2. Total Planned Allocation (Sum of 5 categories: totalAllocatedRupees)
+  // 3. Unallocated Budget = Total Budget - Total Planned Allocation
+  const unallocatedBudgetRupees = totalBudgetRupees - totalAllocatedRupees;
+  // 4. Eligible Expenses spent
+  const monthlyExpensesRupees = summary ? summary.totalMonthlyExpensesPaise / 100 : 0;
+  // 5. Budget Remaining = Total Budget - Eligible Expenses
+  const remainingBudgetRupees = Math.max(0, totalBudgetRupees - monthlyExpensesRupees);
+  // 6. Budget Utilization % = (Eligible Expenses / Total Budget) * 100
+  const budgetUtilizationPercent = totalBudgetRupees > 0 ? Math.round((monthlyExpensesRupees / totalBudgetRupees) * 100) : 0;
+  // 7. Monthly Inflow = Actual recorded income during selected month
+  const monthlyInflowRupees = summary ? summary.totalMonthlyIncomePaise / 100 : 0;
+  // 8. Unallocated Cushion = Monthly Inflow - Total Planned Allocation
+  const unallocatedCushionRupees = monthlyInflowRupees - totalAllocatedRupees;
 
   const handleSaveAllocation = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,7 +84,7 @@ export const BudgetAllocationView: React.FC = () => {
             Income & Budget Allocation Engine
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Allocate incoming revenue into 5 defined buckets before spending. Tracks utilized % and budget overruns.
+            Allocate monthly budget into 5 defined buckets. Tracks planned targets vs. actual expenses and monthly cash inflow.
           </p>
         </div>
 
@@ -83,33 +96,71 @@ export const BudgetAllocationView: React.FC = () => {
         )}
       </div>
 
-      {/* Allocation Summary Ribbon */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Standard Budget Definition Ribbon: 4 Primary Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 1. Total Budget */}
         <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-xs text-slate-500">Monthly Inflow / Income</span>
-          <div className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">
-            {formatINR(monthlyIncomeRupees * 100)}
+          <span className="text-xs text-slate-500">1. Total Monthly Budget</span>
+          <div className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-1">
+            {formatINR(totalBudgetRupees * 100)}
           </div>
-          <span className="text-[11px] text-slate-400">Total recorded income</span>
+          <span className="text-[11px] text-slate-400">Configured spending ceiling</span>
         </div>
 
+        {/* 2. Total Planned Allocation */}
         <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-xs text-slate-500">Total Planned Allocation</span>
-          <div className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-1">
+          <span className="text-xs text-slate-500">2. Total Planned Allocation</span>
+          <div className="text-xl font-bold font-mono text-indigo-600 dark:text-indigo-400 mt-1">
             {formatINR(totalAllocatedRupees * 100)}
           </div>
-          <span className="text-[11px] text-slate-400">Distributed across 5 buckets</span>
+          <span className="text-[11px] text-slate-400">Sum of 5 planned bucket targets</span>
         </div>
 
+        {/* 3. Unallocated Budget */}
         <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-xs text-slate-500">Unallocated Cushion</span>
-          <div className={`text-xl font-bold font-mono mt-1 ${unallocatedRupees < 0 ? 'text-red-600' : 'text-blue-600 dark:text-blue-400'}`}>
-            {formatINR(unallocatedRupees * 100)}
+          <span className="text-xs text-slate-500">3. Unallocated Budget Buffer</span>
+          <div className={`text-xl font-bold font-mono mt-1 ${unallocatedBudgetRupees < 0 ? 'text-red-500' : 'text-blue-600 dark:text-blue-400'}`}>
+            {formatINR(unallocatedBudgetRupees * 100)}
           </div>
           <span className="text-[11px] text-slate-400">
-            {unallocatedRupees < 0 ? 'Budget exceeds current income' : 'Free liquid buffer'}
+            {unallocatedBudgetRupees < 0 ? 'Planned exceeds budget ceiling' : 'Total Budget − Planned Allocation'}
           </span>
         </div>
+
+        {/* 4. Budget Remaining to Spend */}
+        <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+          <span className="text-xs text-slate-500">4. Budget Remaining to Spend</span>
+          <div className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">
+            {formatINR(remainingBudgetRupees * 100)}
+          </div>
+          <span className="text-[11px] text-slate-400">
+            {formatINR(monthlyExpensesRupees * 100)} spent ({budgetUtilizationPercent}% utilized)
+          </span>
+        </div>
+      </div>
+
+      {/* Monthly Inflow & Cashflow Cushion Card */}
+      <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-6 flex-wrap">
+          <div>
+            <span className="text-xs text-slate-500 font-medium">Monthly Inflow (Recorded Income):</span>
+            <div className="text-base font-bold font-mono text-emerald-600 dark:text-emerald-400">
+              {formatINR(monthlyInflowRupees * 100)}
+            </div>
+          </div>
+          <div className="h-8 w-px bg-slate-200 dark:bg-slate-800 hidden md:block" />
+          <div>
+            <span className="text-xs text-slate-500 font-medium">Inflow Cushion (Inflow − Planned Allocation):</span>
+            <div className={`text-base font-bold font-mono ${unallocatedCushionRupees < 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+              {formatINR(unallocatedCushionRupees * 100)}
+            </div>
+          </div>
+        </div>
+        <p className="text-xs text-slate-400 max-w-md">
+          {unallocatedCushionRupees < 0
+            ? 'Note: Planned allocations exceed currently credited income. As monthly income/salary is recorded, this cushion will normalize.'
+            : 'Healthy liquid inflow buffer above planned category allocations.'}
+        </p>
       </div>
 
       {/* 5 Real-Time Category Utilization Cards */}

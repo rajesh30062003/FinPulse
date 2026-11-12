@@ -2,128 +2,164 @@
   "users": [
     {
       "id": "user-1794321590913",
-      "name": "rty",
-      "email": "finalsemprojectmail@gmail.com",
-      "passwordHash": "$2b$10$JCGHesqMHeb2dJqCQ92DTeWz3sC/K0jW4kuQv.xQoZjQkB1s46vnO",
-      "isVerified": true,
-      "verificationToken": "dXNlci0xNzk0MzIxNTkwOTEzLTE3OTQzMjE1OTA5MTMtMC40NDEzNzM0NzQxOTEyODk3",
-      "verificationOtp": "914207",
+      "createdAt": "Tue Nov 10 2026 14:39:50 GMT+0000 (Coordinated Universal Time)",
       "currency": "INR",
-      "monthlyBudgetInPaise": 4000000,
-      "reminderDayOfMonth": 25,
+      "email": "finalsemprojectmail@gmail.com",
       "emailNotificationsEnabled": true,
-      "createdAt": "Tue Nov 10 2026 14:39:50 GMT+0000 (Coordinated Universal Time)"
+      "isVerified": true,
+      "monthlyBudgetInPaise": 4000000,
+      "name": "rty",
+      "passwordHash": "$2b$10$JCGHesqMHeb2dJqCQ92DTeWz3sC/K0jW4kuQv.xQoZjQkB1s46vnO",
+      "reminderDayOfMonth": 25,
+      "updatedAt": "2026-11-12T08:48:37.886Z",
+      "verificationOtp": "914207",
+      "verificationToken": "dXNlci0xNzk0MzIxNTkwOTEzLTE3OTQzMjE1OTA5MTMtMC40NDEzNzM0NzQxOTEyODk3",
+      "failedLoginAttempts": 0,
+      "lockUntil": null
     },
     {
       "id": "user-1794323316803",
-      "name": "Aarav Patel",
-      "email": "aarav@test.local",
-      "passwordHash": "$2b$10$frEW4tWID.XNIKMWJJ8YAO8Io7g1ExxNLVUf.L.fVVT3/w/dmk3.G",
-      "isVerified": true,
-      "currency": "INR",
-      "monthlyBudgetInPaise": 4000000,
-      "reminderDayOfMonth": 25,
-      "emailNotificationsEnabled": true,
       "createdAt": "Tue Nov 10 2026 15:08:36 GMT+0000 (Coordinated Universal Time)",
+      "currency": "INR",
+      "email": "aarav@test.local",
+      "emailNotificationsEnabled": true,
+      "isVerified": true,
+      "monthlyBudgetInPaise": 4000000,
+      "name": "Aarav Patel",
+      "passwordHash": "$2b$10$ovkq6Qd0zM3/spGv28yAkOfaX/IOswzJxxpt.ygjq2Xpzui6PPd.G",
+      "reminderDayOfMonth": 25,
+      "updatedAt": "2026-11-11T10:41:59.245Z",
       "failedLoginAttempts": 0,
       "lockUntil": null
     },
     {
       "id": "user-1794473018005-1c1b67",
-      "name": "Fallback Tester",
-      "email": "fallback_test_1794473017726@finpulse.local",
-      "passwordHash": "$2b$10$Kk3Sd8kpAl0z3N9LVrWpAutrT1HobF1yUHQav9TarcLEJ4HTA9DmG",
-      "isVerified": true,
+      "accountStatus": "active",
+      "createdAt": "Thu Nov 12 2026 08:43:38 GMT+0000 (Coordinated Universal Time)",
       "currency": "INR",
-      "monthlyBudgetInPaise": 4000000,
-      "reminderDayOfMonth": 25,
+      "email": "fallback_test_1794473017726@finpulse.local",
       "emailNotificationsEnabled": true,
-      "createdAt": "Thu Nov 12 2026 08:43:38 GMT+0000 (Coordinated Universal Time)"
+      "failedLoginAttempts": 1,
+      "isVerified": true,
+      "lockUntil": null,
+      "monthlyBudgetInPaise": 4000000,
+      "name": "Fallback Tester",
+      "passwordHash": "$2b$10$Kk3Sd8kpAl0z3N9LVrWpAutrT1HobF1yUHQav9TarcLEJ4HTA9DmG",
+      "reminderDayOfMonth": 25,
+      "updatedAt": "2026-11-12T08:43:39.785Z"
     },
     {
       "id": "user-1794473075908-1f42f8",
-      "name": "Fallback Tester",
-      "email": "fallback_test_1794473075621@finpulse.local",
-      "passwordHash": "$2b$10$oV3bhIZmkl8AMKaSuaqeoO1fST2kReZMLC1jXHc6ZLLEiAztCo.xq",
-      "isVerified": true,
+      "accountStatus": "active",
+      "createdAt": "Thu Nov 12 2026 08:44:35 GMT+0000 (Coordinated Universal Time)",
       "currency": "INR",
-      "monthlyBudgetInPaise": 4000000,
-      "reminderDayOfMonth": 25,
+      "email": "fallback_test_1794473075621@finpulse.local",
       "emailNotificationsEnabled": true,
-      "createdAt": "Thu Nov 12 2026 08:44:35 GMT+0000 (Coordinated Universal Time)"
+      "failedLoginAttempts": 1,
+      "isVerified": true,
+      "lockUntil": null,
+      "monthlyBudgetInPaise": 4000000,
+      "name": "Fallback Tester",
+      "passwordHash": "$2b$10$oV3bhIZmkl8AMKaSuaqeoO1fST2kReZMLC1jXHc6ZLLEiAztCo.xq",
+      "reminderDayOfMonth": 25,
+      "updatedAt": "2026-11-12T08:44:37.679Z"
     },
     {
       "id": "legacy-1794473077958",
-      "name": "Legacy User",
-      "email": "legacy_unverified_1794473077820@finpulse.local",
-      "passwordHash": "$2b$10$amWUeC1mHe5U/AVgI21hdOkcWGuiG3/Sy6tbdIESvb/OCnYJbxLg6",
-      "isVerified": true,
+      "accountStatus": "active",
+      "createdAt": "Thu Nov 12 2026 08:44:38 GMT+0000 (Coordinated Universal Time)",
       "currency": "INR",
-      "monthlyBudgetInPaise": 3000000,
-      "reminderDayOfMonth": 25,
+      "email": "legacy_unverified_1794473077820@finpulse.local",
       "emailNotificationsEnabled": true,
-      "createdAt": "Thu Nov 12 2026 08:44:38 GMT+0000 (Coordinated Universal Time)"
+      "failedLoginAttempts": 0,
+      "isVerified": true,
+      "lockUntil": null,
+      "monthlyBudgetInPaise": 3000000,
+      "name": "Legacy User",
+      "passwordHash": "$2b$10$amWUeC1mHe5U/AVgI21hdOkcWGuiG3/Sy6tbdIESvb/OCnYJbxLg6",
+      "reminderDayOfMonth": 25,
+      "updatedAt": "2026-11-12T08:44:38.196Z"
     },
     {
       "id": "user-1794473436793-0d16c1",
-      "name": "Rajesh Pal",
-      "email": "rjrajeshpal30062003@gmail.com",
-      "passwordHash": "$2b$10$pjqJ.K/vQ8xqXMy3ufxXu.wSq4zOa5c6664.Y94qbD2D0XHo90pdm",
-      "isVerified": true,
+      "accountStatus": "active",
+      "createdAt": "Thu Nov 12 2026 08:50:36 GMT+0000 (Coordinated Universal Time)",
       "currency": "INR",
-      "monthlyBudgetInPaise": 4000000,
-      "reminderDayOfMonth": 25,
+      "email": "rjrajeshpal30062003@gmail.com",
       "emailNotificationsEnabled": true,
-      "createdAt": "Thu Nov 12 2026 08:50:36 GMT+0000 (Coordinated Universal Time)"
+      "failedLoginAttempts": 0,
+      "isVerified": true,
+      "lockUntil": null,
+      "monthlyBudgetInPaise": 4000000,
+      "name": "Rajesh Pal",
+      "passwordHash": "$2b$10$zBVOewVzWi7EocFwUHdeP.Rk.XL7I9r9NQGtaksne15XputCZ/lWi",
+      "reminderDayOfMonth": 25,
+      "updatedAt": "2026-11-12T09:45:12.774Z"
     },
     {
       "id": "user-1794474969244-7c7af4",
-      "name": "CC Tester",
-      "email": "cctest_1794474968933@finpulse.local",
-      "passwordHash": "$2b$10$Cpr/eDGWvOWDVdvANXF8eeey/4/m3Um8b/3.C9g6Sgm3QVP9fXrjy",
-      "isVerified": true,
       "accountStatus": "active",
-      "failedLoginAttempts": 0,
-      "lockUntil": null,
+      "createdAt": "Thu Nov 12 2026 09:16:09 GMT+0000 (Coordinated Universal Time)",
       "currency": "INR",
-      "monthlyBudgetInPaise": 4000000,
-      "reminderDayOfMonth": 25,
+      "email": "cctest_1794474968933@finpulse.local",
       "emailNotificationsEnabled": true,
-      "createdAt": "2026-11-12T09:16:09.245Z"
+      "failedLoginAttempts": 0,
+      "isVerified": true,
+      "lockUntil": null,
+      "monthlyBudgetInPaise": 4000000,
+      "name": "CC Tester",
+      "passwordHash": "$2b$10$Cpr/eDGWvOWDVdvANXF8eeey/4/m3Um8b/3.C9g6Sgm3QVP9fXrjy",
+      "reminderDayOfMonth": 25,
+      "updatedAt": "2026-11-12T09:16:09.246Z"
     },
     {
       "id": "user-1794474979241-33c854",
-      "name": "CC Tester",
-      "email": "cctest_1794474978963@finpulse.local",
-      "passwordHash": "$2b$10$FFW24.Fz8GRLJxx1HFzOwuwcQkOFWLC97d6ihrmbofPELhWFR1w5m",
-      "isVerified": true,
       "accountStatus": "active",
+      "createdAt": "Thu Nov 12 2026 09:16:19 GMT+0000 (Coordinated Universal Time)",
+      "currency": "INR",
+      "email": "cctest_1794474978963@finpulse.local",
+      "emailNotificationsEnabled": true,
       "failedLoginAttempts": 0,
+      "isVerified": true,
       "lockUntil": null,
+      "monthlyBudgetInPaise": 4000000,
+      "name": "CC Tester",
+      "passwordHash": "$2b$10$FFW24.Fz8GRLJxx1HFzOwuwcQkOFWLC97d6ihrmbofPELhWFR1w5m",
+      "reminderDayOfMonth": 25,
+      "updatedAt": "2026-11-12T09:16:19.242Z"
+    },
+    {
+      "id": "user-rjrajeshpal30",
+      "name": "Rajesh Pal",
+      "email": "rjrajeshpal30@gmail.com",
+      "passwordHash": "$2b$10$0L42kmR7sk3hadA6iiG0i.5f0PDpLvYlL1lI1JvWjiKJTQT0Q0b.y",
+      "isVerified": true,
       "currency": "INR",
       "monthlyBudgetInPaise": 4000000,
       "reminderDayOfMonth": 25,
       "emailNotificationsEnabled": true,
-      "createdAt": "2026-11-12T09:16:19.241Z"
+      "createdAt": "2026-11-12T09:53:51.952Z",
+      "failedLoginAttempts": 0,
+      "lockUntil": null
     }
   ],
   "bankAccounts": [
     {
       "id": "bank-1794323316955",
-      "userId": "user-1794323316803",
-      "bankName": "Primary Bank",
       "accountHolderName": "Aarav Patel",
-      "accountType": "Savings",
       "accountNickname": "Primary Savings",
       "accountNumberMasked": "•••• 1234",
+      "accountType": "Savings",
       "balanceInPaise": 0,
-      "openingBalanceInPaise": 0,
+      "bankName": "Primary Bank",
+      "createdAt": "2026-11-10T15:08:36.955Z",
       "isActive": true,
-      "createdAt": "2026-11-10T15:08:36.955Z"
+      "openingBalanceInPaise": 0,
+      "userId": "user-1794323316803"
     },
     {
       "id": "bank-hdfc-01",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "bankName": "HDFC Bank",
       "accountHolderName": "Rajesh Sharma",
       "accountType": "Savings",
@@ -137,7 +173,7 @@
     },
     {
       "id": "bank-sbi-01",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "bankName": "State Bank of India",
       "accountHolderName": "Rajesh Sharma",
       "accountType": "Savings",
@@ -151,104 +187,143 @@
     },
     {
       "id": "bank-1794473018154",
-      "userId": "user-1794473018005-1c1b67",
-      "bankName": "Primary Bank",
       "accountHolderName": "Fallback Tester",
-      "accountType": "Savings",
       "accountNickname": "Primary Savings",
       "accountNumberMasked": "•••• 1234",
+      "accountType": "Savings",
       "balanceInPaise": 0,
-      "openingBalanceInPaise": 0,
+      "bankName": "Primary Bank",
+      "createdAt": "2026-11-12T08:43:38.154Z",
       "isActive": true,
-      "createdAt": "2026-11-12T08:43:38.154Z"
+      "openingBalanceInPaise": 0,
+      "userId": "user-1794473018005-1c1b67"
     },
     {
       "id": "bank-1794473076054",
-      "userId": "user-1794473075908-1f42f8",
-      "bankName": "Primary Bank",
       "accountHolderName": "Fallback Tester",
-      "accountType": "Savings",
       "accountNickname": "Primary Savings",
       "accountNumberMasked": "•••• 1234",
+      "accountType": "Savings",
       "balanceInPaise": 0,
-      "openingBalanceInPaise": 0,
+      "bankName": "Primary Bank",
+      "createdAt": "2026-11-12T08:44:36.054Z",
       "isActive": true,
-      "createdAt": "2026-11-12T08:44:36.054Z"
+      "openingBalanceInPaise": 0,
+      "userId": "user-1794473075908-1f42f8"
     },
     {
       "id": "bank-1794474969398",
-      "userId": "user-1794474969244-7c7af4",
-      "bankName": "Primary Bank",
       "accountHolderName": "CC Tester",
-      "accountType": "Savings",
       "accountNickname": "Primary Savings",
       "accountNumberMasked": "•••• 1234",
+      "accountType": "Savings",
       "balanceInPaise": 0,
-      "openingBalanceInPaise": 0,
+      "bankName": "Primary Bank",
+      "createdAt": "2026-11-12T09:16:09.398Z",
       "isActive": true,
-      "createdAt": "2026-11-12T09:16:09.398Z"
+      "openingBalanceInPaise": 0,
+      "userId": "user-1794474969244-7c7af4"
     },
     {
       "id": "bank-1794474979387",
-      "userId": "user-1794474979241-33c854",
-      "bankName": "Primary Bank",
       "accountHolderName": "CC Tester",
-      "accountType": "Savings",
       "accountNickname": "Primary Savings",
       "accountNumberMasked": "•••• 1234",
+      "accountType": "Savings",
       "balanceInPaise": 0,
-      "openingBalanceInPaise": 0,
+      "bankName": "Primary Bank",
+      "createdAt": "2026-11-12T09:16:19.387Z",
       "isActive": true,
-      "createdAt": "2026-11-12T09:16:19.387Z"
+      "openingBalanceInPaise": 0,
+      "userId": "user-1794474979241-33c854"
+    },
+    {
+      "id": "bank-1794321591174",
+      "accountHolderName": "rty",
+      "accountNickname": "Savings Account",
+      "accountNumberMasked": "•••• 1234",
+      "accountType": "Savings",
+      "balanceInPaise": 0,
+      "bankName": "Primary Bank",
+      "createdAt": "2026-11-10T14:39:51.174Z",
+      "isActive": true,
+      "openingBalanceInPaise": 0,
+      "userId": "user-1794321590913"
+    },
+    {
+      "id": "bank-1794473437044",
+      "accountHolderName": "Rajesh Pal",
+      "accountNickname": "Primary Savings",
+      "accountNumberMasked": "•••• 1234",
+      "accountType": "Savings",
+      "balanceInPaise": 0,
+      "bankName": "Primary Bank",
+      "createdAt": "2026-11-12T08:50:37.044Z",
+      "isActive": true,
+      "openingBalanceInPaise": 0,
+      "userId": "user-rjrajeshpal30"
     }
   ],
   "cashWallets": [
     {
       "id": "cash-1794323317101",
-      "userId": "user-1794323316803",
       "balanceInPaise": 0,
-      "updatedAt": "2026-11-10T15:08:37.101Z"
+      "updatedAt": "2026-11-10T15:08:37.101Z",
+      "userId": "user-1794323316803"
     },
     {
       "id": "cash-wallet-01",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "balanceInPaise": 450000,
       "notes": "Physical cash on hand",
       "updatedAt": "2026-11-11T10:08:08.138Z"
     },
     {
       "id": "cash-1794473018297",
-      "userId": "user-1794473018005-1c1b67",
       "balanceInPaise": 0,
       "notes": "Primary Cash Wallet",
-      "updatedAt": "2026-11-12T08:43:38.297Z"
+      "updatedAt": "2026-11-12T08:43:38.297Z",
+      "userId": "user-1794473018005-1c1b67"
     },
     {
       "id": "cash-1794473076193",
-      "userId": "user-1794473075908-1f42f8",
       "balanceInPaise": 0,
       "notes": "Primary Cash Wallet",
-      "updatedAt": "2026-11-12T08:44:36.193Z"
+      "updatedAt": "2026-11-12T08:44:36.193Z",
+      "userId": "user-1794473075908-1f42f8"
     },
     {
       "id": "cash-1794474969549",
-      "userId": "user-1794474969244-7c7af4",
-      "balanceInPaise": -50000,
+      "balanceInPaise": 0,
       "notes": "Primary Cash Wallet",
-      "updatedAt": "2026-11-12T09:16:09.549Z"
+      "updatedAt": "2026-11-12T09:16:09.549Z",
+      "userId": "user-1794474969244-7c7af4"
     },
     {
       "id": "cash-1794474979530",
-      "userId": "user-1794474979241-33c854",
-      "balanceInPaise": -50000,
+      "balanceInPaise": 0,
       "notes": "Primary Cash Wallet",
-      "updatedAt": "2026-11-12T09:16:19.530Z"
+      "updatedAt": "2026-11-12T09:16:19.530Z",
+      "userId": "user-1794474979241-33c854"
+    },
+    {
+      "id": "cash-1794321591414",
+      "balanceInPaise": 0,
+      "updatedAt": "2026-11-10T14:39:51.414Z",
+      "userId": "user-1794321590913"
+    },
+    {
+      "id": "cash-1794473437282",
+      "balanceInPaise": 0,
+      "notes": "Primary Cash Wallet",
+      "updatedAt": "2026-11-12T08:50:37.282Z",
+      "userId": "user-rjrajeshpal30"
     }
   ],
   "creditCards": [
     {
       "id": "cc-hdfc-01",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "cardName": "HDFC Regalia Gold",
       "bankName": "HDFC Bank",
       "cardNickname": "HDFC Card",
@@ -266,151 +341,167 @@
     },
     {
       "id": "cc-1794474970150",
-      "userId": "user-1794474969244-7c7af4",
-      "cardName": "TATA Neu Infinity",
-      "bankName": "HDFC Bank",
-      "cardNickname": "TATA Neu",
-      "lastFourDigits": "3535",
-      "creditLimitInPaise": 5000000,
-      "outstandingBalanceInPaise": 1000000,
       "availableCreditInPaise": 4000000,
-      "statementDay": 15,
-      "dueDay": 5,
+      "bankName": "HDFC Bank",
       "billingCycle": "Monthly",
-      "isActive": true
+      "cardName": "TATA Neu Infinity",
+      "cardNickname": "TATA Neu",
+      "creditLimitInPaise": 5000000,
+      "dueDay": 5,
+      "isActive": true,
+      "lastFourDigits": "3535",
+      "outstandingBalanceInPaise": 1000000,
+      "statementDay": 15,
+      "userId": "user-1794474969244-7c7af4"
     },
     {
       "id": "cc-1794474970154",
-      "userId": "user-1794474969244-7c7af4",
-      "cardName": "Amazon Pay ICICI Card",
-      "bankName": "ICICI Bank",
-      "cardNickname": "Amazon Pay",
-      "lastFourDigits": "9876",
-      "creditLimitInPaise": 10000000,
-      "outstandingBalanceInPaise": 1500000,
       "availableCreditInPaise": 8500000,
-      "statementDay": 15,
-      "dueDay": 5,
+      "bankName": "ICICI Bank",
       "billingCycle": "Monthly",
-      "isActive": true
+      "cardName": "Amazon Pay ICICI Card",
+      "cardNickname": "Amazon Pay",
+      "creditLimitInPaise": 10000000,
+      "dueDay": 5,
+      "isActive": true,
+      "lastFourDigits": "9876",
+      "outstandingBalanceInPaise": 1500000,
+      "statementDay": 15,
+      "userId": "user-1794474969244-7c7af4"
     },
     {
       "id": "cc-1794474980116",
-      "userId": "user-1794474979241-33c854",
-      "cardName": "TATA Neu Infinity",
-      "bankName": "HDFC Bank",
-      "cardNickname": "TATA Neu",
-      "lastFourDigits": "3535",
-      "creditLimitInPaise": 5000000,
-      "outstandingBalanceInPaise": 1000000,
       "availableCreditInPaise": 4000000,
-      "statementDay": 15,
-      "dueDay": 5,
+      "bankName": "HDFC Bank",
       "billingCycle": "Monthly",
-      "isActive": true
+      "cardName": "TATA Neu Infinity",
+      "cardNickname": "TATA Neu",
+      "creditLimitInPaise": 5000000,
+      "dueDay": 5,
+      "isActive": true,
+      "lastFourDigits": "3535",
+      "outstandingBalanceInPaise": 1000000,
+      "statementDay": 15,
+      "userId": "user-1794474979241-33c854"
     },
     {
       "id": "cc-1794474980119",
-      "userId": "user-1794474979241-33c854",
-      "cardName": "Amazon Pay ICICI Card",
-      "bankName": "ICICI Bank",
-      "cardNickname": "Amazon Pay",
-      "lastFourDigits": "9876",
-      "creditLimitInPaise": 10000000,
-      "outstandingBalanceInPaise": 1500000,
       "availableCreditInPaise": 8500000,
-      "statementDay": 15,
-      "dueDay": 5,
+      "bankName": "ICICI Bank",
       "billingCycle": "Monthly",
-      "isActive": true
+      "cardName": "Amazon Pay ICICI Card",
+      "cardNickname": "Amazon Pay",
+      "creditLimitInPaise": 10000000,
+      "dueDay": 5,
+      "isActive": true,
+      "lastFourDigits": "9876",
+      "outstandingBalanceInPaise": 1500000,
+      "statementDay": 15,
+      "userId": "user-1794474979241-33c854"
+    },
+    {
+      "id": "cc-1794475637883",
+      "availableCreditInPaise": 3540462,
+      "bankName": "HDFC Bank",
+      "billingCycle": "16th to 15th",
+      "cardName": "TATA Neu",
+      "cardNickname": "TATA Neu",
+      "creditLimitInPaise": 4000000,
+      "dueDay": 5,
+      "isActive": true,
+      "lastFourDigits": "1435",
+      "notes": "",
+      "outstandingBalanceInPaise": 459538,
+      "statementDay": 22,
+      "userId": "user-rjrajeshpal30"
     }
   ],
   "transactions": [
     {
       "id": "tx-1794474980570-ktfp",
-      "userId": "user-1794474979241-33c854",
-      "date": "2026-11-12T09:16:20.570Z",
-      "type": "credit_card_expense",
-      "mainCategory": "Essential",
-      "subCategory": "Shopping",
       "amountInPaise": 1500000,
-      "paymentMethod": "Credit Card",
+      "createdAt": "2026-11-12T09:16:20.570Z",
       "creditCardId": "cc-1794474980119",
+      "date": "2026-11-12T09:16:20.570Z",
       "description": "Amazon Great Indian Festival",
+      "mainCategory": "Essential",
+      "paymentMethod": "Credit Card",
       "status": "Completed",
-      "createdAt": "2026-11-12T09:16:20.570Z"
+      "subCategory": "Shopping",
+      "type": "credit_card_expense",
+      "userId": "user-1794474979241-33c854"
     },
     {
       "id": "tx-1794474980422-mhpx",
-      "userId": "user-1794474979241-33c854",
-      "date": "2026-11-12T09:16:20.422Z",
-      "type": "expense",
-      "mainCategory": "Fun",
-      "subCategory": "Restaurants",
       "amountInPaise": 50000,
-      "paymentMethod": "Cash",
+      "createdAt": "2026-11-12T09:16:20.422Z",
+      "date": "2026-11-12T09:16:20.422Z",
       "description": "Dinner cash payment",
+      "mainCategory": "Fun",
+      "paymentMethod": "Cash",
       "status": "Completed",
-      "createdAt": "2026-11-12T09:16:20.422Z"
+      "subCategory": "Restaurants",
+      "type": "expense",
+      "userId": "user-1794474979241-33c854"
     },
     {
       "id": "tx-1794474980125-x35n",
-      "userId": "user-1794474979241-33c854",
-      "date": "2026-11-12T09:16:20.125Z",
-      "type": "credit_card_expense",
-      "mainCategory": "Essential",
-      "subCategory": "Electronics",
       "amountInPaise": 1000000,
-      "paymentMethod": "Credit Card",
+      "createdAt": "2026-11-12T09:16:20.125Z",
       "creditCardId": "cc-1794474980116",
+      "date": "2026-11-12T09:16:20.125Z",
       "description": "Purchase on TATA Neu",
+      "mainCategory": "Essential",
+      "paymentMethod": "Credit Card",
       "status": "Completed",
-      "createdAt": "2026-11-12T09:16:20.125Z"
+      "subCategory": "Electronics",
+      "type": "credit_card_expense",
+      "userId": "user-1794474979241-33c854"
     },
     {
       "id": "tx-1794474970615-ci4b",
-      "userId": "user-1794474969244-7c7af4",
-      "date": "2026-11-12T09:16:10.615Z",
-      "type": "credit_card_expense",
-      "mainCategory": "Essential",
-      "subCategory": "Shopping",
       "amountInPaise": 1500000,
-      "paymentMethod": "Credit Card",
+      "createdAt": "2026-11-12T09:16:10.615Z",
       "creditCardId": "cc-1794474970154",
+      "date": "2026-11-12T09:16:10.615Z",
       "description": "Amazon Great Indian Festival",
+      "mainCategory": "Essential",
+      "paymentMethod": "Credit Card",
       "status": "Completed",
-      "createdAt": "2026-11-12T09:16:10.615Z"
+      "subCategory": "Shopping",
+      "type": "credit_card_expense",
+      "userId": "user-1794474969244-7c7af4"
     },
     {
       "id": "tx-1794474970467-m4id",
-      "userId": "user-1794474969244-7c7af4",
-      "date": "2026-11-12T09:16:10.467Z",
-      "type": "expense",
-      "mainCategory": "Fun",
-      "subCategory": "Restaurants",
       "amountInPaise": 50000,
-      "paymentMethod": "Cash",
+      "createdAt": "2026-11-12T09:16:10.467Z",
+      "date": "2026-11-12T09:16:10.467Z",
       "description": "Dinner cash payment",
+      "mainCategory": "Fun",
+      "paymentMethod": "Cash",
       "status": "Completed",
-      "createdAt": "2026-11-12T09:16:10.467Z"
+      "subCategory": "Restaurants",
+      "type": "expense",
+      "userId": "user-1794474969244-7c7af4"
     },
     {
       "id": "tx-1794474970163-cb64",
-      "userId": "user-1794474969244-7c7af4",
-      "date": "2026-11-12T09:16:10.163Z",
-      "type": "credit_card_expense",
-      "mainCategory": "Essential",
-      "subCategory": "Electronics",
       "amountInPaise": 1000000,
-      "paymentMethod": "Credit Card",
+      "createdAt": "2026-11-12T09:16:10.163Z",
       "creditCardId": "cc-1794474970150",
+      "date": "2026-11-12T09:16:10.163Z",
       "description": "Purchase on TATA Neu",
+      "mainCategory": "Essential",
+      "paymentMethod": "Credit Card",
       "status": "Completed",
-      "createdAt": "2026-11-12T09:16:10.163Z"
+      "subCategory": "Electronics",
+      "type": "credit_card_expense",
+      "userId": "user-1794474969244-7c7af4"
     },
     {
       "id": "tx-scenario-1",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "date": "2026-11-01T10:08:08.139Z",
       "type": "income",
       "mainCategory": "Essential",
@@ -425,7 +516,7 @@
     },
     {
       "id": "tx-scenario-2",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "date": "2026-11-03T10:08:08.139Z",
       "type": "expense",
       "mainCategory": "Essential",
@@ -439,7 +530,7 @@
     },
     {
       "id": "tx-scenario-3",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "date": "2026-11-04T10:08:08.139Z",
       "type": "credit_card_expense",
       "mainCategory": "Essential",
@@ -454,7 +545,7 @@
     },
     {
       "id": "tx-scenario-4",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "date": "2026-11-05T10:08:08.139Z",
       "type": "credit_card_payment",
       "mainCategory": "Liability Settlement",
@@ -470,7 +561,7 @@
     },
     {
       "id": "tx-scenario-5",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "date": "2026-11-06T10:08:08.139Z",
       "type": "transfer",
       "mainCategory": "Transfer",
@@ -486,7 +577,7 @@
     },
     {
       "id": "tx-scenario-6",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "date": "2026-11-07T10:08:08.139Z",
       "type": "investment_deposit",
       "mainCategory": "Investment",
@@ -501,7 +592,7 @@
     },
     {
       "id": "tx-scenario-7",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "date": "2026-11-08T10:08:08.139Z",
       "type": "emergency_deposit",
       "mainCategory": "Emergency Fund",
@@ -516,7 +607,7 @@
     },
     {
       "id": "tx-scenario-8",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "date": "2026-11-09T10:08:08.139Z",
       "type": "credit_card_payment",
       "mainCategory": "Liability Settlement",
@@ -529,23 +620,188 @@
       "notes": "Scenario 8: Paid ₹7,000 against ₹10,000 outstanding; ₹3,000 remains",
       "status": "Completed",
       "createdAt": "2026-11-09T10:08:08.139Z"
+    },
+    {
+      "id": "tx-1794475727617-3dfh",
+      "amountInPaise": 41100,
+      "createdAt": "2026-11-12T09:28:47.617Z",
+      "creditCardId": "cc-1794475637883",
+      "date": "2026-11-06T00:00:00.000Z",
+      "description": "egg, biscuit,banana,dry fruits, maggie,chips",
+      "mainCategory": "Essential",
+      "notes": "",
+      "paymentMethod": "Credit Card",
+      "status": "Completed",
+      "subCategory": "Groceries",
+      "type": "credit_card_expense",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "tx-1794475847930-bknk",
+      "amountInPaise": 321400,
+      "createdAt": "2026-11-12T09:30:47.930Z",
+      "creditCardId": "cc-1794475637883",
+      "date": "2026-11-07T00:00:00.000Z",
+      "description": "Induction oven",
+      "mainCategory": "Essential",
+      "notes": "",
+      "paymentMethod": "Credit Card",
+      "status": "Completed",
+      "subCategory": "Household",
+      "type": "credit_card_expense",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "tx-1794475910376-cx5r",
+      "amountInPaise": 13468,
+      "createdAt": "2026-11-12T09:31:50.376Z",
+      "creditCardId": "cc-1794475637883",
+      "date": "2026-11-07T00:00:00.000Z",
+      "description": "Zomato",
+      "mainCategory": "Essential",
+      "notes": "",
+      "paymentMethod": "Credit Card",
+      "status": "Completed",
+      "subCategory": "Food",
+      "type": "credit_card_expense",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "tx-1794475965150-eatl",
+      "amountInPaise": 26694,
+      "createdAt": "2026-11-12T09:32:45.150Z",
+      "creditCardId": "cc-1794475637883",
+      "date": "2026-11-08T00:00:00.000Z",
+      "description": "Zomato",
+      "mainCategory": "Essential",
+      "notes": "",
+      "paymentMethod": "Credit Card",
+      "status": "Completed",
+      "subCategory": "Food",
+      "type": "credit_card_expense",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "tx-1794475983932-c07l",
+      "amountInPaise": 17579,
+      "createdAt": "2026-11-12T09:33:03.932Z",
+      "creditCardId": "cc-1794475637883",
+      "date": "2026-11-08T00:00:00.000Z",
+      "description": "Zomato",
+      "mainCategory": "Essential",
+      "notes": "",
+      "paymentMethod": "Credit Card",
+      "status": "Completed",
+      "subCategory": "Food",
+      "type": "credit_card_expense",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "tx-1794476053929-8r9n",
+      "amountInPaise": 17579,
+      "createdAt": "2026-11-12T09:34:13.929Z",
+      "creditCardId": "cc-1794475637883",
+      "date": "2026-11-08T00:00:00.000Z",
+      "description": "Zomato",
+      "mainCategory": "Essential",
+      "notes": "",
+      "paymentMethod": "Credit Card",
+      "status": "Completed",
+      "subCategory": "Food",
+      "type": "credit_card_expense",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "tx-1794476119037-4mrs",
+      "amountInPaise": 3000,
+      "createdAt": "2026-11-12T09:35:19.037Z",
+      "creditCardId": "cc-1794475637883",
+      "date": "2026-11-08T00:00:00.000Z",
+      "description": "Office tea",
+      "mainCategory": "Essential",
+      "notes": "",
+      "paymentMethod": "Credit Card",
+      "status": "Completed",
+      "subCategory": "Food",
+      "type": "credit_card_expense",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "tx-1794476304135-195w",
+      "amountInPaise": 3600,
+      "createdAt": "2026-11-12T09:38:24.135Z",
+      "creditCardId": "cc-1794475637883",
+      "date": "2026-11-09T00:00:00.000Z",
+      "description": "Office tea",
+      "mainCategory": "Essential",
+      "notes": "",
+      "paymentMethod": "Credit Card",
+      "status": "Completed",
+      "subCategory": "Food",
+      "type": "credit_card_expense",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "tx-1794476353898-7nv6",
+      "amountInPaise": 3000,
+      "createdAt": "2026-11-12T09:39:13.899Z",
+      "creditCardId": "cc-1794475637883",
+      "date": "2026-11-09T00:00:00.000Z",
+      "description": "Office food",
+      "mainCategory": "Essential",
+      "notes": "",
+      "paymentMethod": "Credit Card",
+      "status": "Completed",
+      "subCategory": "Food",
+      "type": "credit_card_expense",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "tx-1794476399772-xfou",
+      "amountInPaise": 12897,
+      "createdAt": "2026-11-12T09:39:59.772Z",
+      "creditCardId": "cc-1794475637883",
+      "date": "2026-11-09T00:00:00.000Z",
+      "description": "Zomato",
+      "mainCategory": "Essential",
+      "notes": "",
+      "paymentMethod": "Credit Card",
+      "status": "Completed",
+      "subCategory": "Food",
+      "type": "credit_card_expense",
+      "userId": "user-rjrajeshpal30"
+    },
+    {
+      "id": "tx-1794476449155-zjlt",
+      "amountInPaise": 19800,
+      "createdAt": "2026-11-12T09:40:49.155Z",
+      "creditCardId": "cc-1794475637883",
+      "date": "2026-11-11T00:00:00.000Z",
+      "description": "Cup",
+      "mainCategory": "Essential",
+      "notes": "",
+      "paymentMethod": "Credit Card",
+      "status": "Completed",
+      "subCategory": "Groceries",
+      "type": "credit_card_expense",
+      "userId": "user-rjrajeshpal30"
     }
   ],
   "budgetAllocations": [
     {
       "id": "budget-user-1794323316803",
-      "userId": "user-1794323316803",
-      "monthYear": "2026-11",
+      "carryForwardEnabled": false,
+      "emergencyBudgetInPaise": 500000,
       "essentialBudgetInPaise": 2000000,
       "funBudgetInPaise": 500000,
       "investmentBudgetInPaise": 500000,
-      "emergencyBudgetInPaise": 500000,
+      "monthYear": "2026-11",
       "savingsBudgetInPaise": 500000,
-      "carryForwardEnabled": false
+      "userId": "user-1794323316803"
     },
     {
       "id": "budget-demo-user-id-2026-11",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "monthYear": "2026-11",
       "essentialBudgetInPaise": 1800000,
       "funBudgetInPaise": 400000,
@@ -556,53 +812,75 @@
     },
     {
       "id": "budget-user-1794473018005-1c1b67",
-      "userId": "user-1794473018005-1c1b67",
-      "monthYear": "2026-11",
+      "carryForwardEnabled": false,
+      "emergencyBudgetInPaise": 500000,
       "essentialBudgetInPaise": 2000000,
       "funBudgetInPaise": 500000,
       "investmentBudgetInPaise": 500000,
-      "emergencyBudgetInPaise": 500000,
+      "monthYear": "2026-11",
       "savingsBudgetInPaise": 500000,
-      "carryForwardEnabled": false
+      "userId": "user-1794473018005-1c1b67"
     },
     {
       "id": "budget-user-1794473075908-1f42f8",
-      "userId": "user-1794473075908-1f42f8",
-      "monthYear": "2026-11",
+      "carryForwardEnabled": false,
+      "emergencyBudgetInPaise": 500000,
       "essentialBudgetInPaise": 2000000,
       "funBudgetInPaise": 500000,
       "investmentBudgetInPaise": 500000,
-      "emergencyBudgetInPaise": 500000,
+      "monthYear": "2026-11",
       "savingsBudgetInPaise": 500000,
-      "carryForwardEnabled": false
+      "userId": "user-1794473075908-1f42f8"
     },
     {
       "id": "budget-user-1794474969244-7c7af4",
-      "userId": "user-1794474969244-7c7af4",
-      "monthYear": "2026-11",
+      "carryForwardEnabled": false,
+      "emergencyBudgetInPaise": 500000,
       "essentialBudgetInPaise": 2000000,
       "funBudgetInPaise": 500000,
       "investmentBudgetInPaise": 500000,
-      "emergencyBudgetInPaise": 500000,
+      "monthYear": "2026-11",
       "savingsBudgetInPaise": 500000,
-      "carryForwardEnabled": false
+      "userId": "user-1794474969244-7c7af4"
     },
     {
       "id": "budget-user-1794474979241-33c854",
-      "userId": "user-1794474979241-33c854",
-      "monthYear": "2026-11",
+      "carryForwardEnabled": false,
+      "emergencyBudgetInPaise": 500000,
       "essentialBudgetInPaise": 2000000,
       "funBudgetInPaise": 500000,
       "investmentBudgetInPaise": 500000,
-      "emergencyBudgetInPaise": 500000,
+      "monthYear": "2026-11",
       "savingsBudgetInPaise": 500000,
-      "carryForwardEnabled": false
+      "userId": "user-1794474979241-33c854"
+    },
+    {
+      "id": "budget-user-1794321590913",
+      "carryForwardEnabled": false,
+      "emergencyBudgetInPaise": 500000,
+      "essentialBudgetInPaise": 2000000,
+      "funBudgetInPaise": 500000,
+      "investmentBudgetInPaise": 500000,
+      "monthYear": "2026-11",
+      "savingsBudgetInPaise": 500000,
+      "userId": "user-1794321590913"
+    },
+    {
+      "id": "budget-user-1794473436793-0d16c1",
+      "carryForwardEnabled": false,
+      "emergencyBudgetInPaise": 500000,
+      "essentialBudgetInPaise": 2000000,
+      "funBudgetInPaise": 500000,
+      "investmentBudgetInPaise": 500000,
+      "monthYear": "2026-11",
+      "savingsBudgetInPaise": 500000,
+      "userId": "user-rjrajeshpal30"
     }
   ],
   "investments": [
     {
       "id": "inv-mf-01",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "name": "Parag Parikh Flexi Cap Fund",
       "type": "Mutual Funds",
       "investedAmountInPaise": 500000,
@@ -614,7 +892,7 @@
     },
     {
       "id": "inv-stocks-01",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "name": "NIFTY 50 Index Basket",
       "type": "Stocks",
       "investedAmountInPaise": 2500000,
@@ -628,7 +906,7 @@
   "fixedDeposits": [
     {
       "id": "fd-hdfc-01",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "bankName": "HDFC Bank",
       "fdName": "HDFC High Yield FD 1-Year",
       "principalInPaise": 5000000,
@@ -649,51 +927,65 @@
   "emergencyFunds": [
     {
       "id": "ef-1794323317397",
-      "userId": "user-1794323316803",
-      "targetAmountInPaise": 10000000,
       "currentBalanceInPaise": 0,
-      "updatedAt": "2026-11-10T15:08:37.397Z"
+      "targetAmountInPaise": 10000000,
+      "updatedAt": "2026-11-10T15:08:37.397Z",
+      "userId": "user-1794323316803"
     },
     {
       "id": "emergency-fund-01",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "targetAmountInPaise": 10000000,
       "currentBalanceInPaise": 3300000,
       "updatedAt": "2026-11-11T10:08:08.138Z"
     },
     {
       "id": "ef-1794473018582",
-      "userId": "user-1794473018005-1c1b67",
-      "targetAmountInPaise": 10000000,
       "currentBalanceInPaise": 0,
-      "updatedAt": "2026-11-12T08:43:38.582Z"
+      "targetAmountInPaise": 10000000,
+      "updatedAt": "2026-11-12T08:43:38.582Z",
+      "userId": "user-1794473018005-1c1b67"
     },
     {
       "id": "ef-1794473076470",
-      "userId": "user-1794473075908-1f42f8",
-      "targetAmountInPaise": 10000000,
       "currentBalanceInPaise": 0,
-      "updatedAt": "2026-11-12T08:44:36.470Z"
+      "targetAmountInPaise": 10000000,
+      "updatedAt": "2026-11-12T08:44:36.470Z",
+      "userId": "user-1794473075908-1f42f8"
     },
     {
       "id": "ef-1794474969842",
-      "userId": "user-1794474969244-7c7af4",
-      "targetAmountInPaise": 10000000,
       "currentBalanceInPaise": 0,
-      "updatedAt": "2026-11-12T09:16:09.842Z"
+      "targetAmountInPaise": 10000000,
+      "updatedAt": "2026-11-12T09:16:09.842Z",
+      "userId": "user-1794474969244-7c7af4"
     },
     {
       "id": "ef-1794474979817",
-      "userId": "user-1794474979241-33c854",
-      "targetAmountInPaise": 10000000,
       "currentBalanceInPaise": 0,
-      "updatedAt": "2026-11-12T09:16:19.817Z"
+      "targetAmountInPaise": 10000000,
+      "updatedAt": "2026-11-12T09:16:19.817Z",
+      "userId": "user-1794474979241-33c854"
+    },
+    {
+      "id": "ef-1794321591906",
+      "currentBalanceInPaise": 0,
+      "targetAmountInPaise": 10000000,
+      "updatedAt": "2026-11-10T14:39:51.906Z",
+      "userId": "user-1794321590913"
+    },
+    {
+      "id": "ef-1794473437757",
+      "currentBalanceInPaise": 0,
+      "targetAmountInPaise": 10000000,
+      "updatedAt": "2026-11-12T08:50:37.757Z",
+      "userId": "user-rjrajeshpal30"
     }
   ],
   "savingsGoals": [
     {
       "id": "saving-laptop-01",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "name": "MacBook Pro Upgrade",
       "targetAmountInPaise": 12000000,
       "savedAmountInPaise": 4500000,
@@ -703,7 +995,7 @@
     },
     {
       "id": "saving-travel-01",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "name": "Annual Family Vacation",
       "targetAmountInPaise": 6000000,
       "savedAmountInPaise": 3000000,
@@ -715,7 +1007,7 @@
   "notifications": [
     {
       "id": "notif-fd-01",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "title": "Upcoming FD Maturity in 30 Days",
       "message": "Your HDFC High Yield FD (₹50,000 principal) matures soon. Projected payout: ₹53,854.",
       "type": "fd_maturity",
@@ -728,7 +1020,7 @@
     },
     {
       "id": "notif-cc-01",
-      "userId": "demo-user-id",
+      "userId": "user-rjrajeshpal30",
       "title": "Credit Card Bill Reminder",
       "message": "HDFC Regalia Gold has ₹3,000 outstanding due on the 5th. Avoid late fees.",
       "type": "bill_reminder",
@@ -744,107 +1036,179 @@
   "refreshTokens": [
     {
       "id": "token-1794323317686-464io",
-      "userId": "user-1794323316803",
-      "tokenHash": "be333850c3b8a2881039382fec967940188a8917e7d9fe684b850b53fd53ce85",
+      "createdAt": "2026-11-10T15:08:37.686Z",
       "expiresAt": "2026-11-17T15:08:37.686Z",
       "revoked": true,
-      "createdAt": "2026-11-10T15:08:37.686Z"
+      "tokenHash": "be333850c3b8a2881039382fec967940188a8917e7d9fe684b850b53fd53ce85",
+      "userId": "user-1794323316803"
     },
     {
       "id": "token-1794323344540-ifket",
-      "userId": "user-1794323316803",
-      "tokenHash": "f2bbc807716d3ec26550efc34a3c70ea72bd3aa5e2f5fe08a933af972d1ffd6e",
+      "createdAt": "2026-11-10T15:09:04.540Z",
       "expiresAt": "2026-11-17T15:09:04.540Z",
       "revoked": true,
-      "createdAt": "2026-11-10T15:09:04.540Z"
+      "tokenHash": "f2bbc807716d3ec26550efc34a3c70ea72bd3aa5e2f5fe08a933af972d1ffd6e",
+      "userId": "user-1794323316803"
     },
     {
       "id": "token-1794393717799-v8dsm",
-      "userId": "user-1794323316803",
-      "tokenHash": "cc463bc214d6a537e2c66d05caa28475fb7f5944cee9f3ae57c6b14638059259",
+      "createdAt": "2026-11-11T10:41:57.799Z",
       "expiresAt": "2026-11-18T10:41:57.799Z",
       "revoked": true,
-      "createdAt": "2026-11-11T10:41:57.799Z"
+      "tokenHash": "cc463bc214d6a537e2c66d05caa28475fb7f5944cee9f3ae57c6b14638059259",
+      "userId": "user-1794323316803"
     },
     {
       "id": "token-1794393718395-wmk9h",
-      "userId": "user-1794323316803",
-      "tokenHash": "25cee4232bc594c3e200b2de8083ec144a67f29570e6be2393e4635fb40708df",
+      "createdAt": "2026-11-11T10:41:58.395Z",
       "expiresAt": "2026-11-18T10:41:58.395Z",
       "revoked": true,
-      "createdAt": "2026-11-11T10:41:58.395Z"
+      "tokenHash": "25cee4232bc594c3e200b2de8083ec144a67f29570e6be2393e4635fb40708df",
+      "userId": "user-1794323316803"
     },
     {
       "id": "token-1794473018727-h2psa",
-      "userId": "user-1794473018005-1c1b67",
-      "tokenHash": "ab20e2607b2985487a5f7dbe166bd6ffae5dccbbea40a484ca15fb9726c94ed8",
+      "createdAt": "2026-11-12T08:43:38.727Z",
       "expiresAt": "2026-11-19T08:43:38.727Z",
       "revoked": true,
-      "createdAt": "2026-11-12T08:43:38.727Z"
+      "tokenHash": "ab20e2607b2985487a5f7dbe166bd6ffae5dccbbea40a484ca15fb9726c94ed8",
+      "userId": "user-1794473018005-1c1b67"
     },
     {
       "id": "token-1794473019407-reedj",
-      "userId": "user-1794473018005-1c1b67",
-      "tokenHash": "f17f86927b2956101a01b4f571171cc35f6ab62f417d781858fc7c6fb05986e6",
+      "createdAt": "2026-11-12T08:43:39.407Z",
       "expiresAt": "2026-11-19T08:43:39.407Z",
       "revoked": false,
-      "createdAt": "2026-11-12T08:43:39.407Z"
+      "tokenHash": "f17f86927b2956101a01b4f571171cc35f6ab62f417d781858fc7c6fb05986e6",
+      "userId": "user-1794473018005-1c1b67"
     },
     {
       "id": "token-1794473020640-o4z20",
-      "userId": "user-1794473018005-1c1b67",
-      "tokenHash": "5dc788fd33e79ed27303d180948fe61df352a29506d82f9f3b673737c2fb174d",
+      "createdAt": "2026-11-12T08:43:40.640Z",
       "expiresAt": "2026-11-19T08:43:40.640Z",
       "revoked": false,
-      "createdAt": "2026-11-12T08:43:40.640Z"
+      "tokenHash": "5dc788fd33e79ed27303d180948fe61df352a29506d82f9f3b673737c2fb174d",
+      "userId": "user-1794473018005-1c1b67"
     },
     {
       "id": "token-1794473076610-jwicg",
-      "userId": "user-1794473075908-1f42f8",
-      "tokenHash": "031f12f22ddcd4120cd869d61272982b5b0cf53ee3c6e1b7abd5f7f94f3369e2",
+      "createdAt": "2026-11-12T08:44:36.610Z",
       "expiresAt": "2026-11-19T08:44:36.610Z",
       "revoked": true,
-      "createdAt": "2026-11-12T08:44:36.610Z"
+      "tokenHash": "031f12f22ddcd4120cd869d61272982b5b0cf53ee3c6e1b7abd5f7f94f3369e2",
+      "userId": "user-1794473075908-1f42f8"
     },
     {
       "id": "token-1794473077288-zp883",
-      "userId": "user-1794473075908-1f42f8",
-      "tokenHash": "1fb1660bf6095dd4e533e2a7c55d387e84049f533879ce2e9db44ed6e00ccc4b",
+      "createdAt": "2026-11-12T08:44:37.288Z",
       "expiresAt": "2026-11-19T08:44:37.288Z",
       "revoked": false,
-      "createdAt": "2026-11-12T08:44:37.288Z"
+      "tokenHash": "1fb1660bf6095dd4e533e2a7c55d387e84049f533879ce2e9db44ed6e00ccc4b",
+      "userId": "user-1794473075908-1f42f8"
     },
     {
       "id": "token-1794473078335-ypy5z",
-      "userId": "legacy-1794473077958",
-      "tokenHash": "8140bd108b57822d8b6cdd8daa36dc71b100e4ab5ca34f1b72c4bce9872fa118",
+      "createdAt": "2026-11-12T08:44:38.335Z",
       "expiresAt": "2026-11-19T08:44:38.335Z",
       "revoked": false,
-      "createdAt": "2026-11-12T08:44:38.335Z"
+      "tokenHash": "8140bd108b57822d8b6cdd8daa36dc71b100e4ab5ca34f1b72c4bce9872fa118",
+      "userId": "legacy-1794473077958"
     },
     {
       "id": "token-1794473078895-lpw5t",
-      "userId": "user-1794473075908-1f42f8",
-      "tokenHash": "55334d4c5a10e9c7f96fb564c7446fe28d11edf56362d260f22a9b14e147813e",
+      "createdAt": "2026-11-12T08:44:38.895Z",
       "expiresAt": "2026-11-19T08:44:38.895Z",
       "revoked": false,
-      "createdAt": "2026-11-12T08:44:38.895Z"
+      "tokenHash": "55334d4c5a10e9c7f96fb564c7446fe28d11edf56362d260f22a9b14e147813e",
+      "userId": "user-1794473075908-1f42f8"
     },
     {
       "id": "token-1794474969992-4nqu6",
-      "userId": "user-1794474969244-7c7af4",
-      "tokenHash": "f4d2c4786a195a3dac1d38f7c83980f18f3cecca8cc55229b2c6a8c5b75af523",
+      "createdAt": "2026-11-12T09:16:09.992Z",
       "expiresAt": "2026-11-19T09:16:09.992Z",
       "revoked": false,
-      "createdAt": "2026-11-12T09:16:09.992Z"
+      "tokenHash": "f4d2c4786a195a3dac1d38f7c83980f18f3cecca8cc55229b2c6a8c5b75af523",
+      "userId": "user-1794474969244-7c7af4"
     },
     {
       "id": "token-1794474979964-ebl3z",
-      "userId": "user-1794474979241-33c854",
-      "tokenHash": "5805e59c79224cc471cbb3e33cf2ccfef162ab8905150a0da8726c9e569605e0",
+      "createdAt": "2026-11-12T09:16:19.964Z",
       "expiresAt": "2026-11-19T09:16:19.964Z",
       "revoked": false,
-      "createdAt": "2026-11-12T09:16:19.964Z"
+      "tokenHash": "5805e59c79224cc471cbb3e33cf2ccfef162ab8905150a0da8726c9e569605e0",
+      "userId": "user-1794474979241-33c854"
+    },
+    {
+      "id": "token-1794473318131-b6mgn",
+      "createdAt": "2026-11-12T08:48:38.131Z",
+      "expiresAt": "2026-11-19T08:48:38.131Z",
+      "revoked": true,
+      "tokenHash": "8b025ec12eef4eedcfa034dbb0faedba231291a4d3b2b06ce0321fab1a989a10",
+      "userId": "user-1794321590913"
+    },
+    {
+      "id": "token-1794473437995-t9e3b",
+      "createdAt": "2026-11-12T08:50:37.995Z",
+      "expiresAt": "2026-11-19T08:50:37.995Z",
+      "revoked": false,
+      "tokenHash": "3f8a5d0534f1d67cc286d1bde5e0d7be364b54ab238b4b4eb3ea28a323372334",
+      "userId": "user-1794473436793-0d16c1"
+    },
+    {
+      "id": "token-1794473498424-kjhmq",
+      "createdAt": "2026-11-12T08:51:38.425Z",
+      "expiresAt": "2026-11-19T08:51:38.425Z",
+      "revoked": true,
+      "tokenHash": "651cae8e3b757edd1d9b7c0ae718b139385afe9bae25c403b9be29bd3798efab",
+      "userId": "user-1794473436793-0d16c1"
+    },
+    {
+      "id": "token-1794474657789-om5dx",
+      "createdAt": "2026-11-12T09:10:57.789Z",
+      "expiresAt": "2026-11-19T09:10:57.789Z",
+      "revoked": true,
+      "tokenHash": "3a35d5ffe917fc502db0df7754e51d1e2fa2dc404529e9be6576c54e3cff4edf",
+      "userId": "user-1794473436793-0d16c1"
+    },
+    {
+      "id": "token-1794475178407-cmmne",
+      "createdAt": "2026-11-12T09:19:38.407Z",
+      "expiresAt": "2026-11-19T09:19:38.407Z",
+      "revoked": true,
+      "tokenHash": "3e7ab6fe27cf5ff8b99f37d58e895fe11f2f0b089b3edc03a0c6df870277a7e9",
+      "userId": "user-1794473436793-0d16c1"
+    },
+    {
+      "id": "token-1794475215613-s8fn0",
+      "createdAt": "2026-11-12T09:20:15.613Z",
+      "expiresAt": "2026-11-19T09:20:15.613Z",
+      "revoked": true,
+      "tokenHash": "588809f484af19705c26ec09f629b556ac7708ccb602f52cadde5135207e17f0",
+      "userId": "user-1794473436793-0d16c1"
+    },
+    {
+      "id": "token-1794476118574-vi6m9",
+      "createdAt": "2026-11-12T09:35:18.574Z",
+      "expiresAt": "2026-11-19T09:35:18.574Z",
+      "revoked": false,
+      "tokenHash": "427d65fc71638ba73533aa7af40457cbfdc4c60b5fe3a7945c4431f20ea37827",
+      "userId": "user-1794473436793-0d16c1"
+    },
+    {
+      "id": "token-1794476713022-chpzi",
+      "createdAt": "2026-11-12T09:45:13.022Z",
+      "expiresAt": "2026-11-19T09:45:13.022Z",
+      "revoked": false,
+      "tokenHash": "0a91bb20578cd9be140dc86f064b4329f5af6ee4f3fed373d6f2f6fe959b10c8",
+      "userId": "user-1794473436793-0d16c1"
+    },
+    {
+      "id": "token-1794477238756-wtxxv",
+      "userId": "user-rjrajeshpal30",
+      "tokenHash": "3201f74e04424624bfecb89ba29fbf3c42e6a1f384c07ab9bcdf1f3aa56989da",
+      "expiresAt": "2026-11-19T09:53:58.756Z",
+      "revoked": false,
+      "createdAt": "2026-11-12T09:53:58.756Z"
     }
   ],
   "emailVerifications": []
