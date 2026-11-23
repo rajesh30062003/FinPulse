@@ -231,8 +231,8 @@ export const DashboardView: React.FC = () => {
           <div className="text-lg font-bold text-slate-900 dark:text-white font-mono">
             {formatINR(s.totalCurrentInvestmentsPaise)}
           </div>
-          <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-            Gain: +{formatINR(investmentGainPaise)} ({investmentGainPercent}%)
+          <div className={`text-[11px] font-medium ${investmentGainPaise >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+            {investmentGainPaise >= 0 ? 'Gain: +' : 'Loss: -'}{formatINR(Math.abs(investmentGainPaise))} ({investmentGainPercent}%)
           </div>
         </div>
 

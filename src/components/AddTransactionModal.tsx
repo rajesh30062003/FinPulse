@@ -142,8 +142,18 @@ export const AddTransactionModal: React.FC = () => {
         return;
       }
     } else {
-      // Expense mode
-      if (paymentMethod === 'Credit Card') {
+      // Expense / Investment Allocation mode
+      if (mainCategory === 'Investment') {
+        if (paymentMethod === 'Credit Card') {
+          setError('Investments cannot be funded using a credit card. Please select Bank Account or Cash.');
+          return;
+        }
+        txType = 'investment_deposit';
+        if (paymentMethod === 'Bank Account' && (!sourceAccountId || !activeAccounts.some(a => a.id === sourceAccountId))) {
+          setError('Please select an active source bank account for the investment purchase');
+          return;
+        }
+      } else if (paymentMethod === 'Credit Card') {
         txType = 'credit_card_expense';
         if (!creditCardId || !activeCards.some(c => c.id === creditCardId)) {
           setError('Please select an active credit card');
