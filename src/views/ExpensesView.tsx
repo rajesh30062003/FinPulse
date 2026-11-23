@@ -6,9 +6,13 @@ import { formatINR } from '../services/api';
 export const ExpensesView: React.FC = () => {
   const { transactions, setIsAddTxOpen, setAddTxDefaultType } = useFinancial();
 
-  const [activeFilter, setActiveFilter] = useState<'all' | 'Essential' | 'Fun' | 'Investment'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'Essential' | 'Fun'>('all');
 
-  const expenseTxs = transactions.filter(t => t.type === 'expense' || t.type === 'credit_card_expense');
+  const expenseTxs = transactions.filter(
+    t => (t.type === 'expense' || t.type === 'credit_card_expense') &&
+         t.mainCategory !== 'Investment' &&
+         t.type !== 'investment_deposit'
+  );
   const filteredTxs = activeFilter === 'all'
     ? expenseTxs
     : expenseTxs.filter(t => t.mainCategory === activeFilter);
@@ -28,7 +32,7 @@ export const ExpensesView: React.FC = () => {
             Daily Expense Management
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Categorize spending into Essential, Fun, or Investment. Cash, bank transfers, and credit card purchases update balances in real-time.
+            Categorize spending into Essential or Fun. Cash, bank transfers, and credit card purchases update balances in real-time.
           </p>
         </div>
 
@@ -81,7 +85,7 @@ export const ExpensesView: React.FC = () => {
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
-        {(['all', 'Essential', 'Fun', 'Investment'] as const).map(tab => (
+        {(['all', 'Essential', 'Fun'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveFilter(tab)}

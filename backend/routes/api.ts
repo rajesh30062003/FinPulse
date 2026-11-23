@@ -825,9 +825,9 @@ router.get('/dashboard/summary', authenticate, (req: AuthRequest, res: Response)
     .filter(t => t.type === 'income')
     .reduce((sum, t) => sum + t.amountInPaise, 0);
 
-  // Ordinary monthly expenses include cash/bank expenses and credit card purchases (NOT cc bill payments or transfers)
+  // Ordinary monthly expenses include cash/bank expenses and credit card purchases (strictly excludes cc bill payments, transfers, and investment asset allocations)
   const totalMonthlyExpensesPaise = monthTxs
-    .filter(t => t.type === 'expense' || t.type === 'credit_card_expense')
+    .filter(t => (t.type === 'expense' || t.type === 'credit_card_expense') && t.mainCategory !== 'Investment' && t.type !== 'investment_deposit')
     .reduce((sum, t) => sum + t.amountInPaise, 0);
 
   // 7. Investments total
@@ -1199,21 +1199,75 @@ router.post('/credit-cards', authenticate, async (req: AuthRequest, res: Respons
 router.put('/credit-cards/:id', authenticate, async (req: AuthRequest, res: Response) => {
   const db = getDb();
   const card = db.creditCards.find(c => c.id === req.params.id && isOwner(c.userId, req.user!.id));
-  if (!card) return res.status(404).json({ error: 'Credit card not found' });
+  if (!card) return res.status(404).json({ error: 'Credit card not found or unauthorized' });
 
-  const { cardName, bankName, cardNickname, notes, isActive, status } = req.body;
-  if (cardName) card.cardName = cardName;
-  if (bankName) card.bankName = bankName;
-  if (cardNickname) card.cardNickname = cardNickname;
+  const { cardName, bankName, cardNickname, notes, isActive, status, creditLimitInPaise } = req.body;
+  if (cardName) card.cardName = cardName.trim();
+  if (bankName) card.bankName = bankName.trim();
+  if (cardNickname) card.cardNickname = cardNickname.trim();
   if (notes !== undefined) card.notes = notes;
   if (isActive !== undefined) card.isActive = isActive;
   if (status !== undefined) card.status = status;
   else if (isActive === false) card.status = 'Closed';
   else if (isActive === true) card.status = 'Active';
 
+  if (creditLimitInPaise !== undefined) {
+    const numLimit = Math.round(Number(creditLimitInPaise));
+    if (isNaN(numLimit) || numLimit <= 0) {
+      return res.status(400).json({ error: 'Credit limit must be a positive monetary value greater than zero' });
+    }
+    if (numLimit < card.outstandingBalanceInPaise) {
+      const outstandingRupees = (card.outstandingBalanceInPaise / 100).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
+      return res.status(400).json({
+        error: `Credit limit cannot be less than current outstanding debt of ${outstandingRupees}`
+      });
+    }
+    card.creditLimitInPaise = numLimit;
+    card.availableCreditInPaise = numLimit - card.outstandingBalanceInPaise;
+  }
+
   saveDatabase();
   await persistCreditCard(card);
   res.json(card);
+});
+
+// Dedicated endpoint for updating credit card limit with safety checks
+router.put('/credit-cards/:id/limit', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const db = getDb();
+    const card = db.creditCards.find(c => c.id === req.params.id && isOwner(c.userId, req.user!.id));
+    if (!card) return res.status(404).json({ error: 'Credit card not found or unauthorized' });
+
+    const { creditLimitInPaise } = req.body;
+    if (creditLimitInPaise === undefined || creditLimitInPaise === null) {
+      return res.status(400).json({ error: 'Credit limit is required' });
+    }
+
+    const numLimit = Math.round(Number(creditLimitInPaise));
+    if (isNaN(numLimit) || numLimit <= 0) {
+      return res.status(400).json({ error: 'Credit limit must be a positive monetary value greater than zero' });
+    }
+
+    // Safety check: Cannot reduce limit below current outstanding debt
+    if (numLimit < card.outstandingBalanceInPaise) {
+      const outstandingRupees = (card.outstandingBalanceInPaise / 100).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
+      const newLimitRupees = (numLimit / 100).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
+      return res.status(400).json({
+        error: `Cannot reduce credit limit to ${newLimitRupees}. The new limit cannot be lower than the current outstanding balance of ${outstandingRupees}.`
+      });
+    }
+
+    // Atomically update limit and available credit
+    card.creditLimitInPaise = numLimit;
+    card.availableCreditInPaise = numLimit - card.outstandingBalanceInPaise;
+
+    saveDatabase();
+    await persistCreditCard(card);
+
+    return res.json(card);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to update credit limit' });
+  }
 });
 
 router.delete('/credit-cards/:id', authenticate, async (req: AuthRequest, res: Response) => {
@@ -1438,11 +1492,16 @@ router.post('/transactions', authenticate, async (req: AuthRequest, res: Respons
       // Cash payment requires neither bank account nor credit card
     }
 
+    // Ensure investments are strictly categorized as investment asset allocation, never ordinary consumption expenses
+    const resolvedType = mainCategory === 'Investment' 
+      ? 'investment_deposit' 
+      : (paymentMethod === 'Credit Card' ? 'credit_card_expense' : type);
+
     const tx: ITransaction = {
       id: `tx-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       userId: req.user!.id,
       date: date || new Date().toISOString(),
-      type: paymentMethod === 'Credit Card' ? 'credit_card_expense' : type,
+      type: resolvedType,
       mainCategory: mainCategory || 'Other',
       subCategory: customSubCategory || subCategory || 'General',
       customSubCategory,
@@ -1928,97 +1987,285 @@ router.get('/investments', authenticate, (req: AuthRequest, res: Response) => {
   const db = getDb();
   const investments = db.investments.filter(i => isOwner(i.userId, req.user!.id));
 
-  const totalInvested = investments.reduce((sum, i) => sum + i.investedAmountInPaise, 0);
-  const totalCurrent = investments.reduce((sum, i) => sum + i.currentValueInPaise, 0);
+  const totalInvested = investments.reduce((sum, i) => sum + (Number(i.investedAmountInPaise) || 0), 0);
+  const totalCurrent = investments.reduce((sum, i) => sum + (Number(i.currentValueInPaise) || 0), 0);
   const totalGainLoss = totalCurrent - totalInvested;
-  const returnPercentage = totalInvested > 0 ? ((totalGainLoss / totalInvested) * 100).toFixed(2) : '0.00';
+  const returnPercentage = totalInvested > 0 ? Number(((totalGainLoss / totalInvested) * 100).toFixed(2)) : 0;
+
+  const enrichedInvestments = investments.map(inv => {
+    const invested = Number(inv.investedAmountInPaise) || 0;
+    const current = Number(inv.currentValueInPaise) || 0;
+    const gainLoss = current - invested;
+    const retPct = invested > 0 ? Number(((gainLoss / invested) * 100).toFixed(2)) : 0;
+    return {
+      ...inv,
+      gainLossInPaise: gainLoss,
+      returnPercentage: retPct
+    };
+  });
 
   res.json({
-    investments,
+    investments: enrichedInvestments,
     totalInvestedInPaise: totalInvested,
     totalCurrentValueInPaise: totalCurrent,
     totalGainLossInPaise: totalGainLoss,
-    returnPercentage: Number(returnPercentage)
+    returnPercentage
   });
 });
 
 router.post('/investments', authenticate, async (req: AuthRequest, res: Response) => {
-  const db = getDb();
-  const { name, type, investedAmountInPaise, currentValueInPaise, investmentDate, expectedReturnRate, riskLevel, notes, sourceAccountId } = req.body;
+  try {
+    const db = getDb();
+    const {
+      name,
+      type,
+      investedAmountInPaise,
+      currentValueInPaise,
+      units,
+      buyPriceInPaise,
+      currentPriceInPaise,
+      investmentDate,
+      expectedReturnRate,
+      riskLevel,
+      notes,
+      sourceAccountId
+    } = req.body;
 
-  if (!name || !type || !investedAmountInPaise) {
-    return res.status(400).json({ error: 'Name, type, and invested amount are required' });
-  }
-
-  const newInv = {
-    id: `inv-${Date.now()}`,
-    userId: req.user!.id,
-    name,
-    type,
-    investedAmountInPaise: Number(investedAmountInPaise),
-    currentValueInPaise: Number(currentValueInPaise || investedAmountInPaise),
-    investmentDate: investmentDate || new Date().toISOString(),
-    expectedReturnRate: expectedReturnRate ? Number(expectedReturnRate) : undefined,
-    riskLevel: riskLevel || 'Moderate Risk',
-    notes
-  };
-
-  db.investments.push(newInv);
-
-  // If funded from a bank account, record the transaction and deduct bank balance
-  if (sourceAccountId) {
-    const bank = db.bankAccounts.find(b => b.id === sourceAccountId && isOwner(b.userId, req.user!.id));
-    if (!bank) return res.status(404).json({ error: 'Source bank account not found or unauthorized' });
-    if (bank.isActive === false || bank.status === 'Closed') {
-      return res.status(400).json({ error: 'Cannot fund investment using a closed bank account' });
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'Asset name is required' });
     }
-    const tx: ITransaction = {
-      id: `tx-inv-${Date.now()}`,
-      userId: req.user!.id,
-      date: new Date().toISOString(),
-      type: 'investment_deposit',
-      mainCategory: 'Investment',
-      subCategory: type,
-      amountInPaise: Number(investedAmountInPaise),
-      paymentMethod: 'Bank Account',
-      sourceAccountId,
-      description: `Investment purchase: ${name}`,
-      status: 'Completed',
-      createdAt: new Date().toISOString()
-    };
-    LedgerService.applyTransaction(tx);
-    db.transactions.unshift(tx);
-    await persistTransaction(tx);
-    await persistBankAccount(bank);
-  }
+    if (!type) {
+      return res.status(400).json({ error: 'Investment type is required' });
+    }
 
-  saveDatabase();
-  await persistInvestment(newInv);
-  res.status(201).json(newInv);
+    const parsedUnits = units !== undefined && units !== null && !isNaN(Number(units)) ? Number(units) : undefined;
+    const parsedBuyPrice = buyPriceInPaise !== undefined && buyPriceInPaise !== null && !isNaN(Number(buyPriceInPaise)) ? Math.round(Number(buyPriceInPaise)) : undefined;
+    const parsedCurrPrice = currentPriceInPaise !== undefined && currentPriceInPaise !== null && !isNaN(Number(currentPriceInPaise)) ? Math.round(Number(currentPriceInPaise)) : undefined;
+
+    let invAmount = Number(investedAmountInPaise);
+    if ((isNaN(invAmount) || invAmount <= 0) && parsedUnits && parsedBuyPrice) {
+      invAmount = Math.round(parsedUnits * parsedBuyPrice);
+    }
+    if (isNaN(invAmount) || invAmount <= 0) {
+      return res.status(400).json({ error: 'Invested principal must be a positive number greater than zero' });
+    }
+
+    let currVal = currentValueInPaise !== undefined && currentValueInPaise !== null ? Number(currentValueInPaise) : undefined;
+    if (currVal === undefined && parsedUnits && parsedCurrPrice) {
+      currVal = Math.round(parsedUnits * parsedCurrPrice);
+    }
+    if (currVal === undefined) {
+      currVal = invAmount;
+    }
+    if (isNaN(currVal) || currVal < 0) {
+      return res.status(400).json({ error: 'Current market value must be a non-negative number' });
+    }
+
+    const newInv: IInvestment = {
+      id: `inv-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      userId: req.user!.id,
+      name: name.trim(),
+      type,
+      investedAmountInPaise: Math.round(invAmount),
+      currentValueInPaise: Math.round(currVal),
+      units: parsedUnits,
+      buyPriceInPaise: parsedBuyPrice,
+      currentPriceInPaise: parsedCurrPrice,
+      investmentDate: investmentDate || new Date().toISOString(),
+      expectedReturnRate: expectedReturnRate !== undefined && expectedReturnRate !== null && !isNaN(Number(expectedReturnRate)) ? Number(expectedReturnRate) : undefined,
+      riskLevel: riskLevel || 'Moderate Risk',
+      notes: notes ? String(notes).trim() : undefined
+    };
+
+    db.investments.push(newInv);
+
+    // If funded from a bank account, record the asset allocation transaction and deduct bank balance
+    if (sourceAccountId) {
+      const bank = db.bankAccounts.find(b => b.id === sourceAccountId && isOwner(b.userId, req.user!.id));
+      if (!bank) return res.status(404).json({ error: 'Source bank account not found or unauthorized' });
+      if (bank.isActive === false || bank.status === 'Closed') {
+        return res.status(400).json({ error: 'Cannot fund investment using a closed bank account' });
+      }
+      const tx: ITransaction = {
+        id: `tx-inv-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        userId: req.user!.id,
+        date: newInv.investmentDate,
+        type: 'investment_deposit',
+        mainCategory: 'Investment',
+        subCategory: type,
+        amountInPaise: newInv.investedAmountInPaise,
+        paymentMethod: 'Bank Account',
+        sourceAccountId,
+        description: `Investment asset purchase: ${newInv.name}`,
+        status: 'Completed',
+        createdAt: new Date().toISOString()
+      };
+      LedgerService.applyTransaction(tx);
+      db.transactions.unshift(tx);
+      await persistTransaction(tx);
+      await persistBankAccount(bank);
+    }
+
+    saveDatabase();
+    await persistInvestment(newInv);
+
+    const gainLoss = newInv.currentValueInPaise - newInv.investedAmountInPaise;
+    const retPct = newInv.investedAmountInPaise > 0
+      ? Number(((gainLoss / newInv.investedAmountInPaise) * 100).toFixed(2))
+      : 0;
+
+    return res.status(201).json({
+      ...newInv,
+      gainLossInPaise: gainLoss,
+      returnPercentage: retPct
+    });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Failed to create investment' });
+  }
 });
 
-router.put('/investments/:id/valuation', authenticate, async (req: AuthRequest, res: Response) => {
-  const db = getDb();
-  const inv = db.investments.find(i => i.id === req.params.id && isOwner(i.userId, req.user!.id));
-  if (!inv) return res.status(404).json({ error: 'Investment not found' });
+// Full update of an existing investment holding
+router.put('/investments/:id', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const db = getDb();
+    const inv = db.investments.find(i => i.id === req.params.id && isOwner(i.userId, req.user!.id));
+    if (!inv) return res.status(404).json({ error: 'Investment not found or unauthorized' });
 
-  const { currentValueInPaise } = req.body;
-  if (currentValueInPaise !== undefined) {
-    inv.currentValueInPaise = Number(currentValueInPaise);
+    const {
+      name,
+      type,
+      investedAmountInPaise,
+      currentValueInPaise,
+      units,
+      buyPriceInPaise,
+      currentPriceInPaise,
+      investmentDate,
+      expectedReturnRate,
+      riskLevel,
+      notes
+    } = req.body;
+
+    if (name !== undefined) {
+      if (typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ error: 'Asset name cannot be empty' });
+      }
+      inv.name = name.trim();
+    }
+    if (type !== undefined) {
+      inv.type = type;
+    }
+
+    if (units !== undefined) {
+      inv.units = units !== null && !isNaN(Number(units)) && Number(units) >= 0 ? Number(units) : undefined;
+    }
+    if (buyPriceInPaise !== undefined) {
+      inv.buyPriceInPaise = buyPriceInPaise !== null && !isNaN(Number(buyPriceInPaise)) && Number(buyPriceInPaise) >= 0 ? Math.round(Number(buyPriceInPaise)) : undefined;
+    }
+    if (currentPriceInPaise !== undefined) {
+      inv.currentPriceInPaise = currentPriceInPaise !== null && !isNaN(Number(currentPriceInPaise)) && Number(currentPriceInPaise) >= 0 ? Math.round(Number(currentPriceInPaise)) : undefined;
+    }
+
+    if (investedAmountInPaise !== undefined) {
+      const numInv = Math.round(Number(investedAmountInPaise));
+      if (isNaN(numInv) || numInv < 0) {
+        return res.status(400).json({ error: 'Invested principal must be a non-negative number' });
+      }
+      inv.investedAmountInPaise = numInv;
+    } else if ((units !== undefined || buyPriceInPaise !== undefined) && inv.units && inv.buyPriceInPaise) {
+      inv.investedAmountInPaise = Math.round(inv.units * inv.buyPriceInPaise);
+    }
+
+    if (currentValueInPaise !== undefined) {
+      const numCurr = Math.round(Number(currentValueInPaise));
+      if (isNaN(numCurr) || numCurr < 0) {
+        return res.status(400).json({ error: 'Current market value must be a non-negative number' });
+      }
+      inv.currentValueInPaise = numCurr;
+      if (inv.units && inv.units > 0) {
+        inv.currentPriceInPaise = Math.round(numCurr / inv.units);
+      }
+    } else if ((units !== undefined || currentPriceInPaise !== undefined) && inv.units && inv.currentPriceInPaise) {
+      inv.currentValueInPaise = Math.round(inv.units * inv.currentPriceInPaise);
+    }
+
+    if (investmentDate !== undefined) inv.investmentDate = investmentDate;
+    if (expectedReturnRate !== undefined) {
+      inv.expectedReturnRate = expectedReturnRate !== null && !isNaN(Number(expectedReturnRate)) ? Number(expectedReturnRate) : undefined;
+    }
+    if (riskLevel !== undefined) inv.riskLevel = riskLevel;
+    if (notes !== undefined) inv.notes = notes ? String(notes).trim() : undefined;
+
     saveDatabase();
     await persistInvestment(inv);
+
+    const gainLoss = inv.currentValueInPaise - inv.investedAmountInPaise;
+    const retPct = inv.investedAmountInPaise > 0
+      ? Number(((gainLoss / inv.investedAmountInPaise) * 100).toFixed(2))
+      : 0;
+
+    return res.json({
+      ...inv,
+      gainLossInPaise: gainLoss,
+      returnPercentage: retPct
+    });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Failed to update investment' });
   }
-  res.json(inv);
+});
+
+// Dedicated endpoint to update current market valuation
+router.put('/investments/:id/valuation', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const db = getDb();
+    const inv = db.investments.find(i => i.id === req.params.id && isOwner(i.userId, req.user!.id));
+    if (!inv) return res.status(404).json({ error: 'Investment not found or unauthorized' });
+
+    const { currentValueInPaise } = req.body;
+    if (currentValueInPaise === undefined || currentValueInPaise === null) {
+      return res.status(400).json({ error: 'Current market value is required' });
+    }
+
+    const numVal = Math.round(Number(currentValueInPaise));
+    if (isNaN(numVal) || numVal < 0) {
+      return res.status(400).json({ error: 'Current valuation must be a non-negative number' });
+    }
+
+    inv.currentValueInPaise = numVal;
+    if (inv.units && inv.units > 0) {
+      inv.currentPriceInPaise = Math.round(numVal / inv.units);
+    }
+
+    saveDatabase();
+    await persistInvestment(inv);
+
+    const gainLoss = inv.currentValueInPaise - inv.investedAmountInPaise;
+    const retPct = inv.investedAmountInPaise > 0
+      ? Number(((gainLoss / inv.investedAmountInPaise) * 100).toFixed(2))
+      : 0;
+
+    return res.json({
+      ...inv,
+      gainLossInPaise: gainLoss,
+      returnPercentage: retPct
+    });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Failed to update valuation' });
+  }
 });
 
 router.delete('/investments/:id', authenticate, async (req: AuthRequest, res: Response) => {
-  const db = getDb();
-  const idx = db.investments.findIndex(i => i.id === req.params.id && isOwner(i.userId, req.user!.id));
-  if (idx === -1) return res.status(404).json({ error: 'Investment not found' });
-  db.investments.splice(idx, 1);
-  saveDatabase();
-  await deleteInvestment(req.params.id, req.user!.id);
-  res.json({ message: 'Investment removed' });
+  try {
+    const db = getDb();
+    const idx = db.investments.findIndex(i => i.id === req.params.id && isOwner(i.userId, req.user!.id));
+    if (idx === -1) return res.status(404).json({ error: 'Investment not found or unauthorized' });
+
+    const deletedInv = db.investments.splice(idx, 1)[0];
+    saveDatabase();
+    await deleteInvestment(req.params.id, req.user!.id);
+    return res.json({ message: 'Investment asset record removed successfully', id: req.params.id, investment: deletedInv });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to delete investment' });
+  }
 });
 
 // Fixed Deposits

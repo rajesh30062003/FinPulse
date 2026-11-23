@@ -33,8 +33,12 @@ export const AnalyticsView: React.FC = () => {
   const { transactions, accounts, cash, budgetData, investmentsData, summary } = useFinancial();
   const [period, setPeriod] = useState<'monthly' | 'weekly' | 'yearly'>('monthly');
 
-  // 1. Expense Distribution Data
-  const expenseTxs = transactions.filter(t => t.type === 'expense' || t.type === 'credit_card_expense');
+  // 1. Expense Distribution Data (Strictly excludes investments)
+  const expenseTxs = transactions.filter(
+    t => (t.type === 'expense' || t.type === 'credit_card_expense') &&
+         t.mainCategory !== 'Investment' &&
+         t.type !== 'investment_deposit'
+  );
   const catTotals: Record<string, number> = {};
   expenseTxs.forEach(t => {
     const key = t.subCategory || t.mainCategory;
@@ -82,13 +86,13 @@ export const AnalyticsView: React.FC = () => {
     { name: 'Physical Cash', Balance: (cash?.balanceInPaise || 0) / 100 }
   ];
 
-  // 6. Budget Utilization Donut Data
+  // 6. Budget Utilization Donut Data (Based purely on eligible expenses vs spending budget)
   const bAlloc = budgetData?.allocation;
-  const totalAllocatedPaise = bAlloc
-    ? bAlloc.essentialBudgetInPaise + bAlloc.funBudgetInPaise + bAlloc.investmentBudgetInPaise
-    : 3000000;
-  const spentPaise = expensePaise;
-  const remainingPaise = Math.max(0, totalAllocatedPaise - spentPaise);
+  const totalSpendingBudgetPaise = budgetData?.totalBudgetPaise ?? (
+    bAlloc ? bAlloc.essentialBudgetInPaise + bAlloc.funBudgetInPaise : 2200000
+  );
+  const spentPaise = budgetData?.eligibleExpensesPaise ?? expensePaise;
+  const remainingPaise = Math.max(0, totalSpendingBudgetPaise - spentPaise);
 
   const budgetDonutData = [
     { name: 'Spent Amount', value: spentPaise / 100 },

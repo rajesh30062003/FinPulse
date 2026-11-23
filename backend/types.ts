@@ -141,6 +141,9 @@ export interface IInvestment {
     | 'Other Investments';
   investedAmountInPaise: number;
   currentValueInPaise: number;
+  units?: number;
+  buyPriceInPaise?: number;
+  currentPriceInPaise?: number;
   investmentDate: string;
   durationMonths?: number;
   maturityDate?: string;

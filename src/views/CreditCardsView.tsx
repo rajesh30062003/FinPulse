@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CreditCard, Plus, CheckCircle2, ShieldCheck, AlertCircle, ArrowUpRight, RotateCcw, Trash2 } from 'lucide-react';
+import { CreditCard, Plus, CheckCircle2, ShieldCheck, AlertCircle, ArrowUpRight, RotateCcw, Trash2, Sliders, X } from 'lucide-react';
 import { useFinancial } from '../context/FinancialContext';
 import { api, formatINR } from '../services/api';
 import { ICreditCard } from '../types';
@@ -21,6 +21,41 @@ export const CreditCardsView: React.FC = () => {
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+
+  // Credit Limit Edit State
+  const [cardToEditLimit, setCardToEditLimit] = useState<ICreditCard | null>(null);
+  const [newLimitRupees, setNewLimitRupees] = useState('');
+  const [editLimitLoading, setEditLimitLoading] = useState(false);
+  const [editLimitError, setEditLimitError] = useState<string | null>(null);
+
+  const handleSaveCreditLimit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cardToEditLimit) return;
+    const numRupees = parseFloat(newLimitRupees);
+    if (isNaN(numRupees) || numRupees <= 0) {
+      setEditLimitError('Please enter a valid positive credit limit amount');
+      return;
+    }
+    const newLimitPaise = Math.round(numRupees * 100);
+    if (newLimitPaise < cardToEditLimit.outstandingBalanceInPaise) {
+      setEditLimitError(
+        `Credit limit cannot be reduced below the current outstanding balance (${formatINR(cardToEditLimit.outstandingBalanceInPaise)})`
+      );
+      return;
+    }
+    try {
+      setEditLimitLoading(true);
+      setEditLimitError(null);
+      await api.updateCreditCardLimit(cardToEditLimit.id, newLimitPaise);
+      await refreshAll();
+      setMsg(`Credit limit for ${cardToEditLimit.cardName} (•••• ${cardToEditLimit.lastFourDigits}) updated to ${formatINR(newLimitPaise)}.`);
+      setCardToEditLimit(null);
+    } catch (err: any) {
+      setEditLimitError(err.message || 'Failed to update credit limit');
+    } finally {
+      setEditLimitLoading(false);
+    }
+  };
 
   const handleCreateCard = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -250,9 +285,22 @@ export const CreditCardsView: React.FC = () => {
                     </button>
                     <button
                       type="button"
+                      onClick={() => {
+                        setCardToEditLimit(card);
+                        setNewLimitRupees((card.creditLimitInPaise / 100).toString());
+                        setEditLimitError(null);
+                      }}
+                      title="Adjust Credit Limit"
+                      className="px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors flex items-center justify-center gap-1"
+                    >
+                      <Sliders className="w-3.5 h-3.5 text-blue-500" />
+                      <span>Limit</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setCardToClose(card)}
                       title="Close this card"
-                      className="px-3 py-2 rounded-lg border border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 font-semibold text-xs transition-colors flex items-center justify-center gap-1"
+                      className="px-2.5 py-2 rounded-lg border border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 font-semibold text-xs transition-colors flex items-center justify-center gap-1"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       <span>Close</span>
@@ -506,6 +554,146 @@ export const CreditCardsView: React.FC = () => {
                 {isClosing ? 'Closing Card...' : 'Confirm Close Card'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Credit Limit Modal */}
+      {cardToEditLimit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-blue-600" />
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">Modify Credit Limit</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCardToEditLimit(null)}
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Card Information Header */}
+            <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-slate-400 block">{cardToEditLimit.bankName}</span>
+                <span className="font-bold text-xs text-slate-900 dark:text-white">{cardToEditLimit.cardName}</span>
+                <span className="text-[11px] font-mono text-slate-400 block">•••• •••• •••• {cardToEditLimit.lastFourDigits}</span>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] text-slate-400 block">Current Outstanding</span>
+                <span className="font-mono font-bold text-xs text-red-600 dark:text-red-400">
+                  {formatINR(cardToEditLimit.outstandingBalanceInPaise)}
+                </span>
+              </div>
+            </div>
+
+            {editLimitError && (
+              <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{editLimitError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveCreditLimit} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800">
+                <div>
+                  <span className="text-slate-400 text-[11px] block">Current Limit:</span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-white text-sm">
+                    {formatINR(cardToEditLimit.creditLimitInPaise)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[11px] block">Available Credit:</span>
+                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-sm">
+                    {formatINR(cardToEditLimit.availableCreditInPaise)}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  New Credit Limit (₹ Rupees)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-slate-400 font-mono">₹</span>
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    min={cardToEditLimit.outstandingBalanceInPaise > 0 ? (cardToEditLimit.outstandingBalanceInPaise / 100) : 1}
+                    value={newLimitRupees}
+                    onChange={e => {
+                      setNewLimitRupees(e.target.value);
+                      setEditLimitError(null);
+                    }}
+                    placeholder="e.g. 150000"
+                    className="w-full pl-7 pr-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500"
+                  />
+                </div>
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  Minimum allowed limit: {formatINR(cardToEditLimit.outstandingBalanceInPaise)} (equal to current outstanding balance)
+                </span>
+              </div>
+
+              {/* Dynamic preview of Available Credit & Utilization */}
+              {(() => {
+                const parsedVal = parseFloat(newLimitRupees);
+                if (!isNaN(parsedVal) && parsedVal > 0) {
+                  const previewLimitPaise = Math.round(parsedVal * 100);
+                  const previewAvailablePaise = Math.max(0, previewLimitPaise - cardToEditLimit.outstandingBalanceInPaise);
+                  const previewUtil = previewLimitPaise > 0
+                    ? Math.round((cardToEditLimit.outstandingBalanceInPaise / previewLimitPaise) * 100)
+                    : 0;
+                  const isUnderDebt = previewLimitPaise < cardToEditLimit.outstandingBalanceInPaise;
+
+                  return (
+                    <div className={`p-3 rounded-lg border text-[11px] space-y-1.5 ${
+                      isUnderDebt
+                        ? 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'
+                        : 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300'
+                    }`}>
+                      <div className="font-semibold">Projected Impact:</div>
+                      <div className="flex justify-between">
+                        <span>New Available Credit:</span>
+                        <strong className="font-mono">{formatINR(previewAvailablePaise)}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>New Credit Utilization:</span>
+                        <strong className="font-mono">{previewUtil}%</strong>
+                      </div>
+                      {isUnderDebt && (
+                        <div className="text-red-600 dark:text-red-400 font-semibold pt-1 border-t border-red-200 dark:border-red-800/60">
+                          ⚠️ Limit cannot be reduced below outstanding debt.
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCardToEditLimit(null)}
+                  disabled={editLimitLoading}
+                  className="flex-1 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editLimitLoading || (parseFloat(newLimitRupees) * 100 < cardToEditLimit.outstandingBalanceInPaise)}
+                  className="flex-1 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  {editLimitLoading ? 'Updating Limit...' : 'Save Credit Limit'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

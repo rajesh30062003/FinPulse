@@ -398,6 +398,13 @@ export const api = {
     });
   },
 
+  async updateCreditCardLimit(id: string, creditLimitInPaise: number) {
+    return apiRequest(`/credit-cards/${id}/limit`, {
+      method: 'PUT',
+      body: JSON.stringify({ creditLimitInPaise })
+    });
+  },
+
   async closeCreditCard(id: string) {
     return apiRequest(`/credit-cards/${id}/close`, {
       method: 'POST'
@@ -477,6 +484,13 @@ export const api = {
   async createInvestment(data: any) {
     return apiRequest('/investments', {
       method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async updateInvestment(id: string, data: any) {
+    return apiRequest(`/investments/${id}`, {
+      method: 'PUT',
       body: JSON.stringify(data)
     });
   },
